@@ -53,7 +53,8 @@ Both modes write a row to `usage_events` for every call. Adapters live in `src/l
 1. Create a Turso database and token: `turso db create merqado` then `turso db tokens create merqado`.
 2. In Render, create a Blueprint from this repo and fill in `TURSO_DATABASE_URL`, `TURSO_AUTH_TOKEN`, and `MERQADO_SECRET_KEY` (32 random bytes, base64). Names are case-sensitive. Keep the key safe: losing it makes saved credentials unreadable. Set `APP_URL` if you use a custom domain; otherwise Render's URL is used for SSO redirects.
    Build command: `npm ci && npm run build`. Start command: `npm run start`.
-3. Migrations run in the pre-deploy step (`npm run db:migrate`), which needs a paid Render instance type.
+3. `npm run start` applies migrations before starting the server (`scripts/bootstrap.ts`), so no pre-deploy step is needed.
+4. Google sign-in without a terminal: set `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `SSO_ADMIN_EMAIL` and optionally `SSO_FIRM_NAME` / `SSO_DOMAINS` / `SSO_ADMIN_NAME`. Each start creates or updates that firm's Google SSO connection and makes the email a firm admin.
 
 ## Scripts
 

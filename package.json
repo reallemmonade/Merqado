@@ -5,13 +5,13 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "start": "next start -p ${PORT:-3000}",
+    "start": "tsx scripts/bootstrap.ts && next start -p ${PORT:-3000}",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "db:generate": "drizzle-kit generate",
-    "db:migrate": "tsx scripts/migrate.ts",
-    "db:seed": "tsx scripts/seed.ts",
-    "sso:add": "tsx scripts/add-sso.ts"
+    "db:migrate": "tsx --env-file-if-exists=.env.local scripts/migrate.ts",
+    "db:seed": "tsx --env-file-if-exists=.env.local scripts/seed.ts",
+    "sso:add": "tsx --env-file-if-exists=.env.local scripts/add-sso.ts"
   },
   "repository": {
     "type": "git",
