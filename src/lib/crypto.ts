@@ -1,13 +1,18 @@
-import { createCipheriv, createDecipheriv, randomBytes } from "node:crypto";
+import { createCipheriv, createDecipheriv, createHash, randomBytes } from "node:crypto";
 
 const VERSION = "v1";
 
+/**
+ * MERQADO_SECRET_KEY is ideally 32 random bytes in base64. Any other random string of at
+ * least 32 characters (for example one from Render's "Generate" button) is accepted and
+ * stretched to 32 bytes with SHA-256, so the exact format doesn't trip people up.
+ */
 function key(): Buffer {
-  const raw = process.env.MERQADO_SECRET_KEY;
+  const raw = process.env.MERQADO_SECRET_KEY?.trim();
   if (!raw) throw new Error("MERQADO_SECRET_KEY is not set");
-  const buf = Buffer.from(raw, "base64");
-  if (buf.length !== 32) throw new Error("MERQADO_SECRET_KEY must be 32 bytes, base64-encoded");
-  return buf;
+  if (/^[A-Za-z0-9+/]{43}=$/.test(raw)) return Buffer.from(raw, "base64");
+  if (raw.length < 32) throw new Error("MERQADO_SECRET_KEY must be at least 32 random characters");
+  return createHash("sha256").update(raw, "utf8").digest();
 }
 
 /** AES-256-GCM. Output: v1.<iv>.<tag>.<ciphertext>, each part base64url. */
