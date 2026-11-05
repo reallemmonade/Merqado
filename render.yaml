@@ -5,7 +5,6 @@ services:
     runtime: node
     plan: starter
     buildCommand: npm ci && npm run build
-    preDeployCommand: npm run db:migrate
     startCommand: npm run start
     healthCheckPath: /
     envVars:
@@ -20,6 +19,15 @@ services:
         sync: false
       # Only needed for firms on managed AI billing.
       - key: ANTHROPIC_API_KEY
+        sync: false
+      # Google sign-in, set up automatically on start (see scripts/bootstrap.ts).
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: GOOGLE_CLIENT_SECRET
+        sync: false
+      - key: SSO_ADMIN_EMAIL
+        sync: false
+      - key: SSO_FIRM_NAME
         sync: false
       # Set when using a custom domain; SSO redirects use it.
       - key: APP_URL
