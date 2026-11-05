@@ -208,3 +208,45 @@ export const usageEvents = sqliteTable(
   },
   (t) => [index("usage_firm_time").on(t.firmId, t.createdAt)],
 );
+
+/**
+ * A firm's identity provider. OIDC covers Microsoft Entra ID, Google Workspace, Okta,
+ * Auth0, OneLogin and most others. People sign in with their work email; the domain
+ * picks the connection.
+ */
+export const ssoConnections = sqliteTable("sso_connections", {
+  id: id(),
+  firmId: text("firm_id")
+    .notNull()
+    .references(() => firms.id, { onDelete: "cascade" }),
+  label: text("label").notNull(),
+  protocol: text("protocol", { enum: ["oidc"] }).notNull().default("oidc"),
+  issuer: text("issuer").notNull(),
+  clientId: text("client_id").notNull(),
+  encryptedClientSecret: text("encrypted_client_secret").notNull(),
+  /** Lowercase, comma-separated, e.g. "acme.com,acme.co.uk". */
+  emailDomains: text("email_domains").notNull(),
+  /** Title given to people the first time they sign in. Null disables auto-provisioning. */
+  defaultFirmRoleId: text("default_firm_role_id").references(() => firmRoles.id),
+  enabled: integer("enabled", { mode: "boolean" }).notNull().default(true),
+  createdAt: createdAt(),
+});
+
+/** Only the SHA-256 of the session token is stored, so a database leak can't be replayed. */
+export const sessions = sqliteTable(
+  "sessions",
+  {
+    id: id(),
+    tokenHash: text("token_hash").notNull().unique(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    firmId: text("firm_id")
+      .notNull()
+      .references(() => firms.id, { onDelete: "cascade" }),
+    ssoConnectionId: text("sso_connection_id"),
+    expiresAt: integer("expires_at", { mode: "timestamp" }).notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => [index("sessions_user").on(t.userId)],
+);

@@ -20,11 +20,24 @@ npm run db:seed
 DEV_USER_EMAIL=manager@demo.test npm run dev
 ```
 
-Seeded users (all fictional): `partner@`, `manager@`, `consultant@`, `associate@demo.test`. Sign-in is a dev stub until SSO is added; it is disabled in production.
+Seeded users (all fictional): `partner@`, `manager@`, `consultant@`, `associate@demo.test`. `DEV_USER_EMAIL` skips SSO in development only; production always requires SSO.
 
 ## How the pieces fit
 
 **Personas.** Every firm maps its own titles (`firm_roles`) onto four archetypes: associate, consultant, manager, partner. The archetype picks the default home view (`src/lib/roles.ts`). Permissions come from per-engagement access (`viewer`, `editor`, `lead`), never from title.
+
+**Sign-in: each firm's own SSO.** People enter their work email; its domain picks the firm's OpenID Connect connection (Microsoft Entra ID, Google Workspace, Okta, Auth0, OneLogin and most others). The flow uses PKCE, state and nonce checks, and the returned email must be on one of the connection's domains. First-time users are created with the firm's default title unless auto-provisioning is off. Sessions last 12 hours and are stored as SHA-256 hashes (`src/lib/auth`).
+
+Set up a firm (creates it if new, and makes the given person an admin):
+
+```bash
+npm run sso:add -- --firm "Acme Consulting" --slug acme \
+  --issuer https://login.microsoftonline.com/<tenant-id>/v2.0 \
+  --client-id <app-id> --client-secret <secret> \
+  --domains acme.com --admin-email jane@acme.com --admin-name "Jane Doe"
+```
+
+In the firm's identity provider, register a web app with redirect URI `https://<your-domain>/api/auth/callback` and scopes `openid email profile`.
 
 **AI: the firm's model or ours.** A firm connects its own model account (`ai_providers`), or uses Merqado's. `firms.ai_billing_mode` decides who pays:
 
@@ -38,7 +51,8 @@ Both modes write a row to `usage_events` for every call. Adapters live in `src/l
 ## Deploying to Render
 
 1. Create a Turso database and token: `turso db create merqado` then `turso db tokens create merqado`.
-2. In Render, create a Blueprint from this repo and fill in `TURSO_DATABASE_URL`, `TURSO_AUTH_TOKEN`, and `MERQADO_SECRET_KEY` (32 random bytes, base64). Keep that key safe: losing it makes saved credentials unreadable.
+2. In Render, create a Blueprint from this repo and fill in `TURSO_DATABASE_URL`, `TURSO_AUTH_TOKEN`, and `MERQADO_SECRET_KEY` (32 random bytes, base64). Names are case-sensitive. Keep the key safe: losing it makes saved credentials unreadable. Set `APP_URL` if you use a custom domain; otherwise Render's URL is used for SSO redirects.
+   Build command: `npm ci && npm run build`. Start command: `npm run start`.
 3. Migrations run in the pre-deploy step (`npm run db:migrate`), which needs a paid Render instance type.
 
 ## Scripts
@@ -52,7 +66,8 @@ Both modes write a row to `usage_events` for every call. Adapters live in `src/l
 | `npm run db:generate` | Create a migration from `src/db/schema.ts` changes |
 | `npm run db:migrate` | Apply migrations |
 | `npm run db:seed` | Load the demo firm |
+| `npm run sso:add` | Add a firm's SSO connection |
 
 ## Not built yet
 
-SSO and real auth, admin screens for connecting AI and storage, document parsing and retrieval for Ask, findings editing, the storyline board, slide generation, SharePoint and Google Drive connectors.
+SAML and SCIM (user sync), admin screens for connecting AI and storage, document parsing and retrieval for Ask, findings editing, the storyline board, slide generation, SharePoint and Google Drive connectors.

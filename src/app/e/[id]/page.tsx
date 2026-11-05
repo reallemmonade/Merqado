@@ -1,4 +1,4 @@
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { count, desc, eq } from "drizzle-orm";
 import { getDb } from "@/db/client";
 import { engagementMembers, engagements, findings, sources } from "@/db/schema";
@@ -20,7 +20,7 @@ export default async function EngagementPage({ params }: { params: Promise<{ id:
   const { id } = await params;
   const db = getDb();
   const user = await getSessionUser(db);
-  if (!user) notFound();
+  if (!user) redirect(`/login?returnTo=/e/${id}`);
   const membership = await getEngagementAccess(db, user, id);
   if (!membership || !can(membership.access, "read")) notFound();
   const { engagement } = membership;

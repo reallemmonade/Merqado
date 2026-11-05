@@ -1,5 +1,7 @@
 import { and, eq } from "drizzle-orm";
+import { cookies } from "next/headers";
 import type { DB } from "@/db/client";
+import { findSession, SESSION_COOKIE } from "@/lib/auth/session";
 import { engagementMembers, engagements, firmMembers, firmRoles, users, type AccessLevel, type Archetype } from "@/db/schema";
 
 export interface SessionUser {
@@ -13,14 +15,20 @@ export interface SessionUser {
 }
 
 /**
- * Temporary: signs in as DEV_USER_EMAIL outside production.
- * Replace with SSO (SAML/OIDC per firm) before any client data goes in.
+ * The signed-in person, from their SSO session cookie.
+ * Outside production, DEV_USER_EMAIL signs in a seeded user without SSO.
  */
 export async function getSessionUser(db: DB): Promise<SessionUser | null> {
+  const jar = await cookies();
+  const session = await findSession(db, jar.get(SESSION_COOKIE)?.value);
+  if (session) return loadUser(db, eq(users.id, session.userId), session.firmId);
+
   if (process.env.NODE_ENV === "production") return null;
   const email = process.env.DEV_USER_EMAIL;
-  if (!email) return null;
+  return email ? loadUser(db, eq(users.email, email.toLowerCase())) : null;
+}
 
+async function loadUser(db: DB, who: ReturnType<typeof eq>, firmId?: string): Promise<SessionUser | null> {
   const [row] = await db
     .select({
       id: users.id,
@@ -34,7 +42,7 @@ export async function getSessionUser(db: DB): Promise<SessionUser | null> {
     .from(users)
     .innerJoin(firmMembers, eq(firmMembers.userId, users.id))
     .innerJoin(firmRoles, eq(firmRoles.id, firmMembers.firmRoleId))
-    .where(eq(users.email, email))
+    .where(firmId ? and(who, eq(firmMembers.firmId, firmId)) : who)
     .limit(1);
   return row ?? null;
 }
