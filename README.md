@@ -54,7 +54,10 @@ Both modes write a row to `usage_events` for every call. Adapters live in `src/l
 2. In Render, create a Blueprint from this repo and fill in `TURSO_DATABASE_URL`, `TURSO_AUTH_TOKEN`, and `MERQADO_SECRET_KEY` (32 random bytes, base64). Names are case-sensitive. Keep the key safe: losing it makes saved credentials unreadable. Set `APP_URL` if you use a custom domain; otherwise Render's URL is used for SSO redirects.
    Build command: `npm ci && npm run build`. Start command: `npm run start`.
 3. `npm run start` applies migrations before starting the server (`scripts/bootstrap.ts`), so no pre-deploy step is needed.
-4. Google sign-in without a terminal: set `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `SSO_ADMIN_EMAIL` and optionally `SSO_FIRM_NAME` / `SSO_DOMAINS` / `SSO_ADMIN_NAME`. Each start creates or updates that firm's Google SSO connection and makes the email a firm admin.
+4. Sign-in. Merqado has two ways in:
+   - **Continue with Google / Microsoft** (the default for client firms). Merqado owns one Google OAuth client (External audience) and one multi-tenant Microsoft Entra app, set with `GOOGLE_CLIENT_ID`/`GOOGLE_CLIENT_SECRET` and `MICROSOFT_CLIENT_ID`/`MICROSOFT_CLIENT_SECRET`. Redirect URI for both: `<APP_URL>/api/auth/callback`. A firm claims its email domains (`firm_domains`); anyone with a verified work account on a claimed domain can sign in and gets the default title. Personal Gmail/Outlook accounts are rejected. Microsoft identity comes from the UPN, not the editable `email` claim.
+   - **The firm's own identity provider** (Okta, OneLogin, a firm's own Entra app...), via `npm run sso:add`. People type their work email and are routed by domain.
+   - `SSO_ADMIN_EMAIL` (plus optional `SSO_FIRM_NAME`, `SSO_DOMAINS`, `SSO_ADMIN_NAME`) creates the first firm, claims its domain and makes that email an admin on every start.
 
 ## Scripts
 
