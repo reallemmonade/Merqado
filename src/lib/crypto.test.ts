@@ -21,4 +21,13 @@ describe("secret encryption", () => {
     parts[3] = Buffer.from("tampered").toString("base64url");
     expect(() => decryptJson(parts.join("."))).toThrow();
   });
+
+  it("accepts a long non-base64 key and rejects a short one", () => {
+    const original = process.env.MERQADO_SECRET_KEY;
+    process.env.MERQADO_SECRET_KEY = "x".repeat(40) + "-_!";
+    expect(decryptJson(encryptJson({ a: 1 }))).toEqual({ a: 1 });
+    process.env.MERQADO_SECRET_KEY = "too-short";
+    expect(() => encryptJson({ a: 1 })).toThrow(/at least 32/);
+    process.env.MERQADO_SECRET_KEY = original;
+  });
 });
