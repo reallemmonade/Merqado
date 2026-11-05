@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { eq } from "drizzle-orm";
 import { getDb } from "@/db/client";
 import { engagementMembers, engagements } from "@/db/schema";
@@ -11,17 +12,7 @@ export const dynamic = "force-dynamic";
 export default async function Home() {
   const db = getDb();
   const user = await getSessionUser(db);
-  if (!user) {
-    return (
-      <main className="main" style={{ maxWidth: 640, margin: "0 auto" }}>
-        <h1>Sign in to Merqado</h1>
-        <p className="muted">
-          Single sign-on is not set up yet. For local development, set DEV_USER_EMAIL to a seeded user and run
-          <code> npm run db:seed</code>.
-        </p>
-      </main>
-    );
-  }
+  if (!user) redirect("/login");
 
   const rows = await db
     .select({ id: engagements.id, clientName: engagements.clientName, title: engagements.title, status: engagements.status })

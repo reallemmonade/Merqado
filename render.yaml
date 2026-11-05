@@ -21,3 +21,6 @@ services:
       # Only needed for firms on managed AI billing.
       - key: ANTHROPIC_API_KEY
         sync: false
+      # Set when using a custom domain; SSO redirects use it.
+      - key: APP_URL
+        sync: false
