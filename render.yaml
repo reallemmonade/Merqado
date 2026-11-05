@@ -1,0 +1,23 @@
+# Render Blueprint. Database is Turso (libSQL), hosted outside Render.
+services:
+  - type: web
+    name: merqado
+    runtime: node
+    plan: starter
+    buildCommand: npm ci && npm run build
+    preDeployCommand: npm run db:migrate
+    startCommand: npm run start
+    healthCheckPath: /
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: TURSO_DATABASE_URL
+        sync: false
+      - key: TURSO_AUTH_TOKEN
+        sync: false
+      # Set once and never change: it decrypts every saved AI and storage credential.
+      - key: MERQADO_SECRET_KEY
+        sync: false
+      # Only needed for firms on managed AI billing.
+      - key: ANTHROPIC_API_KEY
+        sync: false
