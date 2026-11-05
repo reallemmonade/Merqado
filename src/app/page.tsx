@@ -12,7 +12,7 @@ export const dynamic = "force-dynamic";
 export default async function Home() {
   const db = getDb();
   const user = await getSessionUser(db);
-  if (!user) redirect("/login");
+  if (!user) redirect("/welcome");
 
   const rows = await db
     .select({ id: engagements.id, clientName: engagements.clientName, title: engagements.title, status: engagements.status })
