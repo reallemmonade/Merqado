@@ -20,11 +20,16 @@ services:
       # Only needed for firms on managed AI billing.
       - key: ANTHROPIC_API_KEY
         sync: false
-      # Google sign-in, set up automatically on start (see scripts/bootstrap.ts).
+      # Merqado's shared "Continue with Google / Microsoft" sign-in apps.
       - key: GOOGLE_CLIENT_ID
         sync: false
       - key: GOOGLE_CLIENT_SECRET
         sync: false
+      - key: MICROSOFT_CLIENT_ID
+        sync: false
+      - key: MICROSOFT_CLIENT_SECRET
+        sync: false
+      # First firm and admin, created on start (see scripts/bootstrap.ts).
       - key: SSO_ADMIN_EMAIL
         sync: false
       - key: SSO_FIRM_NAME

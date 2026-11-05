@@ -2,12 +2,16 @@ import { redirect } from "next/navigation";
 import { getDb } from "@/db/client";
 import { safeReturnTo } from "@/lib/auth/session";
 import { getSessionUser } from "@/lib/session";
+import { enabledPlatformProviders, PLATFORM_PROVIDERS } from "@/lib/auth/platform";
 
 export const dynamic = "force-dynamic";
 
 const ERRORS: Record<string, string> = {
   email: "Enter your work email address.",
-  no_connection: "Your firm hasn't set up Merqado sign-in yet. Ask your Merqado admin.",
+  no_connection: "That sign-in option isn't available. Try another one.",
+  firm_not_found: "Your firm isn't on Merqado yet. Ask your Merqado admin, or contact us to get started.",
+  use_button: "Your firm signs in with Google or Microsoft. Use one of the buttons above.",
+  personal_account: "Use your work account, not a personal Google or Microsoft account.",
   idp_unreachable: "We couldn't reach your firm's sign-in service. Try again in a minute.",
   idp_denied: "Sign-in was cancelled or denied by your firm's sign-in service.",
   expired: "Sign-in took too long. Try again.",
@@ -25,6 +29,8 @@ export default async function LoginPage({
   const sp = await searchParams;
   if (await getSessionUser(getDb())) redirect(safeReturnTo(sp.returnTo));
   const error = sp.error ? (ERRORS[sp.error] ?? ERRORS.failed) : null;
+  const returnTo = safeReturnTo(sp.returnTo);
+  const providers = enabledPlatformProviders();
 
   return (
     <main className="main" style={{ maxWidth: 440, margin: "10vh auto 0" }}>
@@ -33,9 +39,27 @@ export default async function LoginPage({
       </div>
       <section className="card">
         <h1 style={{ fontSize: 24 }}>Sign in</h1>
-        <p className="muted" style={{ margin: 0 }}>
-          Use your work email. We'll send you to your firm's sign-in page.
-        </p>
+        {providers.length > 0 && (
+          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            {providers.map((p) => (
+              <form key={p} method="post" action="/api/auth/start">
+                <input type="hidden" name="provider" value={p} />
+                <input type="hidden" name="returnTo" value={returnTo} />
+                <button type="submit" className="secondary" style={{ width: "100%" }}>
+                  Continue with {PLATFORM_PROVIDERS[p].label}
+                </button>
+              </form>
+            ))}
+            <p className="muted" style={{ margin: "6px 0 0", fontSize: 13 }}>
+              Or, if your firm uses its own sign-in (Okta, OneLogin, ...), enter your work email.
+            </p>
+          </div>
+        )}
+        {providers.length === 0 && (
+          <p className="muted" style={{ margin: 0 }}>
+            Use your work email. We'll send you to your firm's sign-in page.
+          </p>
+        )}
         <form method="post" action="/api/auth/start" style={{ display: "flex", flexDirection: "column", gap: 10 }}>
           <label htmlFor="email">Work email</label>
           <input
@@ -48,7 +72,7 @@ export default async function LoginPage({
             placeholder="you@yourfirm.com"
             required
           />
-          <input type="hidden" name="returnTo" value={safeReturnTo(sp.returnTo)} />
+          <input type="hidden" name="returnTo" value={returnTo} />
           <button type="submit">Continue</button>
         </form>
         {error && (

@@ -250,3 +250,19 @@ export const sessions = sqliteTable(
   },
   (t) => [index("sessions_user").on(t.userId)],
 );
+
+/**
+ * Email domains a firm has claimed for the shared "Continue with Google / Microsoft" buttons.
+ * Anyone with a verified work account on a claimed domain can sign in to that firm, so a
+ * firm's IT team doesn't need to set anything up. Firms with their own identity provider
+ * use `sso_connections` instead.
+ */
+export const firmDomains = sqliteTable("firm_domains", {
+  domain: text("domain").primaryKey(),
+  firmId: text("firm_id")
+    .notNull()
+    .references(() => firms.id, { onDelete: "cascade" }),
+  /** Title given to people the first time they sign in. Null means only pre-added people. */
+  defaultFirmRoleId: text("default_firm_role_id").references(() => firmRoles.id),
+  createdAt: createdAt(),
+});

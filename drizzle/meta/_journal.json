@@ -15,6 +15,13 @@
       "when": 1793900728484,
       "tag": "0001_sso",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1793907808667,
+      "tag": "0002_firm_domains",
+      "breakpoints": true
     }
   ]
 }
