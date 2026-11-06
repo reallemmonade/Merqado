@@ -4,6 +4,7 @@ import { eq } from "drizzle-orm";
 import { getDb } from "@/db/client";
 import { engagementMembers, engagements } from "@/db/schema";
 import { AppNav } from "@/components/AppNav";
+import { NewEngagement } from "@/components/NewEngagement";
 import { PERSONA_HOME } from "@/lib/roles";
 import { getSessionUser } from "@/lib/session";
 
@@ -43,6 +44,7 @@ export default async function Home() {
             </div>
           ))}
           {rows.length === 0 && <p className="muted">You are not on any engagements yet.</p>}
+          <NewEngagement />
         </section>
       </main>
     </div>

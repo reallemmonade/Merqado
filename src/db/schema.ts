@@ -266,3 +266,193 @@ export const firmDomains = sqliteTable("firm_domains", {
   defaultFirmRoleId: text("default_firm_role_id").references(() => firmRoles.id),
   createdAt: createdAt(),
 });
+
+// ---------------------------------------------------------------------------
+// Experts: the interview pipeline, transcripts, guides and key takeaways.
+// ---------------------------------------------------------------------------
+
+/** Proposed by anyone on the team, approved by a reviewer, then booked and held. */
+export const EXPERT_STATUSES = ["proposed", "approved", "scheduled", "completed", "declined"] as const;
+export type ExpertStatus = (typeof EXPERT_STATUSES)[number];
+
+/** An interview archetype for a case (e.g. "Customers"), with how many calls the team wants. */
+export const expertTypes = sqliteTable(
+  "expert_types",
+  {
+    id: id(),
+    engagementId: text("engagement_id")
+      .notNull()
+      .references(() => engagements.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    target: integer("target").notNull().default(0),
+    sort: integer("sort").notNull().default(0),
+  },
+  (t) => [index("expert_types_engagement").on(t.engagementId)],
+);
+
+/** A topic the case needs covered in interviews (e.g. "Pricing power"). */
+export const expertTopics = sqliteTable(
+  "expert_topics",
+  {
+    id: id(),
+    engagementId: text("engagement_id")
+      .notNull()
+      .references(() => engagements.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    /** Calls that should discuss it. */
+    target: integer("target").notNull().default(5),
+    sort: integer("sort").notNull().default(0),
+  },
+  (t) => [index("expert_topics_engagement").on(t.engagementId)],
+);
+
+export const experts = sqliteTable(
+  "experts",
+  {
+    id: id(),
+    engagementId: text("engagement_id")
+      .notNull()
+      .references(() => engagements.id, { onDelete: "cascade" }),
+    typeId: text("type_id").references(() => expertTypes.id, { onDelete: "set null" }),
+    status: text("status", { enum: EXPERT_STATUSES }).notNull().default("proposed"),
+    firstName: text("first_name").notNull(),
+    lastName: text("last_name").notNull().default(""),
+    company: text("company").notNull().default(""),
+    title: text("title").notNull().default(""),
+    /** Manual override; null means use the one generated from company and title. */
+    anonTitle: text("anon_title"),
+    isFormer: integer("is_former", { mode: "boolean" }).notNull().default(false),
+    /** ISO date (YYYY-MM-DD) of the call, planned or held. */
+    interviewDate: text("interview_date"),
+    network: text("network").notNull().default(""),
+    callMinutes: integer("call_minutes").notNull().default(0),
+    followupMinutes: integer("followup_minutes").notNull().default(0),
+    surveyMinutes: integer("survey_minutes").notNull().default(0),
+    /** Whole dollars per hour. */
+    hourlyRate: integer("hourly_rate").notNull().default(0),
+    /** JSON array of expert_topics ids this person has expertise in. */
+    topicIds: text("topic_ids").notNull().default("[]"),
+    notes: text("notes").notNull().default(""),
+    /** Generated or edited interview guide, as plain text / Markdown. */
+    guide: text("guide"),
+    guideUpdatedAt: integer("guide_updated_at", { mode: "timestamp" }),
+    proposedBy: text("proposed_by").references(() => users.id),
+    approvedBy: text("approved_by").references(() => users.id),
+    createdAt: createdAt(),
+  },
+  (t) => [index("experts_engagement").on(t.engagementId)],
+);
+
+export const expertTranscripts = sqliteTable(
+  "expert_transcripts",
+  {
+    id: id(),
+    expertId: text("expert_id")
+      .notNull()
+      .references(() => experts.id, { onDelete: "cascade" }),
+    engagementId: text("engagement_id")
+      .notNull()
+      .references(() => engagements.id, { onDelete: "cascade" }),
+    kind: text("kind", { enum: ["call", "followup"] }).notNull().default("call"),
+    filename: text("filename").notNull(),
+    /** The transcript exactly as uploaded (verbatim). */
+    body: text("body").notNull(),
+    /** AI-cleaned version: speakers labeled, fillers and garble removed, names and figures fixed. */
+    cleanedBody: text("cleaned_body"),
+    cleanStatus: text("clean_status", { enum: ["none", "cleaning", "cleaned", "failed"] }).notNull().default("none"),
+    /** JSON array of { quote, reason } the cleaner flagged for a human to check (e.g. possible MNPI). */
+    cleanFlags: text("clean_flags").notNull().default("[]"),
+    /** JSON array of expert_topics ids the call actually discussed (from analysis). */
+    discussedTopicIds: text("discussed_topic_ids").notNull().default("[]"),
+    uploadedBy: text("uploaded_by").references(() => users.id),
+    createdAt: createdAt(),
+  },
+  (t) => [index("expert_transcripts_expert").on(t.expertId)],
+);
+
+/** A theme the team is testing across interviews; key takeaways roll up into these. */
+export const hypotheses = sqliteTable(
+  "hypotheses",
+  {
+    id: id(),
+    engagementId: text("engagement_id")
+      .notNull()
+      .references(() => engagements.id, { onDelete: "cascade" }),
+    statement: text("statement").notNull(),
+    /** Where it lives in the deck, e.g. "Slide 4". */
+    slideRef: text("slide_ref").notNull().default(""),
+    sort: integer("sort").notNull().default(0),
+    createdAt: createdAt(),
+  },
+  (t) => [index("hypotheses_engagement").on(t.engagementId)],
+);
+
+export const TAKEAWAY_VERDICTS = ["supports", "challenges", "new"] as const;
+
+export const keyTakeaways = sqliteTable(
+  "key_takeaways",
+  {
+    id: id(),
+    expertId: text("expert_id")
+      .notNull()
+      .references(() => experts.id, { onDelete: "cascade" }),
+    engagementId: text("engagement_id")
+      .notNull()
+      .references(() => engagements.id, { onDelete: "cascade" }),
+    body: text("body").notNull(),
+    verdict: text("verdict", { enum: TAKEAWAY_VERDICTS }).notNull().default("new"),
+    hypothesisId: text("hypothesis_id").references(() => hypotheses.id, { onDelete: "set null" }),
+    /** Where in the transcript, e.g. "06:40". */
+    locator: text("locator").notNull().default(""),
+    /** Whether it counts toward the hypotheses section. */
+    included: integer("included", { mode: "boolean" }).notNull().default(true),
+    source: text("source", { enum: ["ai", "manual"] }).notNull().default("manual"),
+    sort: integer("sort").notNull().default(0),
+    createdAt: createdAt(),
+  },
+  (t) => [index("key_takeaways_engagement").on(t.engagementId)],
+);
+
+/** The team's running interview guide, one per interviewee type (or a general one). */
+export const runningGuides = sqliteTable(
+  "running_guides",
+  {
+    id: id(),
+    engagementId: text("engagement_id")
+      .notNull()
+      .references(() => engagements.id, { onDelete: "cascade" }),
+    typeId: text("type_id").references(() => expertTypes.id, { onDelete: "cascade" }),
+    body: text("body").notNull().default(""),
+    updatedAt: createdAt(),
+  },
+  (t) => [index("running_guides_engagement").on(t.engagementId)],
+);
+
+export const caseBudgets = sqliteTable("case_budgets", {
+  engagementId: text("engagement_id")
+    .primaryKey()
+    .references(() => engagements.id, { onDelete: "cascade" }),
+  /** Whole dollars. */
+  total: integer("total").notNull().default(0),
+  plannedInterviews: integer("planned_interviews").notNull().default(0),
+});
+
+export const EXPENSE_CATEGORIES = ["meals", "travel", "ai_tools", "other"] as const;
+
+export const caseExpenses = sqliteTable(
+  "case_expenses",
+  {
+    id: id(),
+    engagementId: text("engagement_id")
+      .notNull()
+      .references(() => engagements.id, { onDelete: "cascade" }),
+    category: text("category", { enum: EXPENSE_CATEGORIES }).notNull().default("other"),
+    description: text("description").notNull().default(""),
+    /** Whole dollars. */
+    amount: integer("amount").notNull(),
+    spentOn: text("spent_on"),
+    createdBy: text("created_by").references(() => users.id),
+    createdAt: createdAt(),
+  },
+  (t) => [index("case_expenses_engagement").on(t.engagementId)],
+);

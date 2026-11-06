@@ -22,6 +22,20 @@
       "when": 1793907808667,
       "tag": "0002_firm_domains",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "6",
+      "when": 1793947163947,
+      "tag": "0003_experts",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "6",
+      "when": 1793947754503,
+      "tag": "0004_transcript_cleaning",
+      "breakpoints": true
     }
   ]
 }
