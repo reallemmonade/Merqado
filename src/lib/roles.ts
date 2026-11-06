@@ -18,13 +18,25 @@ export const DEFAULT_FIRM_ROLES: { title: string; archetype: Archetype; rank: nu
 
 const ACCESS_RANK: Record<AccessLevel, number> = { viewer: 0, editor: 1, lead: 2 };
 
-export type Action = "read" | "ask" | "upload" | "edit_findings" | "manage_members" | "manage_connections";
+export type Action =
+  | "read"
+  | "ask"
+  | "upload"
+  | "edit_findings"
+  | "edit_experts"
+  | "approve_experts"
+  | "manage_members"
+  | "manage_connections";
 
 const REQUIRED: Record<Action, AccessLevel> = {
   read: "viewer",
   ask: "viewer",
   upload: "editor",
   edit_findings: "editor",
+  /** Propose experts, log calls, upload transcripts, edit takeaways. */
+  edit_experts: "editor",
+  /** Approve or pass on proposed experts. Raise to "lead" to limit it to engagement leads. */
+  approve_experts: "editor",
   manage_members: "lead",
   manage_connections: "lead",
 };

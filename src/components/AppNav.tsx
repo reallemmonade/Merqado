@@ -6,7 +6,16 @@ export interface NavEngagement {
   title: string;
 }
 
-export function AppNav({ engagements, activeId }: { engagements: NavEngagement[]; activeId?: string }) {
+export function AppNav({
+  engagements,
+  activeId,
+  section,
+}: {
+  engagements: NavEngagement[];
+  activeId?: string;
+  /** The part of the engagement being viewed, when it isn't the overview. */
+  section?: "experts";
+}) {
   return (
     <nav className="nav" aria-label="Main">
       <Link href="/" className="brand" style={{ padding: 0 }}>
@@ -15,9 +24,20 @@ export function AppNav({ engagements, activeId }: { engagements: NavEngagement[]
       <div>
         <div className="eyebrow">Engagements</div>
         {engagements.map((e) => (
-          <Link key={e.id} href={`/e/${e.id}`} aria-current={e.id === activeId ? "page" : undefined}>
-            {e.clientName} · {e.title}
-          </Link>
+          <div key={e.id}>
+            <Link href={`/e/${e.id}`} aria-current={e.id === activeId && !section ? "page" : undefined}>
+              {e.clientName} · {e.title}
+            </Link>
+            {e.id === activeId && (
+              <Link
+                href={`/e/${e.id}/experts`}
+                aria-current={section === "experts" ? "page" : undefined}
+                style={{ paddingLeft: 20 }}
+              >
+                Experts
+              </Link>
+            )}
+          </div>
         ))}
         {engagements.length === 0 && <p className="muted">No engagements yet.</p>}
       </div>

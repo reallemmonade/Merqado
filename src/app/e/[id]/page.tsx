@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { count, desc, eq } from "drizzle-orm";
 import { getDb } from "@/db/client";
@@ -46,6 +47,13 @@ export default async function EngagementPage({ params }: { params: Promise<{ id:
           </div>
           <h1 style={{ fontSize: 30 }}>{engagement.title}</h1>
         </header>
+
+        <nav className="subtabs" aria-label="Engagement sections">
+          <Link href={`/e/${id}`} aria-current="page">
+            Overview
+          </Link>
+          <Link href={`/e/${id}/experts`}>Experts</Link>
+        </nav>
 
         <section className="tiles" aria-label="Status">
           <div className="card">

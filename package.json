@@ -11,7 +11,8 @@
     "db:generate": "drizzle-kit generate",
     "db:migrate": "tsx --env-file-if-exists=.env.local scripts/migrate.ts",
     "db:seed": "tsx --env-file-if-exists=.env.local scripts/seed.ts",
-    "sso:add": "tsx --env-file-if-exists=.env.local scripts/add-sso.ts"
+    "sso:add": "tsx --env-file-if-exists=.env.local scripts/add-sso.ts",
+    "db:seed:experts": "tsx --env-file-if-exists=.env.local scripts/seed-experts.ts"
   },
   "repository": {
     "type": "git",
@@ -32,6 +33,7 @@
     "@google-cloud/storage": "^8.4.0",
     "@libsql/client": "^0.18.0",
     "drizzle-orm": "^0.45.4",
+    "mammoth": "^1.11.0",
     "next": "^16.4.5",
     "openai": "^7.51.0",
     "openid-client": "^6.8.9",
