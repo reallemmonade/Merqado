@@ -9,7 +9,8 @@ import { findExpert } from "@/lib/experts/data";
 import { takeawayFields } from "@/lib/experts/schemas";
 
 /** Max transcript characters sent to the model per call (long calls are cut, not dropped). */
-const MAX_CHARS = 180_000;
+/** About 75k tokens: a few hours of calls. Longer text is cut, and the reply says so. */
+const MAX_CHARS = 300_000;
 
 const reply = z.object({
   takeaways: z
@@ -54,6 +55,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   if (!transcripts.length) return badRequest("Upload a transcript for this expert first.");
 
   let budget = MAX_CHARS;
+  const fullLength = transcripts.reduce((n, t) => n + (t.cleanedBody ?? t.body).length, 0);
   const text = transcripts
     .map((t) => {
       const chunk = (t.cleanedBody ?? t.body).slice(0, Math.max(0, budget));
@@ -118,7 +120,11 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     for (const t of transcripts) {
       await db.update(expertTranscripts).set({ discussedTopicIds: JSON.stringify(discussed) }).where(eq(expertTranscripts.id, t.id));
     }
-    return NextResponse.json({ count: parsed.takeaways.length });
+    const note =
+      fullLength > MAX_CHARS
+        ? `These transcripts are very long, so the takeaways were drafted from the first ${Math.round((MAX_CHARS / fullLength) * 100)}% of the text. The full transcript is still saved.`
+        : undefined;
+    return NextResponse.json({ count: parsed.takeaways.length, note });
   } catch (err) {
     return aiError(err);
   }

@@ -87,7 +87,15 @@ export default async function ExpertsTranscriptsPage({
               <div>
                 <h2 style={{ fontSize: 19 }}>{openExpert.anonTitle}</h2>
                 <div className="muted" style={{ fontSize: 13 }}>
-                  {openExpert.name} · {open.kind === "call" ? "Main call" : "Follow-up"} · {open.filename}
+                  {openExpert.name} · {open.kind === "call" ? "Main call" : "Follow-up"} ·{" "}
+                  <a
+                    href={`/api/engagements/${id}/transcripts/${open.id}/file`}
+                    target="_blank"
+                    rel="noopener"
+                    title={open.sourceId ? "Open the original file" : "Download the full transcript text"}
+                  >
+                    {open.filename}
+                  </a>
                 </div>
                 {parseIdList(open.discussedTopicIds).length > 0 && (
                   <div className="muted" style={{ fontSize: 12, marginTop: 4 }}>

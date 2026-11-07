@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { shortDate } from "@/lib/experts/calc";
 import type { ExpertsData } from "@/lib/experts/data";
+import { SourceLink } from "./SourceLink";
 import { useApi } from "./useApi";
 
 const VERDICTS = [
@@ -117,7 +118,13 @@ export function KtaView({ engagementId, data, canEdit }: { engagementId: string;
                               </option>
                             ))}
                           </select>
-                          {k.locator && <span>{k.locator}</span>}
+                          {k.locator && (
+                            <SourceLink
+                              engagementId={engagementId}
+                              transcripts={data.transcripts.filter((t) => t.expertId === k.expertId)}
+                              locator={k.locator}
+                            />
+                          )}
                           {k.source === "ai" && <span>AI draft</span>}
                         </div>
                       </div>

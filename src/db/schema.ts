@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { integer, primaryKey, sqliteTable, text, uniqueIndex, index } from "drizzle-orm/sqlite-core";
+import { blob, integer, primaryKey, sqliteTable, text, uniqueIndex, index } from "drizzle-orm/sqlite-core";
 
 const id = () =>
   text("id")
@@ -155,6 +155,17 @@ export const sources = sqliteTable(
   },
   (t) => [index("sources_engagement").on(t.engagementId)],
 );
+
+/**
+ * Original file bytes, kept here only when the firm has no cloud storage connected yet,
+ * so every source can still be opened. Once storage is connected, new files go there.
+ */
+export const sourceBlobs = sqliteTable("source_blobs", {
+  sourceId: text("source_id")
+    .primaryKey()
+    .references(() => sources.id, { onDelete: "cascade" }),
+  data: blob("data", { mode: "buffer" }).notNull(),
+});
 
 export const FINDING_STATUSES = ["hypothesis", "supported", "needs_data", "contradicted"] as const;
 
@@ -355,6 +366,8 @@ export const expertTranscripts = sqliteTable(
       .references(() => engagements.id, { onDelete: "cascade" }),
     kind: text("kind", { enum: ["call", "followup"] }).notNull().default("call"),
     filename: text("filename").notNull(),
+    /** The original uploaded file (Word, text, captions), so it can be opened as it was. */
+    sourceId: text("source_id").references(() => sources.id, { onDelete: "set null" }),
     /** The transcript exactly as uploaded (verbatim). */
     body: text("body").notNull(),
     /** AI-cleaned version: speakers labeled, fillers and garble removed, names and figures fixed. */
