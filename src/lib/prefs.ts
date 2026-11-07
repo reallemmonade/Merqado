@@ -2,39 +2,40 @@
 
 export const PREFS_COOKIE = "mq_prefs";
 
-export const THEMES = ["system", "light", "dark", "guava"] as const;
-/** Guava theme: a sky that follows the real sunrise and sunset (see lib/guava). */
+/** Appearance follows the Guava sky (see lib/guava): the sky decides light or dark, so there is no theme switch. */
 export const GUAVA_LOOKS = ["guava", "lavender-aurora", "ember-aurora", "aurora", "nightshift", "rosewater", "marigold"] as const;
 export const GUAVA_FONTS = ["clean", "storybook", "rounded", "receipt", "poster", "notebook"] as const;
-export const ACCENTS = ["blue", "green", "teal", "violet", "orange", "rose"] as const;
-export const SIDEBARS = ["dark", "light"] as const;
 export const TEXT_SIZES = ["small", "default", "large"] as const;
 export const CASE_MENUS = ["auto", "full", "icons"] as const;
 
-export interface Prefs {
-  theme: (typeof THEMES)[number];
-  accent: (typeof ACCENTS)[number];
-  sidebar: (typeof SIDEBARS)[number];
-  text: (typeof TEXT_SIZES)[number];
-  /** Case side menu: auto = full on the Overview, icons in sections. */
-  caseMenu: (typeof CASE_MENUS)[number];
-  guava: GuavaPrefs;
+export interface GuavaCity {
+  name: string;
+  lat: number;
+  lon: number;
+  tz: string;
 }
 
 export interface GuavaPrefs {
   look: (typeof GUAVA_LOOKS)[number];
   font: (typeof GUAVA_FONTS)[number];
-  /** City name from the Guava city list; "" follows the device's time zone. */
-  city: string;
+  /** The place whose sunrise and sunset drive the day; null follows the device's time zone. */
+  city: GuavaCity | null;
   /** true = change through the day; false = stick to `freeze`. */
   cycle: boolean;
   /** Local hour in quarter hours, used when cycle is off. */
   freeze: number;
 }
 
-export const DEFAULT_GUAVA: GuavaPrefs = { look: "guava", font: "clean", city: "", cycle: true, freeze: 12 };
+export interface Prefs {
+  text: (typeof TEXT_SIZES)[number];
+  /** Case side menu: auto = full on the Overview, icons in sections. */
+  caseMenu: (typeof CASE_MENUS)[number];
+  guava: GuavaPrefs;
+}
 
-export const DEFAULT_PREFS: Prefs = { theme: "system", accent: "blue", sidebar: "dark", text: "default", caseMenu: "auto", guava: DEFAULT_GUAVA };
+export const DEFAULT_GUAVA: GuavaPrefs = { look: "guava", font: "clean", city: null, cycle: true, freeze: 12 };
+
+export const DEFAULT_PREFS: Prefs = { text: "default", caseMenu: "auto", guava: DEFAULT_GUAVA };
 
 function pick<T extends readonly string[]>(options: T, value: unknown, fallback: T[number]): T[number] {
   return typeof value === "string" && (options as readonly string[]).includes(value) ? (value as T[number]) : fallback;
@@ -53,13 +54,20 @@ export function parsePrefs(raw: string | undefined): Prefs {
   }
   const d = DEFAULT_PREFS;
   return {
-    theme: pick(THEMES, data.theme, d.theme),
-    accent: pick(ACCENTS, data.accent, d.accent),
-    sidebar: pick(SIDEBARS, data.sidebar, d.sidebar),
     text: pick(TEXT_SIZES, data.text, d.text),
     caseMenu: pick(CASE_MENUS, data.caseMenu, d.caseMenu),
     guava: parseGuava(data.guava),
   };
+}
+
+function parseCity(raw: unknown): GuavaCity | null {
+  if (!raw || typeof raw !== "object") return null;
+  const c = raw as Record<string, unknown>;
+  const lat = Number(c.lat), lon = Number(c.lon);
+  if (typeof c.name !== "string" || typeof c.tz !== "string" || !c.tz) return null;
+  if (!Number.isFinite(lat) || !Number.isFinite(lon) || Math.abs(lat) > 90 || Math.abs(lon) > 180) return null;
+  // Rounded to about 0.1 degree: enough for sunrise and sunset, not a street address.
+  return { name: c.name.slice(0, 60), lat: Math.round(lat * 10) / 10, lon: Math.round(lon * 10) / 10, tz: c.tz.slice(0, 60) };
 }
 
 function parseGuava(raw: unknown): GuavaPrefs {
@@ -69,7 +77,7 @@ function parseGuava(raw: unknown): GuavaPrefs {
   return {
     look: pick(GUAVA_LOOKS, g.look, d.look),
     font: pick(GUAVA_FONTS, g.font, d.font),
-    city: typeof g.city === "string" ? g.city.slice(0, 60) : d.city,
+    city: parseCity(g.city),
     cycle: typeof g.cycle === "boolean" ? g.cycle : d.cycle,
     freeze,
   };
@@ -79,21 +87,17 @@ export function serializePrefs(prefs: Prefs): string {
   return encodeURIComponent(JSON.stringify(prefs));
 }
 
-/** Attributes on <html> that the stylesheet keys off. */
+/** Attributes on <html> that the stylesheet keys off. data-theme (light or dark) comes from the sky. */
 export function htmlAttrs(prefs: Prefs) {
   return {
-    "data-theme-pref": prefs.theme,
-    "data-theme": prefs.theme === "system" || prefs.theme === "guava" ? undefined : prefs.theme,
-    "data-accent": prefs.accent,
-    "data-sidebar": prefs.sidebar,
     "data-text": prefs.text,
   };
 }
 
 export const GUAVA_CACHE = "mq_guava";
 
-/** Runs before paint: resolves the "system" theme, follows OS changes, and paints the last Guava sky. */
-export const THEME_SCRIPT = `(function(){var d=document.documentElement,m=matchMedia("(prefers-color-scheme: dark)");function s(){if(d.getAttribute("data-theme-pref")==="system")d.setAttribute("data-theme",m.matches?"dark":"light")}if(d.getAttribute("data-theme-pref")==="guava"){try{var c=JSON.parse(localStorage.getItem("${GUAVA_CACHE}")||"null");if(c&&c.vars){for(var k in c.vars)d.style.setProperty(k,c.vars[k]);d.setAttribute("data-theme",c.scheme)}}catch(e){}}s();m.addEventListener("change",s)})()`;
+/** Runs before paint: puts back the last sky this browser drew so the first paint already has the right colors. */
+export const THEME_SCRIPT = `(function(){var d=document.documentElement;try{var c=JSON.parse(localStorage.getItem("${GUAVA_CACHE}")||"null");if(c&&c.vars){for(var k in c.vars)d.style.setProperty(k,c.vars[k]);d.setAttribute("data-theme",c.scheme);d.style.colorScheme=c.scheme}}catch(e){}})()`;
 
 export function initials(name: string): string {
   const parts = name.trim().split(/\s+/).filter(Boolean);
