@@ -2,6 +2,7 @@ import { and, eq } from "drizzle-orm";
 import { cookies } from "next/headers";
 import type { DB } from "@/db/client";
 import { findSession, SESSION_COOKIE } from "@/lib/auth/session";
+import { findTestAccount } from "@/lib/auth/test-accounts";
 import { engagementMembers, engagements, firmMembers, firmRoles, users, type AccessLevel, type Archetype } from "@/db/schema";
 
 export interface SessionUser {
@@ -9,6 +10,7 @@ export interface SessionUser {
   email: string;
   name: string;
   firmId: string;
+  firmRoleId: string;
   title: string;
   archetype: Archetype;
   isAdmin: boolean;
@@ -35,6 +37,7 @@ async function loadUser(db: DB, who: ReturnType<typeof eq>, firmId?: string): Pr
       email: users.email,
       name: users.name,
       firmId: firmMembers.firmId,
+      firmRoleId: firmMembers.firmRoleId,
       title: firmRoles.title,
       archetype: firmRoles.archetype,
       isAdmin: firmMembers.isAdmin,
@@ -63,4 +66,12 @@ export async function getEngagementAccess(
     .where(and(eq(engagements.id, engagementId), eq(engagements.firmId, user.firmId)))
     .limit(1);
   return row ?? null;
+}
+
+/**
+ * Firm admins and personal test accounts can switch their own title from the app to see
+ * another persona's view. Titles only shape the view; permissions come from engagement access.
+ */
+export function canSwitchOwnTitle(user: SessionUser): boolean {
+  return user.isAdmin || findTestAccount(user.email) !== null;
 }

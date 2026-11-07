@@ -69,3 +69,9 @@ export function workEmailFromClaims(
   if (!upn.includes("@")) return { error: "no_email" };
   return { email: upn };
 }
+
+/** A verified Google email whatever the account type, used only for named test accounts. */
+export function verifiedGoogleEmail(claims: Record<string, unknown>): string | null {
+  const email = typeof claims.email === "string" ? claims.email.trim().toLowerCase() : "";
+  return email.includes("@") && claims.email_verified === true ? email : null;
+}
