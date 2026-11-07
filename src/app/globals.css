@@ -381,3 +381,17 @@ button.x:hover { color: var(--bad); }
 .gpt-start .composer textarea { border: 0; }
 .gpt-start .composer textarea:focus { outline: none; }
 .gpt-start .composer { align-items: center; }
+
+/* A record opened from the Overview: briefly highlighted where it lands. */
+.flash { animation: flash 2.2s ease-out; }
+@keyframes flash { 0%, 35% { box-shadow: 0 0 0 3px var(--accent); background-color: var(--accent-soft); } 100% { box-shadow: 0 0 0 3px transparent; } }
+[id^="task-"], [id^="note-"], [id^="hyp-"], [id^="mod-"], [id^="ms-"] { scroll-margin: 80px; }
+/* Overview: every count and chart piece opens its source. */
+a.plain { color: inherit; text-decoration: none; }
+a.plain:hover { text-decoration: underline; }
+a.tag, a.pill, .filter-chip a { text-decoration: none; }
+a.tag:hover, a.pill:hover { filter: brightness(0.95); }
+.legend a { color: inherit; text-decoration: none; }
+.legend a:hover { color: var(--ink); }
+.filter-chip { display: inline-flex; align-items: center; gap: 8px; align-self: flex-start; }
+.hyp-on { box-shadow: 0 0 0 2px var(--accent); }

@@ -71,7 +71,7 @@ export function NoteItem({ engagementId, n }: { engagementId: string; n: NoteRow
   const { call, busy } = useApi();
   const url = `/api/engagements/${engagementId}/notes`;
   return (
-    <div className={`item${n.resolved ? " off" : ""}`}>
+    <div id={`note-${n.id}`} className={`item${n.resolved ? " off" : ""}`}>
       <div className="meta">
         <span className={`tag note-${n.kind}`}>{NOTE_KIND_LABEL[n.kind]}</span>
         {n.isPrivate && <span className="tag">Private</span>}
