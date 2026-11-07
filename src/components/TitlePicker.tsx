@@ -12,7 +12,7 @@ export function TitlePicker({ current, titles }: { current: string; titles: { id
 
   return (
     <div className="field">
-      <label htmlFor="title-picker">View as</label>
+      <label htmlFor="title-picker">Role</label>
       <select
         id="title-picker"
         value={value}
