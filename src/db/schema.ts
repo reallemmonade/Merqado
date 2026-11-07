@@ -151,6 +151,8 @@ export const sources = sqliteTable(
       .notNull()
       .default("uploaded"),
     uploadedBy: text("uploaded_by").references(() => users.id),
+    /** Folder in the case's Files view, e.g. "Models". Empty means unfiled. */
+    folder: text("folder").notNull().default(""),
     createdAt: createdAt(),
   },
   (t) => [index("sources_engagement").on(t.engagementId)],
@@ -468,4 +470,244 @@ export const caseExpenses = sqliteTable(
     createdAt: createdAt(),
   },
   (t) => [index("case_expenses_engagement").on(t.engagementId)],
+);
+
+// ---------------------------------------------------------------------------
+// Case workspace: workplan, team channel, notes, dictionary, deck, case GPT.
+// ---------------------------------------------------------------------------
+
+/** A workstream such as "Market sizing"; deck sections, notes and tasks tag to it. */
+export const workplanModules = sqliteTable(
+  "workplan_modules",
+  {
+    id: id(),
+    engagementId: text("engagement_id")
+      .notNull()
+      .references(() => engagements.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    leadId: text("lead_id").references(() => users.id, { onDelete: "set null" }),
+    sort: integer("sort").notNull().default(0),
+    createdAt: createdAt(),
+  },
+  (t) => [index("workplan_modules_engagement").on(t.engagementId)],
+);
+
+/** A dated checkpoint such as "Client update 1"; the workplan's columns and the case timeline. */
+export const workplanMilestones = sqliteTable(
+  "workplan_milestones",
+  {
+    id: id(),
+    engagementId: text("engagement_id")
+      .notNull()
+      .references(() => engagements.id, { onDelete: "cascade" }),
+    label: text("label").notNull(),
+    /** ISO date (YYYY-MM-DD). */
+    date: text("date").notNull(),
+    /** Client-facing columns show in the workplan grid; others only on the timeline. */
+    isColumn: integer("is_column", { mode: "boolean" }).notNull().default(true),
+    createdAt: createdAt(),
+  },
+  (t) => [index("workplan_milestones_engagement").on(t.engagementId)],
+);
+
+export const TASK_STATUSES = ["not_yet", "in_progress", "almost_done", "done"] as const;
+export type TaskStatus = (typeof TASK_STATUSES)[number];
+
+export const workplanTasks = sqliteTable(
+  "workplan_tasks",
+  {
+    id: id(),
+    engagementId: text("engagement_id")
+      .notNull()
+      .references(() => engagements.id, { onDelete: "cascade" }),
+    moduleId: text("module_id")
+      .notNull()
+      .references(() => workplanModules.id, { onDelete: "cascade" }),
+    milestoneId: text("milestone_id").references(() => workplanMilestones.id, { onDelete: "set null" }),
+    title: text("title").notNull(),
+    assigneeId: text("assignee_id").references(() => users.id, { onDelete: "set null" }),
+    status: text("status", { enum: TASK_STATUSES }).notNull().default("not_yet"),
+    sort: integer("sort").notNull().default(0),
+    createdAt: createdAt(),
+  },
+  (t) => [index("workplan_tasks_engagement").on(t.engagementId)],
+);
+
+/** A team chat; only people whose archetype is listed can see it. */
+export const chatRooms = sqliteTable(
+  "chat_rooms",
+  {
+    id: id(),
+    engagementId: text("engagement_id")
+      .notNull()
+      .references(() => engagements.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    /** JSON array of archetypes allowed in the room. */
+    archetypes: text("archetypes").notNull().default("[]"),
+    sort: integer("sort").notNull().default(0),
+    createdAt: createdAt(),
+  },
+  (t) => [index("chat_rooms_engagement").on(t.engagementId)],
+);
+
+export const chatMessages = sqliteTable(
+  "chat_messages",
+  {
+    id: id(),
+    roomId: text("room_id")
+      .notNull()
+      .references(() => chatRooms.id, { onDelete: "cascade" }),
+    engagementId: text("engagement_id")
+      .notNull()
+      .references(() => engagements.id, { onDelete: "cascade" }),
+    userId: text("user_id").references(() => users.id, { onDelete: "set null" }),
+    body: text("body").notNull(),
+    pinned: integer("pinned", { mode: "boolean" }).notNull().default(false),
+    createdAt: createdAt(),
+  },
+  (t) => [index("chat_messages_room").on(t.roomId, t.createdAt)],
+);
+
+export const NOTE_KINDS = ["note", "decision", "open"] as const;
+export type NoteKind = (typeof NOTE_KINDS)[number];
+
+export const caseNotes = sqliteTable(
+  "case_notes",
+  {
+    id: id(),
+    engagementId: text("engagement_id")
+      .notNull()
+      .references(() => engagements.id, { onDelete: "cascade" }),
+    kind: text("kind", { enum: NOTE_KINDS }).notNull().default("note"),
+    body: text("body").notNull(),
+    moduleId: text("module_id").references(() => workplanModules.id, { onDelete: "set null" }),
+    /** Where it came from, e.g. "Core team" or "AtlasGPT". */
+    origin: text("origin").notNull().default(""),
+    /** A pinned chat or GPT conversation this note points to. */
+    link: text("link"),
+    /** Only the author sees a private note. */
+    isPrivate: integer("is_private", { mode: "boolean" }).notNull().default(false),
+    resolved: integer("resolved", { mode: "boolean" }).notNull().default(false),
+    createdBy: text("created_by").references(() => users.id, { onDelete: "set null" }),
+    createdAt: createdAt(),
+  },
+  (t) => [index("case_notes_engagement").on(t.engagementId)],
+);
+
+export const glossaryTerms = sqliteTable(
+  "glossary_terms",
+  {
+    id: id(),
+    engagementId: text("engagement_id")
+      .notNull()
+      .references(() => engagements.id, { onDelete: "cascade" }),
+    term: text("term").notNull(),
+    category: text("category").notNull().default("Industry"),
+    definition: text("definition").notNull().default(""),
+    /** AI-suggested terms wait for a person to add them. */
+    status: text("status", { enum: ["active", "suggested"] }).notNull().default("active"),
+    createdAt: createdAt(),
+  },
+  (t) => [index("glossary_terms_engagement").on(t.engagementId)],
+);
+
+export const deckSlides = sqliteTable(
+  "deck_slides",
+  {
+    id: id(),
+    engagementId: text("engagement_id")
+      .notNull()
+      .references(() => engagements.id, { onDelete: "cascade" }),
+    section: text("section").notNull().default(""),
+    headline: text("headline").notNull(),
+    /** One point per line. */
+    body: text("body").notNull().default(""),
+    /** Source line shown under the slide. */
+    sourceNote: text("source_note").notNull().default(""),
+    moduleId: text("module_id").references(() => workplanModules.id, { onDelete: "set null" }),
+    status: text("status", { enum: ["draft", "final"] }).notNull().default("draft"),
+    sort: integer("sort").notNull().default(0),
+    createdAt: createdAt(),
+  },
+  (t) => [index("deck_slides_engagement").on(t.engagementId)],
+);
+
+/** Review rules the deck generator and checks follow (e.g. "headlines are so-whats"). */
+export const deckLearnings = sqliteTable(
+  "deck_learnings",
+  {
+    id: id(),
+    engagementId: text("engagement_id")
+      .notNull()
+      .references(() => engagements.id, { onDelete: "cascade" }),
+    rule: text("rule").notNull(),
+    origin: text("origin").notNull().default(""),
+    createdAt: createdAt(),
+  },
+  (t) => [index("deck_learnings_engagement").on(t.engagementId)],
+);
+
+/**
+ * Something a deck check found: a quality flag on one slide, or a contradiction between two
+ * claims (slide vs slide, or slide vs takeaways, notes or the model).
+ */
+export const deckIssues = sqliteTable(
+  "deck_issues",
+  {
+    id: id(),
+    engagementId: text("engagement_id")
+      .notNull()
+      .references(() => engagements.id, { onDelete: "cascade" }),
+    kind: text("kind", { enum: ["qc", "contradiction"] }).notNull(),
+    severity: text("severity", { enum: ["high", "medium", "low"] }).notNull().default("medium"),
+    slideId: text("slide_id").references(() => deckSlides.id, { onDelete: "cascade" }),
+    claim: text("claim").notNull().default(""),
+    /** The other side of a contradiction. */
+    otherRef: text("other_ref").notNull().default(""),
+    otherClaim: text("other_claim").notNull().default(""),
+    detail: text("detail").notNull().default(""),
+    fix: text("fix").notNull().default(""),
+    status: text("status", { enum: ["open", "resolved", "dismissed"] }).notNull().default("open"),
+    createdAt: createdAt(),
+  },
+  (t) => [index("deck_issues_engagement").on(t.engagementId, t.kind)],
+);
+
+/** A conversation with the case GPT. Shared chats show under Team chats. */
+export const gptChats = sqliteTable(
+  "gpt_chats",
+  {
+    id: id(),
+    engagementId: text("engagement_id")
+      .notNull()
+      .references(() => engagements.id, { onDelete: "cascade" }),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    title: text("title").notNull(),
+    folder: text("folder").notNull().default(""),
+    shared: integer("shared", { mode: "boolean" }).notNull().default(false),
+    pinned: integer("pinned", { mode: "boolean" }).notNull().default(false),
+    createdAt: createdAt(),
+    updatedAt: integer("updated_at", { mode: "timestamp" })
+      .notNull()
+      .default(sql`(unixepoch())`),
+  },
+  (t) => [index("gpt_chats_engagement").on(t.engagementId, t.userId)],
+);
+
+export const gptMessages = sqliteTable(
+  "gpt_messages",
+  {
+    id: id(),
+    chatId: text("chat_id")
+      .notNull()
+      .references(() => gptChats.id, { onDelete: "cascade" }),
+    role: text("role", { enum: ["user", "assistant"] }).notNull(),
+    body: text("body").notNull(),
+    /** JSON array of { n, label, href, text } the answer cites. */
+    sources: text("sources").notNull().default("[]"),
+    createdAt: createdAt(),
+  },
+  (t) => [index("gpt_messages_chat").on(t.chatId, t.createdAt)],
 );
