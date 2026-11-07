@@ -244,8 +244,8 @@ async function provisionUser(
 
 /**
  * Lets a named personal test account (TEST_ACCOUNT_EMAILS) into its firm as a regular,
- * non-admin member with the configured title, and onto every engagement as an editor so
- * there is something to look at.
+ * non-admin member, and onto every engagement as an editor so there is something to look at.
+ * The configured title is only the starting one; after that it's switched from the app.
  */
 async function provisionTestAccount(db: DB, account: TestAccount, name: string) {
   const domain = testAccountFirmDomain();
@@ -270,10 +270,13 @@ async function provisionTestAccount(db: DB, account: TestAccount, name: string) 
     where: and(eq(firmMembers.firmId, firmId), eq(firmMembers.userId, userId)),
   });
   if (member) {
-    await db
-      .update(firmMembers)
-      .set({ firmRoleId: role.id, isAdmin: false })
-      .where(and(eq(firmMembers.firmId, firmId), eq(firmMembers.userId, userId)));
+    // Keep whatever title they picked in the app; only make sure they aren't an admin.
+    if (member.isAdmin) {
+      await db
+        .update(firmMembers)
+        .set({ isAdmin: false })
+        .where(and(eq(firmMembers.firmId, firmId), eq(firmMembers.userId, userId)));
+    }
   } else {
     await db.insert(firmMembers).values({ firmId, userId, firmRoleId: role.id, isAdmin: false });
   }

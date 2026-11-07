@@ -5,8 +5,8 @@
  *
  *   TEST_ACCOUNT_EMAILS="someone@gmail.com, other@gmail.com:Manager"
  *
- * Each entry is an email, optionally followed by ":Title" (one of the firm's titles; the
- * firm's default title otherwise). Accounts join the firm of SSO_ADMIN_EMAIL, or of
+ * Each entry is an email, optionally followed by ":Title" for the starting title (one of the
+ * firm's titles; the firm's default title otherwise). After that, the title is switched in the app. Accounts join the firm of SSO_ADMIN_EMAIL, or of
  * TEST_ACCOUNT_FIRM_DOMAIN when set. They are never firm admins.
  */
 type Env = Record<string, string | undefined>;
