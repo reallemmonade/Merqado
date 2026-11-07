@@ -34,6 +34,10 @@ services:
         sync: false
       - key: SSO_FIRM_NAME
         sync: false
+      # Personal Google accounts allowed in for testing, e.g. "me@gmail.com" or "me@gmail.com:Manager".
+      # They join SSO_ADMIN_EMAIL's firm as regular (non-admin) members. See src/lib/auth/test-accounts.ts.
+      - key: TEST_ACCOUNT_EMAILS
+        sync: false
       # Set when using a custom domain; SSO redirects use it.
       - key: APP_URL
         sync: false

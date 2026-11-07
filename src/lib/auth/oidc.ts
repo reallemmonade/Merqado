@@ -1,14 +1,16 @@
 import * as oidc from "openid-client";
 import { and, eq } from "drizzle-orm";
 import type { DB } from "@/db/client";
-import { firmDomains, firmMembers, firmRoles, ssoConnections, users } from "@/db/schema";
+import { engagementMembers, engagements, firmDomains, firmMembers, firmRoles, ssoConnections, users } from "@/db/schema";
 import { decryptJson, encryptJson } from "@/lib/crypto";
 import {
   PLATFORM_PROVIDERS,
   platformCredentials,
+  verifiedGoogleEmail,
   workEmailFromClaims,
   type PlatformProvider,
 } from "@/lib/auth/platform";
+import { findTestAccount, testAccountFirmDomain, type TestAccount } from "@/lib/auth/test-accounts";
 
 export const FLOW_COOKIE = "mq_sso_flow";
 export const FLOW_TTL_SECONDS = 10 * 60;
@@ -191,6 +193,14 @@ function displayName(claims: Record<string, unknown>, email: string): string {
 async function completePlatformSignIn(db: DB, flow: FlowState, provider: PlatformProvider, callbackUrl: URL) {
   const claims = await exchangeCode({ provider }, flow, callbackUrl);
   const result = workEmailFromClaims(provider, claims);
+  if ("error" in result && result.error === "personal_account" && provider === "google") {
+    const email = verifiedGoogleEmail(claims);
+    const testAccount = email ? findTestAccount(email) : null;
+    if (testAccount) {
+      const { userId, firmId } = await provisionTestAccount(db, testAccount, displayName(claims, testAccount.email));
+      return { userId, firmId, connectionId: undefined, returnTo: flow.returnTo };
+    }
+  }
   if ("error" in result) {
     throw result.error === "personal_account"
       ? new SignInError("personal_account", "Use your work account, not a personal one.")
@@ -230,4 +240,50 @@ async function provisionUser(
   }
   await db.insert(firmMembers).values({ firmId, userId: user!.id, firmRoleId: role.id });
   return user!.id;
+}
+
+/**
+ * Lets a named personal test account (TEST_ACCOUNT_EMAILS) into its firm as a regular,
+ * non-admin member with the configured title, and onto every engagement as an editor so
+ * there is something to look at.
+ */
+async function provisionTestAccount(db: DB, account: TestAccount, name: string) {
+  const domain = testAccountFirmDomain();
+  const claimed = domain
+    ? await db.query.firmDomains.findFirst({ where: eq(firmDomains.domain, domain) })
+    : undefined;
+  if (!claimed) throw new SignInError("firm_not_found", "Test accounts aren't set up on this Merqado.");
+  const firmId = claimed.firmId;
+
+  const roles = await db.query.firmRoles.findMany({ where: eq(firmRoles.firmId, firmId) });
+  const role =
+    (account.title && roles.find((r) => r.title.toLowerCase() === account.title!.toLowerCase())) ||
+    roles.find((r) => r.id === claimed.defaultFirmRoleId) ||
+    [...roles].sort((a, b) => a.rank - b.rank)[0];
+  if (!role) throw new SignInError("not_provisioned", "Ask your firm's Merqado admin to add you before signing in.");
+
+  let user = await db.query.users.findFirst({ where: eq(users.email, account.email) });
+  if (!user) [user] = await db.insert(users).values({ email: account.email, name }).returning();
+  const userId = user!.id;
+
+  const member = await db.query.firmMembers.findFirst({
+    where: and(eq(firmMembers.firmId, firmId), eq(firmMembers.userId, userId)),
+  });
+  if (member) {
+    await db
+      .update(firmMembers)
+      .set({ firmRoleId: role.id, isAdmin: false })
+      .where(and(eq(firmMembers.firmId, firmId), eq(firmMembers.userId, userId)));
+  } else {
+    await db.insert(firmMembers).values({ firmId, userId, firmRoleId: role.id, isAdmin: false });
+  }
+
+  const firmEngagements = await db.query.engagements.findMany({ where: eq(engagements.firmId, firmId) });
+  if (firmEngagements.length) {
+    await db
+      .insert(engagementMembers)
+      .values(firmEngagements.map((e) => ({ engagementId: e.id, userId, access: "editor" as const })))
+      .onConflictDoNothing();
+  }
+  return { userId, firmId };
 }
