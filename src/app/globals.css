@@ -273,6 +273,10 @@ button.x:hover { color: var(--bad); }
 .seg-link { display: inline-flex; align-items: center; padding: 0 14px; min-height: 34px; font-size: 13px; color: var(--ink); text-decoration: none; background: var(--surface); }
 .seg-link[aria-current="page"] { background: var(--ink); color: var(--surface); }
 .row.todo { align-items: center; }
+.todo-add { padding-top: 10px; flex-wrap: wrap; }
+.toolbar.todo-add input[type="text"] { flex: 1; min-width: 160px; }
+.todo-add input[type="date"] { width: auto; }
+.todo-suggest { border-top: 1px solid var(--line); margin-top: 12px; padding-top: 10px; }
 .sev-high { background: #fde4e1; color: var(--bad); }
 .sev-medium { background: var(--chal); color: var(--chal-ink); }
 .sev-low { background: var(--track); color: var(--muted); }
