@@ -2,7 +2,7 @@
 
 import { CopyButton } from "@/components/CopyButton";
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { coverage, money, shortDate, STATUS_LABEL, STATUS_ORDER, type Status } from "@/lib/experts/calc";
 import type { ExpertRow, ExpertsData } from "@/lib/experts/data";
 import { TRANSCRIPT_ACCEPT } from "@/lib/experts/transcript-text";
@@ -39,8 +39,10 @@ export function PipelineView({
   const [sel, setSel] = useState<string | null>(initialExpert ?? data.experts[0]?.id ?? null);
   const [mode, setMode] = useState<"view" | "edit" | "new">(data.experts.length ? "view" : "new");
   const [tab, setTab] = useState<Tab>(initialTab ?? "overview");
-  // In Full table mode the details open as a pop-out panel over the table instead of beside it.
-  const [drawer, setDrawer] = useState(false);
+  // Whether the expert details are showing. In Simple view they sit beside the table and start open;
+  // closing them lets the table take the full width. In Full table they pop out over the table.
+  const [drawer, setDrawer] = useState(true);
+  const sideRef = useRef<HTMLElement>(null);
   const layout = useTableLayout(
     engagementId,
     useMemo(() => data.experts.map((e) => e.id), [data.experts]),
@@ -118,10 +120,23 @@ export function PipelineView({
   }
 
   useEffect(() => {
-    if (!full || !drawer) return;
+    if (!drawer) return;
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && setDrawer(false);
     window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
+    // Simple view: clicking anywhere outside the panel closes it, except on rows and controls,
+    // so picking another expert or using the toolbar keeps it open.
+    const onDown = (e: MouseEvent) => {
+      if (full) return; // Full table uses its backdrop instead.
+      const t = e.target as Element | null;
+      if (!t || sideRef.current?.contains(t)) return;
+      if (t.closest("button, a, input, select, textarea, label, tr, [role=dialog]")) return;
+      setDrawer(false);
+    };
+    document.addEventListener("mousedown", onDown);
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      document.removeEventListener("mousedown", onDown);
+    };
   }, [full, drawer]);
 
   const setStatus = (e: ExpertRow, status: Status) =>
@@ -212,7 +227,14 @@ export function PipelineView({
             ))}
           </select>
           <div className="seg" role="group" aria-label="Columns">
-            <button type="button" aria-pressed={!full} onClick={() => setFull(false)}>
+            <button
+              type="button"
+              aria-pressed={!full}
+              onClick={() => {
+                setFull(false);
+                setDrawer(true);
+              }}
+            >
               Simple
             </button>
             <button
@@ -321,9 +343,9 @@ export function PipelineView({
                     {g.rows.map((e) => {
                       const est = e.billed ? "" : "~";
                       return (
-                        <tr key={e.id} className={e.id === sel ? "selected" : undefined}>
+                        <tr key={e.id} className={drawer && e.id === sel ? "selected" : undefined}>
                           <td style={{ paddingLeft: 16 }}>
-                            <button type="button" className="linklike" aria-pressed={e.id === sel} onClick={() => openExpert(e.id)}>
+                            <button type="button" className="linklike" aria-pressed={drawer && e.id === sel} onClick={() => openExpert(e.id)}>
                               <span style={{ fontWeight: 500 }}>{e.anonTitle || e.name}</span>
                               <span className="muted" style={{ fontSize: 12 }}>
                                 {e.name}
@@ -377,15 +399,9 @@ export function PipelineView({
         </p>
       </section>
 
-      {!full ? (
-        <aside className="side panel" aria-label="Expert details">
-          {details}
-        </aside>
-      ) : (
-        drawer && (
-          <>
-            <div className="drawer-backdrop" onClick={() => setDrawer(false)} />
-            <aside className="drawer panel" role="dialog" aria-modal="true" aria-label="Expert details">
+      {!full
+        ? drawer && (
+            <aside ref={sideRef} className="side panel" aria-label="Expert details">
               <div className="drawer-close">
                 <button type="button" className="secondary small" onClick={() => setDrawer(false)}>
                   Close
@@ -393,9 +409,20 @@ export function PipelineView({
               </div>
               {details}
             </aside>
-          </>
-        )
-      )}
+          )
+        : drawer && (
+            <>
+              <div className="drawer-backdrop" onClick={() => setDrawer(false)} />
+              <aside className="drawer panel" role="dialog" aria-modal="true" aria-label="Expert details">
+                <div className="drawer-close">
+                  <button type="button" className="secondary small" onClick={() => setDrawer(false)}>
+                    Close
+                  </button>
+                </div>
+                {details}
+              </aside>
+            </>
+          )}
     </div>
   );
 }
@@ -653,9 +680,7 @@ function ExpertTile({
                   <div className="meta">
                     <span className={`tag v-${k.verdict}`}>{VERDICT_LABEL[k.verdict]}</span>
                     {h && <span>{[h.slideRef, h.statement].filter(Boolean).join(" · ")}</span>}
-                    {k.locator && (
-                      <SourceLink engagementId={engagementId} transcripts={transcripts} locator={k.locator} />
-                    )}
+                    {k.locator && <SourceLink engagementId={engagementId} transcripts={transcripts} locator={k.locator} />}
                     <span style={{ flex: 1 }} />
                     {canEdit && (
                       <label className="check" style={{ fontSize: 12 }}>
@@ -697,11 +722,19 @@ function ExpertTile({
                 </form>
                 <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
                   {transcripts.length > 0 && (
-                    <button type="button" disabled={api.busy === "kta-gen"} onClick={async () => {
+                    <button
+                      type="button"
+                      disabled={api.busy === "kta-gen"}
+                      onClick={async () => {
                         const res = await api.call("kta-gen", `${base}/experts/${expert.id}/takeaways?generate=1`);
                         if (res?.note) api.setError(res.note);
-                      }}>
-                      {api.busy === "kta-gen" ? "Reading the transcript…" : takeaways.some((k) => k.source === "ai") ? "Regenerate from transcript" : "Generate from transcript"}
+                      }}
+                    >
+                      {api.busy === "kta-gen"
+                        ? "Reading the transcript…"
+                        : takeaways.some((k) => k.source === "ai")
+                          ? "Regenerate from transcript"
+                          : "Generate from transcript"}
                     </button>
                   )}
                   <TranscriptUpload engagementId={engagementId} expertId={expert.id} api={api} />
