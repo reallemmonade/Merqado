@@ -59,7 +59,7 @@ export const COLUMNS: Column[] = [
       <EditableCell
         label="Shown in decks as"
         value={e.anonOverride ?? ""}
-        placeholder={e.anonTitle || "Leave blank for automatic"}
+        placeholder={e.anonTitle || "Automatic"}
         render={(v) => v || e.anonTitle || <span className="muted">—</span>}
         canEdit={c.canEdit}
         style={{ minWidth: 180 }}

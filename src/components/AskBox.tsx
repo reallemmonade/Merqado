@@ -40,7 +40,7 @@ export function AskBox({ engagementId }: { engagementId: string }) {
           type="text"
           value={question}
           onChange={(e) => setQuestion(e.target.value)}
-          placeholder="Ask about data, interviews, or findings…"
+          placeholder="Ask a question"
           style={{ flex: "1 1 280px" }}
         />
         <button type="submit" disabled={busy || !question.trim()}>

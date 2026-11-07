@@ -49,8 +49,7 @@ export function NewEngagement() {
         </label>
       </div>
       <label className="check">
-        <input type="checkbox" checked={sample} onChange={(e) => setSample(e.target.checked)} /> Fill the Experts tab with sample data (a
-        made-up plastics case) to try it out
+        <input type="checkbox" checked={sample} onChange={(e) => setSample(e.target.checked)} /> Sample data
       </label>
       <div style={{ display: "flex", gap: 8 }}>
         <button type="submit" disabled={busy}>

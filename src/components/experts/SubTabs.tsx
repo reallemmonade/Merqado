@@ -23,7 +23,7 @@ export function SubTabs({ engagementId }: { engagementId: string }) {
         </Link>
       ))}
       <span className="muted" style={{ padding: "10px 0" }} title="Coming later">
-        Wish list (soon)
+        Wish list
       </span>
     </nav>
   );

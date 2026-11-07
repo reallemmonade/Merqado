@@ -13,9 +13,6 @@ export function RunningGuides({ engagementId, data, canEdit }: { engagementId: s
   return (
     <section className="card">
       <h2 style={{ fontSize: 18 }}>Running guides</h2>
-      <p className="muted" style={{ margin: 0, fontSize: 13 }}>
-        The questions you ask everyone of a type. Each expert&rsquo;s generated guide adds bespoke questions on top.
-      </p>
       <label className="field">
         Guide for
         <select value={pick} onChange={(e) => setPick(e.target.value)}>

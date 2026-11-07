@@ -144,7 +144,7 @@ export function TopicsCell({
     <td style={{ minWidth: 220 }} className="cell-editable">
       {editing ? (
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-          {topics.length === 0 && <span className="muted">Add topics under Case setup.</span>}
+          {topics.length === 0 && <span className="muted">No topics</span>}
           {topics.map((t) => (
             <label key={t.id} className="check" style={{ fontSize: 13 }}>
               <input

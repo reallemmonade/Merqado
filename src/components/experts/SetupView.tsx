@@ -27,7 +27,6 @@ export function SetupView({
     <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 420px), 1fr))", gap: 16 }}>
       <NamedTargets
         title="Interviewee types"
-        hint="The archetypes you want to talk to, and how many calls with each."
         kind="type"
         rows={data.types.map((t) => ({ id: t.id, name: t.name, target: t.target }))}
         placeholder="Customers"
@@ -37,7 +36,6 @@ export function SetupView({
       />
       <NamedTargets
         title="Topics"
-        hint="What the case needs covered, and how many calls should discuss each."
         kind="topic"
         rows={data.topics.map((t) => ({ id: t.id, name: t.name, target: t.target }))}
         placeholder="Pricing power"
@@ -62,7 +60,6 @@ export function SetupView({
 
 function NamedTargets({
   title,
-  hint,
   kind,
   rows,
   placeholder,
@@ -71,7 +68,6 @@ function NamedTargets({
   api,
 }: {
   title: string;
-  hint: string;
   kind: "type" | "topic";
   rows: { id: string; name: string; target: number }[];
   placeholder: string;
@@ -84,9 +80,6 @@ function NamedTargets({
   return (
     <section className="card">
       <h2 style={{ fontSize: 18 }}>{title}</h2>
-      <p className="muted" style={{ margin: 0, fontSize: 13 }}>
-        {hint}
-      </p>
       {rows.map((r) => (
         <Row key={r.id} kind={kind} row={r} canEdit={canEdit} send={send} />
       ))}
@@ -175,9 +168,6 @@ function Hypotheses({
   return (
     <section className="card">
       <h2 style={{ fontSize: 18 }}>Hypotheses</h2>
-      <p className="muted" style={{ margin: 0, fontSize: 13 }}>
-        The themes you&rsquo;re testing. Guides aim questions at them and key takeaways roll up into them.
-      </p>
       {rows.map((h) => (
         <div className="row" key={h.id}>
           <span>
@@ -244,9 +234,6 @@ function Budget({
   return (
     <section className="card">
       <h2 style={{ fontSize: 18 }}>Budget and timing</h2>
-      <p className="muted" style={{ margin: 0, fontSize: 13 }}>
-        Used for the budget bar and the projection on Metrics.
-      </p>
       <form
         onSubmit={async (ev) => {
           ev.preventDefault();

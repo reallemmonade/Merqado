@@ -31,22 +31,11 @@ export function KtaView({ engagementId, data, canEdit }: { engagementId: string;
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-      <p className="muted" style={{ margin: 0 }}>
-        {included.length} of {data.takeaways.length} takeaways from {interviews.length} interviews are included. Untick a takeaway to
-        leave it out of the hypotheses.
-      </p>
-      <p className="notice" style={{ margin: 0 }}>
-        Takeaways use a simple placeholder layout for now. They&rsquo;ll switch to your firm&rsquo;s KTA format once it&rsquo;s set.
-      </p>
       <div className="split">
         <section className="primary" aria-label="Takeaways by interview">
           {interviews.length === 0 && (
             <div className="empty">
               <strong>No takeaways yet</strong>
-              <span className="muted">
-                Open an expert in the <Link href={`/e/${engagementId}/experts`}>Calls</Link>, upload their transcript and generate
-                takeaways.
-              </span>
             </div>
           )}
           {interviews.map((e) => {
@@ -61,9 +50,6 @@ export function KtaView({ engagementId, data, canEdit }: { engagementId: string;
                     {[type?.name, shortDate(e.interviewDate)].filter(Boolean).join(" · ")}
                   </span>
                   <span style={{ flex: 1 }} />
-                  <span className="muted" style={{ fontSize: 12 }}>
-                    {on} of {ks.length} included
-                  </span>
                   {canEdit && (
                     <button
                       type="button"
@@ -143,7 +129,7 @@ export function KtaView({ engagementId, data, canEdit }: { engagementId: string;
               Edit themes
             </Link>
           </div>
-          {themes.length === 0 && <p className="muted">Add the hypotheses you&rsquo;re testing in Case setup.</p>}
+          {themes.length === 0 && <p className="muted">No hypotheses</p>}
           {themes.map(({ h, ks, sup, ch, read }) => (
             <div key={h.id} className="card" style={{ gap: 10, padding: 16 }}>
               <div>

@@ -43,6 +43,13 @@
       "when": 1794083903689,
       "tag": "0005_transcript_originals",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "6",
+      "when": 1794087320533,
+      "tag": "0006_case_workspace",
+      "breakpoints": true
     }
   ]
 }
