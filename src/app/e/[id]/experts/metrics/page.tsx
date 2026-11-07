@@ -20,17 +20,22 @@ export default async function ExpertsMetricsPage({ params }: { params: Promise<{
     expenses: data.expenses,
     elapsedShare: elapsedShare(engagement.startsOn, engagement.endsOn),
   });
-  const scale = Math.max(b.total, b.projected, b.spent + b.booked, 1) * 1.04;
+  // Budget bar: the full bar is the budget, unless we're projected to go over it.
   const over = b.projected - b.total;
+  const stillExpected = Math.max(0, b.projected - b.spent - b.booked);
+  const scale = Math.max(b.total, b.projected, 1);
 
   const discussedBy = (topicId: string) =>
-    new Set(data.transcripts.filter((t) => t.discussedTopicIds.includes(topicId)).map((t) => t.expertId)).size;
-  const topicRows = data.topics.map((t) => ({
-    ...t,
-    tagged: live.filter((e) => e.topicIds.includes(t.id)).length,
-    discussed: discussedBy(t.id),
-  }));
-  const topicMax = Math.max(1, ...topicRows.map((t) => Math.max(t.tagged, t.target)));
+    new Set(data.transcripts.filter((t) => t.discussedTopicIds.includes(topicId)).map((t) => t.expertId));
+  const topicRows = data.topics.map((t) => {
+    const discussedIds = discussedBy(t.id);
+    const discussed = discussedIds.size;
+    // Experts on the list who know this topic but haven't talked about it in a transcript yet.
+    const notYet = live.filter((e) => e.topicIds.includes(t.id) && !discussedIds.has(e.id)).length;
+    const short = Math.max(0, t.target - discussed - notYet);
+    const full = Math.max(t.target, discussed, 1);
+    return { ...t, discussed, notYet, short, full };
+  });
   const setupLink = <Link href={`/e/${id}/experts/setup`}>Case setup</Link>;
 
   return (
@@ -86,27 +91,51 @@ export default async function ExpertsMetricsPage({ params }: { params: Promise<{
                 <div><div className="muted" style={{ fontSize: 12 }}>Total budget</div><div className="tile-value" style={{ fontSize: 20 }}>{money(b.total)}</div></div>
                 <div><div className="muted" style={{ fontSize: 12 }}>Spent so far</div><div className="tile-value" style={{ fontSize: 20 }}>{money(b.spent)}</div></div>
                 <div><div className="muted" style={{ fontSize: 12 }}>Remaining</div><div className="tile-value" style={{ fontSize: 20 }}>{money(b.remaining)}</div></div>
-                <div><div className="muted" style={{ fontSize: 12 }}>Projected</div><div className="tile-value" style={{ fontSize: 20, color: over > 0 ? "var(--bad)" : undefined }}>{money(b.projected)}</div></div>
+                <div><div className="muted" style={{ fontSize: 12 }}>Projected total</div><div className="tile-value" style={{ fontSize: 20, color: over > 0 ? "var(--bad)" : undefined }}>{money(b.projected)}</div></div>
               </div>
-              <div
-                className="budget-bar"
-                role="img"
-                aria-label={`Honoraria ${money(b.honorariaPaid)}, expenses ${money(b.expenses)}, AI tools ${money(b.aiTools)}, booked ${money(b.booked)}, of ${money(b.total)}; projected ${money(b.projected)}`}
-              >
-                <span style={{ width: pct(b.honorariaPaid, scale), background: "var(--st-completed)", borderRadius: "6px 0 0 6px" }} />
-                <span style={{ width: pct(b.expenses, scale), background: "#0f8a8a" }} />
-                <span style={{ width: pct(b.aiTools, scale), background: "#7a4fb4" }} />
-                <span style={{ width: pct(b.booked, scale), background: "repeating-linear-gradient(135deg, var(--st-scheduled) 0 6px, var(--st-approved) 6px 12px)" }} />
-                <span aria-hidden="true" style={{ position: "absolute", left: pct(b.total, scale), top: -6, bottom: -6, width: 2, background: "var(--ink)" }} />
-                <span aria-hidden="true" style={{ position: "absolute", left: pct(b.projected, scale), top: -6, bottom: -6, borderLeft: "2px dashed var(--bad)" }} />
+              <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                <div
+                  className="budget-bar"
+                  role="img"
+                  aria-label={`Spent ${money(b.spent)}, booked ${money(b.booked)}, still expected ${money(stillExpected)}, against a budget of ${money(b.total)}`}
+                >
+                  <span style={{ width: pct(b.spent, scale), background: "var(--st-completed)", borderRadius: "6px 0 0 6px" }} />
+                  <span style={{ width: pct(b.booked, scale), background: "var(--st-scheduled)" }} />
+                  <span style={{ width: pct(stillExpected, scale), background: "var(--st-approved)", outline: "1px solid var(--st-scheduled)", outlineOffset: -1 }} />
+                  {over > 0 && (
+                    <span aria-hidden="true" style={{ position: "absolute", left: pct(b.total, scale), top: -4, bottom: -4, width: 2, background: "var(--ink)" }} />
+                  )}
+                </div>
+                <div style={{ position: "relative", height: 16, fontSize: 12 }} className="muted" aria-hidden="true">
+                  <span style={{ position: "absolute", left: 0 }}>$0</span>
+                  <span style={{ position: "absolute", right: over > 0 ? `calc(100% - ${pct(b.total, scale)})` : 0, whiteSpace: "nowrap" }}>
+                    Budget {money(b.total)}
+                  </span>
+                </div>
               </div>
-              <div className="legend">
-                <span><i style={{ background: "var(--st-completed)" }} />Honoraria paid {money(b.honorariaPaid)}</span>
-                <span><i style={{ background: "#0f8a8a" }} />Expenses {money(b.expenses)}</span>
-                <span><i style={{ background: "#7a4fb4" }} />AI tools {money(b.aiTools)}</span>
-                <span><i style={{ background: "var(--st-scheduled)" }} />Booked, not billed {money(b.booked)}</span>
-                <span><i style={{ background: "var(--ink)", width: 2 }} />Budget</span>
-                <span><i style={{ borderLeft: "2px dashed var(--bad)", width: 0 }} />Projected</span>
+              <div className="legend" style={{ flexDirection: "column", gap: 6, fontSize: 13 }}>
+                <span>
+                  <i style={{ background: "var(--st-completed)" }} />
+                  <strong style={{ color: "var(--ink)", fontWeight: 500 }}>Spent {money(b.spent)}</strong>: honoraria {money(b.honorariaPaid)}, expenses{" "}
+                  {money(b.expenses)}, AI tools {money(b.aiTools)}
+                </span>
+                <span>
+                  <i style={{ background: "var(--st-scheduled)" }} />
+                  <strong style={{ color: "var(--ink)", fontWeight: 500 }}>Booked {money(b.booked)}</strong>: interviews scheduled or approved, not billed yet
+                </span>
+                <span>
+                  <i style={{ background: "var(--st-approved)", border: "1px solid var(--st-scheduled)", boxSizing: "border-box" }} />
+                  <strong style={{ color: "var(--ink)", fontWeight: 500 }}>Still expected {money(stillExpected)}</strong>: our estimate for proposed and future interviews
+                  {b.futureExpenses > 0 ? " and expenses" : ""}
+                </span>
+                <span>
+                  <i style={{ background: "var(--track)" }} />
+                  {over > 0 ? (
+                    <strong style={{ color: "var(--bad)", fontWeight: 500 }}>Past the black line: {money(over)} over budget</strong>
+                  ) : (
+                    <><strong style={{ color: "var(--ink)", fontWeight: 500 }}>Left over {money(-over)}</strong>: budget we don&rsquo;t expect to use</>
+                  )}
+                </span>
               </div>
               <p style={{ margin: 0, fontSize: 13, color: over > 0 ? "var(--bad)" : "var(--good)", fontWeight: 600 }}>
                 {over > 0 ? `Projected ${money(over)} over budget` : `Projected ${money(-over)} under budget`}
@@ -149,23 +178,43 @@ export default async function ExpertsMetricsPage({ params }: { params: Promise<{
         <h2 id="topic-h" style={{ fontSize: 18 }}>
           Topic coverage
         </h2>
+        <p className="muted" style={{ margin: 0, fontSize: 13 }}>
+          How many experts have actually talked about each topic in an interview, against the target set in Case setup. A full bar means
+          the target is met.
+        </p>
         <div className="legend">
-          <span><i style={{ background: "var(--st-approved)", border: "1px solid var(--st-scheduled)" }} />Experts with this expertise</span>
-          <span><i style={{ background: "var(--st-completed)" }} />Actually discussed it (from transcripts)</span>
-          <span><i style={{ background: "var(--ink)", width: 2 }} />Target</span>
+          <span><i className="seg-completed" />Discussed in an interview</span>
+          <span><i style={{ background: "var(--st-approved)", border: "1px solid var(--st-scheduled)", boxSizing: "border-box" }} />Experts who know it, not discussed yet</span>
+          <span><i style={{ background: "var(--track)" }} />Still needed</span>
         </div>
         {topicRows.length === 0 && <p className="muted">Add the case topics in {setupLink}.</p>}
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 420px), 1fr))", gap: "14px 40px" }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 380px), 1fr))", gap: "16px 40px" }}>
           {topicRows.map((t) => (
-            <div key={t.id} style={{ display: "grid", gridTemplateColumns: "minmax(0, 170px) minmax(0, 1fr) 64px", gap: 10, alignItems: "center" }}>
-              <span style={{ fontSize: 13, fontWeight: 500 }}>{t.name}</span>
-              <div role="img" aria-label={`${t.name}: ${t.tagged} experts tagged, ${t.discussed} discussed it, target ${t.target}`} style={{ position: "relative", display: "flex", flexDirection: "column", gap: 3 }}>
-                <span style={{ height: 12, width: pct(t.tagged, topicMax), background: "var(--st-approved)", border: "1px solid var(--st-scheduled)", borderRadius: 3, boxSizing: "border-box" }} />
-                <span style={{ height: 12, width: pct(t.discussed, topicMax), background: "var(--st-completed)", borderRadius: 3 }} />
-                {t.target > 0 && <span aria-hidden="true" style={{ position: "absolute", left: pct(t.target, topicMax), top: -3, bottom: -3, width: 2, background: "var(--ink)" }} />}
+            <div key={t.id} style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", gap: 8, fontSize: 13 }}>
+                <strong style={{ fontWeight: 500 }}>{t.name}</strong>
+                <span style={{ whiteSpace: "nowrap" }}>
+                  {t.target > 0 ? `${t.discussed} of ${t.target} discussed` : `${t.discussed} discussed`}
+                </span>
               </div>
-              <span className="muted" style={{ fontSize: 12, textAlign: "right", color: t.target && t.discussed < 2 ? "var(--warn)" : undefined }}>
-                {t.discussed} of {t.target || "–"}
+              <div
+                className="covbar big"
+                role="img"
+                aria-label={`${t.name}: ${t.discussed} discussed, ${t.notYet} more experts know it, target ${t.target}`}
+              >
+                <span className="seg-completed" style={{ width: pct(t.discussed, t.full) }} />
+                <span style={{ width: pct(Math.min(t.notYet, t.full - t.discussed), t.full), background: "var(--st-approved)", outline: "1px solid var(--st-scheduled)", outlineOffset: -1 }} />
+              </div>
+              <span className="muted" style={{ fontSize: 12, color: t.short > 0 ? "var(--warn)" : undefined }}>
+                {t.target > 0 && t.discussed >= t.target
+                  ? "Target met"
+                  : [
+                      t.notYet > 0 ? `${t.notYet} more ${t.notYet === 1 ? "expert knows" : "experts know"} it` : null,
+                      t.short > 0 ? `find ${t.short} more ${t.short === 1 ? "expert" : "experts"} to hit the target` : null,
+                    ]
+                      .filter(Boolean)
+                      .join(", ")
+                      .replace(/^./, (c) => c.toUpperCase()) || "No target set"}
               </span>
             </div>
           ))}
