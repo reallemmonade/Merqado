@@ -140,16 +140,6 @@ export default async function ExpertsMetricsPage({ params }: { params: Promise<{
               <p style={{ margin: 0, fontSize: 13, color: over > 0 ? "var(--bad)" : "var(--good)", fontWeight: 600 }}>
                 {over > 0 ? `Projected ${money(over)} over budget` : `Projected ${money(-over)} under budget`}
               </p>
-              <p className="muted" style={{ margin: 0, fontSize: 13 }}>
-                Spent {money(b.spent)} + booked {money(b.booked)} + proposed {money(b.proposed)} + {b.futureInterviews} more planned
-                interviews at the {money(b.averageHonorarium)} average ({money(b.futureInterviewCost)})
-                {b.futureExpenses > 0
-                  ? ` + expenses and AI at the pace so far (${money(b.futureExpenses)})`
-                  : engagement.startsOn && engagement.endsOn
-                    ? ""
-                    : ". Add the case start and end dates in Case setup to project expenses too"}
-                .
-              </p>
             </>
           )}
           <details>
