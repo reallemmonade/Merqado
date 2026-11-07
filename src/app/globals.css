@@ -176,7 +176,7 @@ table.grid.full tr.drop-here td { box-shadow: inset 0 2px 0 var(--accent), inset
 .empty { border: 1.5px dashed var(--line); border-radius: 8px; padding: 20px; display: flex; flex-direction: column; gap: 8px; align-items: flex-start; }
 .guide-text { white-space: pre-wrap; line-height: 1.6; font-size: 13px; }
 .budget-bar { position: relative; height: 30px; border-radius: 6px; background: var(--track); overflow: visible; display: flex; }
-.budget-bar span { height: 100%; }
+.budget-bar > span, .budget-bar > a { height: 100%; }
 .legend { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 12px; color: var(--muted); }
 .legend i { display: inline-block; width: 11px; height: 11px; border-radius: 3px; margin-right: 6px; vertical-align: -1px; }
 .transcript { white-space: pre-wrap; line-height: 1.65; font-size: 14px; max-height: 70vh; overflow: auto; }
@@ -187,6 +187,27 @@ table.grid.full tr.drop-here td { box-shadow: inset 0 2px 0 var(--accent), inset
 .copy-btn.inline { position: static; }
 .copyable:hover .copy-btn, .copyable:focus-within .copy-btn, .copy-btn.shown, .copy-btn:focus-visible { opacity: 1; pointer-events: auto; }
 @media (hover: none) { .copy-btn { opacity: 1; pointer-events: auto; } }
+
+/* Metrics bar segments link to the experts behind them in Calls. */
+.covbar a, .budget-bar a { display: block; height: 100%; transition: filter 0.1s; }
+.covbar a:hover, .budget-bar a:hover, .covbar a:focus-visible, .budget-bar a:focus-visible { filter: brightness(0.85); }
+.focus-chip { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 12px; border-radius: 8px; background: var(--selected); border: 1px solid var(--st-scheduled); font-size: 13px; }
+
+/* Rounded ends on every progress bar. Empty segments aren't rendered, so first/last filled are the first/last a or plain span. */
+.covbar.big { overflow: visible; }
+.covbar > :first-child { border-top-left-radius: inherit; border-bottom-left-radius: inherit; }
+.covbar > span:not(.seg-rest):last-child, .covbar > a:last-of-type { border-top-right-radius: inherit; border-bottom-right-radius: inherit; }
+.budget-bar > a:first-of-type { border-top-left-radius: 6px; border-bottom-left-radius: 6px; }
+.budget-bar > a:last-of-type { border-top-right-radius: 6px; border-bottom-right-radius: 6px; }
+.seg-rest { flex: 1; height: 100%; }
+.budget-bar > .budget-mark { position: absolute; top: -4px; bottom: -4px; height: auto; width: 2px; background: var(--ink); }
+
+/* Hover popups on bar segments. */
+.tip-host { position: relative; outline-offset: 2px; }
+.tip { position: absolute; bottom: calc(100% + 8px); left: 0; transform: translateY(4px); z-index: 30; display: flex; flex-direction: column; gap: 2px; padding: 8px 10px; border-radius: 8px; background: var(--ink); color: var(--surface); font-size: 12px; line-height: 1.35; white-space: nowrap; pointer-events: none; opacity: 0; transition: opacity 0.12s, transform 0.12s; box-shadow: 0 6px 18px rgba(0, 0, 0, 0.18); }
+.tip strong { font-weight: 600; }
+.seg-rest > .tip, .budget-mark > .tip { left: auto; right: 0; }
+.tip-host:hover > .tip, .tip-host:focus-visible > .tip { opacity: 1; transform: none; }
 
 /* ---------- Case shell: side menu, icon rail, case GPT bar ---------- */
 .nav .nav-item { display: flex; align-items: center; gap: 12px; min-height: 40px; padding: 0 10px; }
