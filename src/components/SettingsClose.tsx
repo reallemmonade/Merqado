@@ -2,11 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect } from "react";
-
-/** Only same-site paths; anything else goes home. */
-export function safeReturnPath(from: string | undefined): string {
-  return from && from.startsWith("/") && !from.startsWith("//") && !from.startsWith("/\\") ? from : "/";
-}
+import { safeReturnPath } from "@/lib/return-path";
 
 /** Leaves Settings for the page you opened it from (or home). Esc does the same. */
 export function SettingsClose({ from }: { from?: string }) {
