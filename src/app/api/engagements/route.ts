@@ -3,6 +3,8 @@ import { z } from "zod";
 import { getDb } from "@/db/client";
 import { engagementMembers, engagements } from "@/db/schema";
 import { seedSampleExperts } from "@/lib/experts/sample";
+import { loadMembers } from "@/lib/case/page";
+import { seedCaseWorkspace } from "@/lib/case/sample";
 import { getSessionUser } from "@/lib/session";
 
 const body = z.object({
@@ -23,6 +25,9 @@ export async function POST(req: Request) {
     .values({ firmId: user.firmId, clientName: parsed.data.clientName, title: parsed.data.title })
     .returning({ id: engagements.id });
   await db.insert(engagementMembers).values({ engagementId: eng!.id, userId: user.id, access: "lead" });
-  if (parsed.data.sample) await seedSampleExperts(db, eng!.id);
+  if (parsed.data.sample) {
+    await seedSampleExperts(db, eng!.id);
+    await seedCaseWorkspace(db, eng!.id, await loadMembers(eng!.id, user.firmId), user.id);
+  }
   return NextResponse.json({ id: eng!.id });
 }

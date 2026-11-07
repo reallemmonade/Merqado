@@ -50,15 +50,10 @@ export default async function LoginPage({
                 </button>
               </form>
             ))}
-            <p className="muted" style={{ margin: "6px 0 0", fontSize: 13 }}>
-              Or, if your firm uses its own sign-in (Okta, OneLogin, ...), enter your work email.
+            <p className="muted" style={{ margin: "6px 0 0", fontSize: 13, textAlign: "center" }}>
+              or
             </p>
           </div>
-        )}
-        {providers.length === 0 && (
-          <p className="muted" style={{ margin: 0 }}>
-            Use your work email. We'll send you to your firm's sign-in page.
-          </p>
         )}
         <form method="post" action="/api/auth/start" style={{ display: "flex", flexDirection: "column", gap: 10 }}>
           <label htmlFor="email">Work email</label>

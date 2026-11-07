@@ -148,7 +148,7 @@ export function PipelineView({
             }}
           />
         ) : (
-          <p className="muted">You have view access on this engagement.</p>
+          <p className="muted">View only</p>
         )}
         {api.error && <p className="error">{api.error}</p>}
       </div>
@@ -243,8 +243,7 @@ export function PipelineView({
 
         {data.types.length === 0 && (
           <p className="notice">
-            Add the interviewee types for this case (customers, competitors and so on) under{" "}
-            <Link href={`/e/${engagementId}/experts/setup`}>Case setup</Link> to group experts and track coverage.
+            <Link href={`/e/${engagementId}/experts/setup`}>Add interviewee types</Link>
           </p>
         )}
 
@@ -252,10 +251,6 @@ export function PipelineView({
           <div className="group copyable" key={g.id || "none"}>
             <div className="group-head">
               <h2>{g.name}</h2>
-              <span className="muted" style={{ fontSize: 13 }}>
-                {g.cov.completed} {g.target ? `of ${g.target}` : ""} done
-                {g.cov.proposed ? ` · ${g.cov.proposed} to approve` : ""}
-              </span>
               <span className="grow" style={{ flex: 1 }} />
               {g.target > 0 && (
                 <div
@@ -273,7 +268,7 @@ export function PipelineView({
             </div>
             {g.rows.length === 0 ? (
               <p className="muted" style={{ padding: "12px 16px", margin: 0, fontSize: 13 }}>
-                {query || statusFilter !== "all" ? "No matches." : "No experts yet."}
+                {query || statusFilter !== "all" ? "No matches" : "No experts"}
               </p>
             ) : full ? (
               <div className="scroll-x">
@@ -351,30 +346,18 @@ export function PipelineView({
             )}
           </div>
         ))}
-        {full && (
-          <p className="muted" style={{ fontSize: 12, margin: 0 }}>
-            {canEdit && <>Click any cell to change it. Enter saves, Esc cancels. </>}
-            Drag a column heading, or the ⋮⋮ beside a name, to rearrange the table your way (only you see your arrangement). Click an expert&rsquo;s
-            name to open their details.
-            {layout.customised && (
-              <>
-                {" "}
-                <button type="button" className="secondary small" onClick={layout.reset} style={{ marginLeft: 6 }}>
-                  Reset layout
-                </button>
-              </>
-            )}
-          </p>
+        {full && layout.customised && (
+          <div>
+            <button type="button" className="secondary small" onClick={layout.reset}>
+              Reset layout
+            </button>
+          </div>
         )}
         {full && !drawer && api.error && (
           <p className="error" style={{ margin: 0 }}>
             {api.error}
           </p>
         )}
-        <p className="muted" style={{ fontSize: 12, margin: 0 }}>
-          Minutes = call + follow-up + survey. Honorarium = minutes ÷ 60 × hourly rate. &ldquo;~&rdquo; marks an estimate for a call that hasn&rsquo;t
-          happened yet (an hour if no length is set).
-        </p>
       </section>
 
       {!full ? (
@@ -447,7 +430,7 @@ function ExpertTile({
           <h2 style={{ fontSize: 22 }}>{expert.name}</h2>
           <div>{[expert.title, expert.company].filter(Boolean).join(", ")}</div>
           <div className="muted" style={{ fontSize: 13 }}>
-            Shown in decks as <strong style={{ color: "var(--ink)" }}>{expert.anonTitle}</strong>
+            Anonymized: <strong style={{ color: "var(--ink)" }}>{expert.anonTitle}</strong>
           </div>
         </div>
         {expert.status === "declined" ? (
@@ -570,10 +553,6 @@ function ExpertTile({
 
         {tab === "guide" && (
           <>
-            <p className="muted" style={{ margin: 0, fontSize: 13 }}>
-              Bespoke questions aimed at your hypotheses and storyline, followed by the running guide for{" "}
-              {type ? type.name.toLowerCase() : "this case"}.
-            </p>
             {guideDraft !== null ? (
               <>
                 <label className="sr-only" htmlFor="guide-edit">
@@ -604,9 +583,6 @@ function ExpertTile({
             ) : (
               <div className="empty">
                 <strong>No guide yet</strong>
-                <span className="muted" style={{ fontSize: 13 }}>
-                  Generate one from the running guide and your hypotheses, or write your own.
-                </span>
               </div>
             )}
             {canEdit && guideDraft === null && (
@@ -638,11 +614,6 @@ function ExpertTile({
             {takeaways.length === 0 && (
               <div className="empty">
                 <strong>No takeaways yet</strong>
-                <span className="muted" style={{ fontSize: 13 }}>
-                  {transcripts.length
-                    ? "Generate them from the transcript, or add your own."
-                    : "Upload the transcript after the call and Merqado will draft the key takeaways."}
-                </span>
               </div>
             )}
             {takeaways.map((k) => {

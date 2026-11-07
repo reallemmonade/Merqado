@@ -40,7 +40,7 @@ export function AppNav({
             )}
           </div>
         ))}
-        {engagements.length === 0 && <p className="muted">No engagements yet.</p>}
+        {engagements.length === 0 && <p className="muted">No engagements</p>}
       </div>
       <div style={{ marginTop: "auto", display: "flex", flexDirection: "column", gap: 12 }}>
         <NavTitleSwitch />

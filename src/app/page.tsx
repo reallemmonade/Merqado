@@ -5,7 +5,6 @@ import { getDb } from "@/db/client";
 import { engagementMembers, engagements } from "@/db/schema";
 import { AppNav } from "@/components/AppNav";
 import { NewEngagement } from "@/components/NewEngagement";
-import { PERSONA_HOME } from "@/lib/roles";
 import { getSessionUser } from "@/lib/session";
 
 export const dynamic = "force-dynamic";
@@ -21,7 +20,6 @@ export default async function Home() {
     .innerJoin(engagementMembers, eq(engagementMembers.engagementId, engagements.id))
     .where(eq(engagementMembers.userId, user.id));
 
-  const home = PERSONA_HOME[user.archetype];
 
   return (
     <div className="shell">
@@ -29,7 +27,7 @@ export default async function Home() {
       <main className="main">
         <header>
           <div className="muted">
-            {user.title} · {home.label}
+            {user.title}
           </div>
           <h1 style={{ fontSize: 30 }}>Good to see you, {user.name.split(" ")[0]}</h1>
         </header>
@@ -43,7 +41,7 @@ export default async function Home() {
               <span className="muted">{e.status}</span>
             </div>
           ))}
-          {rows.length === 0 && <p className="muted">You are not on any engagements yet.</p>}
+          {rows.length === 0 && <p className="muted">No engagements</p>}
           <NewEngagement />
         </section>
       </main>
