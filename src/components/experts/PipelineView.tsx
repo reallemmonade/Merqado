@@ -10,6 +10,7 @@ import { ExpertForm, type ExpertFormValues } from "./ExpertForm";
 import { FullTable, useTableLayout } from "./FullTable";
 import { SourceLink } from "./SourceLink";
 import { useApi } from "./useApi";
+import type { Focus } from "@/lib/experts/focus";
 
 type Tab = "overview" | "guide" | "takeaways";
 const VERDICT_LABEL = {
@@ -25,6 +26,7 @@ export function PipelineView({
   canApprove,
   initialExpert,
   initialTab,
+  focus,
 }: {
   engagementId: string;
   data: ExpertsData;
@@ -32,6 +34,7 @@ export function PipelineView({
   canApprove: boolean;
   initialExpert?: string;
   initialTab?: Tab;
+  focus?: Focus | null;
 }) {
   const [full, setFull] = useState(false);
   const [query, setQuery] = useState("");
@@ -50,13 +53,17 @@ export function PipelineView({
 
   const visible = useMemo(() => {
     const q = query.trim().toLowerCase();
-    return data.experts.filter((e) => {
+    const rank = focus ? new Map(focus.ids.map((id, i) => [id, i])) : null;
+    const rows = data.experts.filter((e) => {
+      if (rank && !rank.has(e.id)) return false;
       if (statusFilter !== "all" && e.status !== statusFilter) return false;
       if (!q) return true;
       const topicNames = data.topics.filter((t) => e.topicIds.includes(t.id)).map((t) => t.name);
       return [e.name, e.company, e.title, e.anonTitle, e.network, ...topicNames].join(" ").toLowerCase().includes(q);
     });
-  }, [data, query, statusFilter]);
+    // A focus from Metrics brings its own order (e.g. latest call first).
+    return rank ? rows.sort((a, b) => rank.get(a.id)! - rank.get(b.id)!) : rows;
+  }, [data, query, statusFilter, focus]);
 
   const groups = useMemo(() => {
     const list = data.types.map((t) => ({
@@ -248,7 +255,19 @@ export function PipelineView({
           </p>
         )}
 
-        {groups.map((g) => (
+        {focus && (
+          <div className="focus-chip" role="status">
+            <span>
+              Showing <strong>{focus.label}</strong> ({focus.ids.length})
+            </span>
+            <Link href={`/e/${engagementId}/experts`} aria-label="Clear filter and show all calls">
+              ✕ Show all
+            </Link>
+          </div>
+        )}
+        {focus && focus.ids.length === 0 && <p className="muted">No experts in this group yet.</p>}
+
+        {groups.filter((g) => !focus || g.rows.length > 0).map((g) => (
           <div className="group copyable" key={g.id || "none"}>
             <div className="group-head">
               <h2>{g.name}</h2>
@@ -278,7 +297,7 @@ export function PipelineView({
             ) : full ? (
               <div className="scroll-x">
                 <FullTable
-                  rows={layout.sortRows(g.rows)}
+                  rows={focus ? g.rows : layout.sortRows(g.rows)}
                   data={data}
                   sel={drawer ? sel : null}
                   canEdit={canEdit}

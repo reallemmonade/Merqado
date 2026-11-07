@@ -44,7 +44,7 @@ export function KtaView({ engagementId, data, canEdit }: { engagementId: string;
             <div className="empty">
               <strong>No takeaways yet</strong>
               <span className="muted">
-                Open an expert in the <Link href={`/e/${engagementId}/experts`}>Pipeline</Link>, upload their transcript and generate
+                Open an expert in the <Link href={`/e/${engagementId}/experts`}>Calls</Link>, upload their transcript and generate
                 takeaways.
               </span>
             </div>

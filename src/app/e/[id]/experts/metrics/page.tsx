@@ -3,6 +3,7 @@ import { CopyButton } from "@/components/CopyButton";
 import { DeleteExpense, ExpenseForm } from "@/components/experts/ExpenseForm";
 import type { CopyTable } from "@/lib/copy/table";
 import { budgetSummary, coverage, elapsedShare, money } from "@/lib/experts/calc";
+import { focusHref } from "@/lib/experts/focus";
 import { loadExpertsPage } from "@/lib/experts/page";
 
 const pct = (n: number, d: number) => (d > 0 ? `${Math.max(0, (n / d) * 100)}%` : "0%");
@@ -39,6 +40,12 @@ export default async function ExpertsMetricsPage({ params }: { params: Promise<{
     return { ...t, discussed, notYet, short, full };
   });
   const setupLink = <Link href={`/e/${id}/experts/setup`}>Case setup</Link>;
+  // A clickable bar segment: opens Calls narrowed to the experts behind it. Empty segments render nothing.
+  const Seg = ({ focus, n, width, className, style, title }: { focus: string; n: number; width: string; className?: string; style?: React.CSSProperties; title: string }) => {
+    if (n <= 0) return null;
+    const label = `${title}: see them in Calls`;
+    return <Link href={focusHref(id, focus)} className={className} style={{ ...style, width }} title={label} aria-label={label} />;
+  };
 
   // What each card's Copy button puts on the clipboard: the numbers behind the chart, as a table.
   const coverageCopy: CopyTable[] = [
@@ -116,19 +123,11 @@ export default async function ExpertsMetricsPage({ params }: { params: Promise<{
               <div key={t.id} style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                 <div style={{ display: "flex", justifyContent: "space-between", gap: 8, fontSize: 13 }}>
                   <strong style={{ fontWeight: 500 }}>{t.name}</strong>
-                  <span className="muted">
-                    {t.cov.completed} done · {inMotion} in motion{t.target ? ` · target ${t.target}` : ""}
-                  </span>
                 </div>
-                <div
-                  className="covbar big"
-                  role="img"
-                  aria-label={`${t.name}: ${t.cov.completed} completed, ${t.cov.scheduled} scheduled, ${t.cov.approved} approved, ${t.cov.proposed} proposed, target ${t.target}`}
-                >
-                  <span className="seg-completed" style={{ width: pct(t.cov.completed, target) }} />
-                  <span className="seg-scheduled" style={{ width: pct(t.cov.scheduled, target) }} />
-                  <span className="seg-approved" style={{ width: pct(t.cov.approved, target) }} />
-                  <span className="seg-proposed" style={{ width: pct(t.cov.proposed, target) }} />
+                <div className="covbar big">
+                  {(["completed", "scheduled", "approved", "proposed"] as const).map((st) => (
+                    <Seg key={st} focus={`type:${t.id}:${st}`} n={t.cov[st]} width={pct(t.cov[st], target)} className={`seg-${st}`} title={`${t.name}, ${t.cov[st]} ${st}`} />
+                  ))}
                 </div>
               </div>
             );
@@ -151,52 +150,43 @@ export default async function ExpertsMetricsPage({ params }: { params: Promise<{
                 <div><div className="muted" style={{ fontSize: 12 }}>Projected total</div><div className="tile-value" style={{ fontSize: 20, color: over > 0 ? "var(--bad)" : undefined }}>{money(b.projected)}</div></div>
               </div>
               <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                <div
-                  className="budget-bar"
-                  role="img"
-                  aria-label={`Spent ${money(b.spent)}, booked ${money(b.booked)}, still expected ${money(stillExpected)}, against a budget of ${money(b.total)}`}
-                >
-                  <span style={{ width: pct(b.spent, scale), background: "var(--st-completed)", borderRadius: "6px 0 0 6px" }} />
-                  <span style={{ width: pct(b.booked, scale), background: "var(--st-scheduled)" }} />
-                  <span style={{ width: pct(stillExpected, scale), background: "var(--st-approved)", outline: "1px solid var(--st-scheduled)", outlineOffset: -1 }} />
+                <div className="budget-bar">
+                  <Seg focus="budget:spent" n={b.spent > 0 ? 1 : 0} width={pct(b.spent, scale)} style={{ background: "var(--st-completed)", borderRadius: "6px 0 0 6px" }} title={`Spent ${money(b.spent)}`} />
+                  <Seg focus="budget:booked" n={b.booked > 0 ? 1 : 0} width={pct(b.booked, scale)} style={{ background: "var(--st-scheduled)" }} title={`Booked ${money(b.booked)}`} />
+                  <Seg focus="budget:expected" n={stillExpected > 0 ? 1 : 0} width={pct(stillExpected, scale)} style={{ background: "var(--st-approved)", outline: "1px solid var(--st-scheduled)", outlineOffset: -1 }} title={`Still expected ${money(stillExpected)}`} />
                   {over > 0 && (
                     <span aria-hidden="true" style={{ position: "absolute", left: pct(b.total, scale), top: -4, bottom: -4, width: 2, background: "var(--ink)" }} />
                   )}
                 </div>
-                <div style={{ position: "relative", height: 16, fontSize: 12 }} className="muted" aria-hidden="true">
-                  <span style={{ position: "absolute", left: 0 }}>$0</span>
-                  <span style={{ position: "absolute", right: over > 0 ? `calc(100% - ${pct(b.total, scale)})` : 0, whiteSpace: "nowrap" }}>
-                    Budget {money(b.total)}
-                  </span>
-                </div>
               </div>
-              <div className="legend" style={{ flexDirection: "column", gap: 6, fontSize: 13 }}>
+              <div className="legend">
                 <span>
                   <i style={{ background: "var(--st-completed)" }} />
-                  <strong style={{ color: "var(--ink)", fontWeight: 500 }}>Spent {money(b.spent)}</strong>: honoraria {money(b.honorariaPaid)}, expenses{" "}
-                  {money(b.expenses)}, AI tools {money(b.aiTools)}
+                  Spent
                 </span>
                 <span>
                   <i style={{ background: "var(--st-scheduled)" }} />
-                  <strong style={{ color: "var(--ink)", fontWeight: 500 }}>Booked {money(b.booked)}</strong>: interviews scheduled or approved, not billed yet
+                  Booked, not billed
                 </span>
                 <span>
                   <i style={{ background: "var(--st-approved)", border: "1px solid var(--st-scheduled)", boxSizing: "border-box" }} />
-                  <strong style={{ color: "var(--ink)", fontWeight: 500 }}>Still expected {money(stillExpected)}</strong>: our estimate for proposed and future interviews
-                  {b.futureExpenses > 0 ? " and expenses" : ""}
+                  Still expected
                 </span>
+                {over > 0 && (
+                  <span>
+                    <i style={{ background: "var(--ink)", width: 2 }} />
+                    Budget
+                  </span>
+                )}
                 <span>
                   <i style={{ background: "var(--track)" }} />
                   {over > 0 ? (
-                    <strong style={{ color: "var(--bad)", fontWeight: 500 }}>Past the black line: {money(over)} over budget</strong>
+                    <span style={{ color: "var(--bad)" }}>Over budget</span>
                   ) : (
-                    <><strong style={{ color: "var(--ink)", fontWeight: 500 }}>Left over {money(-over)}</strong>: budget we don&rsquo;t expect to use</>
+                    <>Left over</>
                   )}
                 </span>
               </div>
-              <p style={{ margin: 0, fontSize: 13, color: over > 0 ? "var(--bad)" : "var(--good)", fontWeight: 600 }}>
-                {over > 0 ? `Projected ${money(over)} over budget` : `Projected ${money(-over)} under budget`}
-              </p>
             </>
           )}
           <details>
@@ -226,13 +216,9 @@ export default async function ExpertsMetricsPage({ params }: { params: Promise<{
         <h2 id="topic-h" style={{ fontSize: 18 }}>
           Topic coverage
         </h2>
-        <p className="muted" style={{ margin: 0, fontSize: 13 }}>
-          How many experts have actually talked about each topic in an interview, against the target set in Case setup. A full bar means
-          the target is met.
-        </p>
         <div className="legend">
           <span><i className="seg-completed" />Discussed in an interview</span>
-          <span><i style={{ background: "var(--st-approved)", border: "1px solid var(--st-scheduled)", boxSizing: "border-box" }} />Experts who know it, not discussed yet</span>
+          <span><i style={{ background: "var(--st-approved)", border: "1px solid var(--st-scheduled)", boxSizing: "border-box" }} />Know it, not discussed yet</span>
           <span><i style={{ background: "var(--track)" }} />Still needed</span>
         </div>
         {topicRows.length === 0 && <p className="muted">Add the case topics in {setupLink}.</p>}
@@ -241,35 +227,20 @@ export default async function ExpertsMetricsPage({ params }: { params: Promise<{
             <div key={t.id} style={{ display: "flex", flexDirection: "column", gap: 6 }}>
               <div style={{ display: "flex", justifyContent: "space-between", gap: 8, fontSize: 13 }}>
                 <strong style={{ fontWeight: 500 }}>{t.name}</strong>
-                <span style={{ whiteSpace: "nowrap" }}>
-                  {t.target > 0 ? `${t.discussed} of ${t.target} discussed` : `${t.discussed} discussed`}
-                </span>
               </div>
-              <div
-                className="covbar big"
-                role="img"
-                aria-label={`${t.name}: ${t.discussed} discussed, ${t.notYet} more experts know it, target ${t.target}`}
-              >
-                <span className="seg-completed" style={{ width: pct(t.discussed, t.full) }} />
-                <span style={{ width: pct(Math.min(t.notYet, t.full - t.discussed), t.full), background: "var(--st-approved)", outline: "1px solid var(--st-scheduled)", outlineOffset: -1 }} />
+              <div className="covbar big">
+                <Seg focus={`topic:${t.id}:discussed`} n={t.discussed} width={pct(t.discussed, t.full)} className="seg-completed" title={`${t.name}, ${t.discussed} discussed`} />
+                <Seg
+                  focus={`topic:${t.id}:notyet`}
+                  n={t.notYet}
+                  width={pct(Math.min(t.notYet, t.full - t.discussed), t.full)}
+                  style={{ background: "var(--st-approved)", outline: "1px solid var(--st-scheduled)", outlineOffset: -1 }}
+                  title={`${t.name}, ${t.notYet} know it but haven\u2019t discussed it yet`}
+                />
               </div>
-              <span className="muted" style={{ fontSize: 12, color: t.short > 0 ? "var(--warn)" : undefined }}>
-                {t.target > 0 && t.discussed >= t.target
-                  ? "Target met"
-                  : [
-                      t.notYet > 0 ? `${t.notYet} more ${t.notYet === 1 ? "expert knows" : "experts know"} it` : null,
-                      t.short > 0 ? `find ${t.short} more ${t.short === 1 ? "expert" : "experts"} to hit the target` : null,
-                    ]
-                      .filter(Boolean)
-                      .join(", ")
-                      .replace(/^./, (c) => c.toUpperCase()) || "No target set"}
-              </span>
             </div>
           ))}
         </div>
-        <p className="muted" style={{ margin: 0, fontSize: 12 }}>
-          &ldquo;Discussed&rdquo; comes from generating key takeaways on a transcript, which also tags the topics the call covered.
-        </p>
       </section>
     </div>
   );

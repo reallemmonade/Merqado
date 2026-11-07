@@ -13,7 +13,7 @@ export function TranscriptUploadForm({ engagementId, experts }: { engagementId: 
   const [fileKey, setFileKey] = useState(0);
   const [done, setDone] = useState<string | null>(null);
 
-  if (!experts.length) return <p className="muted">Add an expert in the Pipeline first, then upload their transcript here.</p>;
+  if (!experts.length) return <p className="muted">Add an expert in Calls first, then upload their transcript here.</p>;
   return (
     <form
       onSubmit={async (e) => {

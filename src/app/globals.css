@@ -187,3 +187,8 @@ table.grid.full tr.drop-here td { box-shadow: inset 0 2px 0 var(--accent), inset
 .copy-btn.inline { position: static; }
 .copyable:hover .copy-btn, .copyable:focus-within .copy-btn, .copy-btn.shown, .copy-btn:focus-visible { opacity: 1; pointer-events: auto; }
 @media (hover: none) { .copy-btn { opacity: 1; pointer-events: auto; } }
+
+/* Metrics bar segments link to the experts behind them in Calls. */
+.covbar a, .budget-bar a { display: block; height: 100%; transition: filter 0.1s; }
+.covbar a:hover, .budget-bar a:hover, .covbar a:focus-visible, .budget-bar a:focus-visible { filter: brightness(0.85); }
+.focus-chip { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 12px; border-radius: 8px; background: var(--selected); border: 1px solid var(--st-scheduled); font-size: 13px; }
