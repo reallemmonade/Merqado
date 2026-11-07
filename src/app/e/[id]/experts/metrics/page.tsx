@@ -41,11 +41,27 @@ export default async function ExpertsMetricsPage({ params }: { params: Promise<{
   });
   const setupLink = <Link href={`/e/${id}/experts/setup`}>Case setup</Link>;
   // A clickable bar segment: opens Calls narrowed to the experts behind it. Empty segments render nothing.
-  const Seg = ({ focus, n, width, className, style, title }: { focus: string; n: number; width: string; className?: string; style?: React.CSSProperties; title: string }) => {
-    if (n <= 0) return null;
-    const label = `${title}: see them in Calls`;
-    return <Link href={focusHref(id, focus)} className={className} style={{ ...style, width }} title={label} aria-label={label} />;
-  };
+  // Hovering (or tabbing to) a segment pops up its details.
+  const Tip = ({ head, lines }: { head: string; lines?: string[] }) => (
+    <span className="tip" role="tooltip">
+      <strong>{head}</strong>
+      {lines?.map((l) => <span key={l}>{l}</span>)}
+    </span>
+  );
+  const Seg = ({ focus, n, width, className, style, head, lines }: { focus: string; n: number; width: string; className?: string; style?: React.CSSProperties; head: string; lines?: string[] }) =>
+    n > 0 ? (
+      <Link href={focusHref(id, focus)} className={`tip-host ${className ?? ""}`} style={{ ...style, width }}>
+        <Tip head={head} lines={[...(lines ?? []), "Click to see them in Calls"]} />
+      </Link>
+    ) : null;
+  // The empty grey rest of a bar, with its own popup.
+  const Rest = ({ head, lines }: { head: string; lines?: string[] }) => (
+    <span className="tip-host seg-rest" tabIndex={0}>
+      <Tip head={head} lines={lines} />
+    </span>
+  );
+  const experts = (n: number) => `${n} ${n === 1 ? "expert" : "experts"}`;
+  const STATUS_TIP = { completed: "Completed", scheduled: "Scheduled", approved: "Approved", proposed: "Proposed" } as const;
 
   // What each card's Copy button puts on the clipboard: the numbers behind the chart, as a table.
   const coverageCopy: CopyTable[] = [
@@ -125,8 +141,11 @@ export default async function ExpertsMetricsPage({ params }: { params: Promise<{
                 </div>
                 <div className="covbar big">
                   {(["completed", "scheduled", "approved", "proposed"] as const).map((st) => (
-                    <Seg key={st} focus={`type:${t.id}:${st}`} n={t.cov[st]} width={pct(t.cov[st], target)} className={`seg-${st}`} title={`${t.name}, ${t.cov[st]} ${st}`} />
+                    <Seg key={st} focus={`type:${t.id}:${st}`} n={t.cov[st]} width={pct(t.cov[st], target)} className={`seg-${st}`} head={`${STATUS_TIP[st]}: ${experts(t.cov[st])}`} lines={[t.name]} />
                   ))}
+                  {t.target > t.cov.completed + inMotion && (
+                    <Rest head={`Still needed: ${experts(t.target - t.cov.completed - inMotion)}`} lines={[`${t.name} target is ${t.target}`]} />
+                  )}
                 </div>
               </div>
             );
@@ -150,11 +169,20 @@ export default async function ExpertsMetricsPage({ params }: { params: Promise<{
               </div>
               <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
                 <div className="budget-bar">
-                  <Seg focus="budget:spent" n={b.spent > 0 ? 1 : 0} width={pct(b.spent, scale)} style={{ background: "var(--st-completed)" }} title={`Spent ${money(b.spent)}`} />
-                  <Seg focus="budget:booked" n={b.booked > 0 ? 1 : 0} width={pct(b.booked, scale)} style={{ background: "var(--st-scheduled)" }} title={`Booked ${money(b.booked)}`} />
-                  <Seg focus="budget:expected" n={stillExpected > 0 ? 1 : 0} width={pct(stillExpected, scale)} style={{ background: "var(--st-approved)", outline: "1px solid var(--st-scheduled)", outlineOffset: -1 }} title={`Still expected ${money(stillExpected)}`} />
+                  <Seg focus="budget:spent" n={b.spent > 0 ? 1 : 0} width={pct(b.spent, scale)} style={{ background: "var(--st-completed)" }} head={`Spent ${money(b.spent)}`} lines={[`Honoraria ${money(b.honorariaPaid)}`, `Expenses ${money(b.expenses)}`, `AI tools ${money(b.aiTools)}`]} />
+                  <Seg focus="budget:booked" n={b.booked > 0 ? 1 : 0} width={pct(b.booked, scale)} style={{ background: "var(--st-scheduled)" }} head={`Booked, not billed ${money(b.booked)}`} lines={["Interviews scheduled or approved"]} />
+                  <Seg focus="budget:expected" n={stillExpected > 0 ? 1 : 0} width={pct(stillExpected, scale)} style={{ background: "var(--st-approved)", outline: "1px solid var(--st-scheduled)", outlineOffset: -1 }} head={`Still expected ${money(stillExpected)}`}
+                    lines={[
+                      `Proposed interviews ${money(b.proposed)}`,
+                      `${b.futureInterviews} more planned at ${money(b.averageHonorarium)} avg: ${money(b.futureInterviewCost)}`,
+                      ...(b.futureExpenses > 0 ? [`Expenses and AI at the pace so far: ${money(b.futureExpenses)}`] : []),
+                    ]}
+                  />
+                  {over < 0 && <Rest head={`Left over ${money(-over)}`} lines={[`Budget ${money(b.total)}, projected ${money(b.projected)}`]} />}
                   {over > 0 && (
-                    <span aria-hidden="true" style={{ position: "absolute", left: pct(b.total, scale), top: -4, bottom: -4, width: 2, background: "var(--ink)" }} />
+                    <span className="tip-host budget-mark" tabIndex={0} style={{ left: pct(b.total, scale) }}>
+                      <Tip head={`Budget ${money(b.total)}`} lines={[`Projected ${money(over)} over`]} />
+                    </span>
                   )}
                 </div>
               </div>
@@ -219,14 +247,16 @@ export default async function ExpertsMetricsPage({ params }: { params: Promise<{
                 <strong style={{ fontWeight: 500 }}>{t.name}</strong>
               </div>
               <div className="covbar big">
-                <Seg focus={`topic:${t.id}:discussed`} n={t.discussed} width={pct(t.discussed, t.full)} className="seg-completed" title={`${t.name}, ${t.discussed} discussed`} />
+                <Seg focus={`topic:${t.id}:discussed`} n={t.discussed} width={pct(t.discussed, t.full)} className="seg-completed" head={`Discussed: ${experts(t.discussed)}`} lines={[t.name]} />
                 <Seg
                   focus={`topic:${t.id}:notyet`}
                   n={t.notYet}
                   width={pct(Math.min(t.notYet, t.full - t.discussed), t.full)}
                   style={{ background: "var(--st-approved)", outline: "1px solid var(--st-scheduled)", outlineOffset: -1 }}
-                  title={`${t.name}, ${t.notYet} know it but haven\u2019t discussed it yet`}
+                  head={`Know it, not discussed yet: ${experts(t.notYet)}`}
+                  lines={[t.name]}
                 />
+                {t.short > 0 && <Rest head={`Still needed: ${experts(t.short)}`} lines={[`${t.name} target is ${t.target}`]} />}
               </div>
             </div>
           ))}
