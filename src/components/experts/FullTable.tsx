@@ -399,7 +399,7 @@ export function FullTable({
                     ⋮⋮
                   </span>
                   <button type="button" className="linklike" onClick={() => onOpen(e.id)} title="Open details">
-                    <span style={{ fontWeight: 500, whiteSpace: "nowrap" }}>{e.name || "Unnamed"} ›</span>
+                    <span style={{ fontWeight: 500, whiteSpace: "nowrap" }}>{e.name || "Unnamed"} <span aria-hidden="true">›</span></span>
                   </button>
                 </div>
               </td>

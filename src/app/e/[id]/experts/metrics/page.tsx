@@ -1,5 +1,7 @@
 import Link from "next/link";
+import { CopyButton } from "@/components/CopyButton";
 import { DeleteExpense, ExpenseForm } from "@/components/experts/ExpenseForm";
+import type { CopyTable } from "@/lib/copy/table";
 import { budgetSummary, coverage, elapsedShare, money } from "@/lib/experts/calc";
 import { loadExpertsPage } from "@/lib/experts/page";
 
@@ -38,10 +40,64 @@ export default async function ExpertsMetricsPage({ params }: { params: Promise<{
   });
   const setupLink = <Link href={`/e/${id}/experts/setup`}>Case setup</Link>;
 
+  // What each card's Copy button puts on the clipboard: the numbers behind the chart, as a table.
+  const coverageCopy: CopyTable[] = [
+    {
+      title: "Coverage by type",
+      columns: ["Type", "Completed", "Scheduled", "Approved", "Proposed", "Target", "Still needed"],
+      rows: typeRows.map((t) => [
+        t.name,
+        t.cov.completed,
+        t.cov.scheduled,
+        t.cov.approved,
+        t.cov.proposed,
+        t.target || "—",
+        t.target ? Math.max(0, t.target - t.cov.completed - t.cov.scheduled - t.cov.approved - t.cov.proposed) : "—",
+      ]),
+    },
+  ];
+  const budgetCopy: CopyTable[] = [
+    {
+      title: "Case budget",
+      columns: ["Item", "Amount"],
+      rows: [
+        ["Total budget", money(b.total)],
+        ["Spent so far", money(b.spent)],
+        ["Spent on honoraria", money(b.honorariaPaid)],
+        ["Spent on expenses", money(b.expenses)],
+        ["Spent on AI tools", money(b.aiTools)],
+        ["Booked, not billed yet", money(b.booked)],
+        ["Still expected", money(stillExpected)],
+        ["Projected total", money(b.projected)],
+        ["Remaining (budget less spent)", money(b.remaining)],
+        [over > 0 ? "Projected over budget" : "Projected under budget", money(Math.abs(over))],
+      ],
+      numeric: [1],
+    },
+    ...(data.expenses.length
+      ? [
+          {
+            title: "Expenses",
+            columns: ["Category", "Description", "Date", "Amount"],
+            rows: data.expenses.map((x) => [CATEGORY_LABEL[x.category], x.description, x.spentOn, money(x.amount)]),
+            numeric: [3],
+          },
+        ]
+      : []),
+  ];
+  const topicCopy: CopyTable[] = [
+    {
+      title: "Topic coverage",
+      columns: ["Topic", "Discussed in an interview", "Know it, not discussed yet", "Target", "Experts still to find"],
+      rows: topicRows.map((t) => [t.name, t.discussed, t.notYet, t.target || "—", t.target ? t.short : "—"]),
+    },
+  ];
+
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 460px), 1fr))", gap: 16 }}>
-        <section className="card" aria-labelledby="cov-h">
+        <section className="card copyable" aria-labelledby="cov-h">
+          <CopyButton tables={coverageCopy} />
           <h2 id="cov-h" style={{ fontSize: 18 }}>
             Coverage by type
           </h2>
@@ -79,7 +135,8 @@ export default async function ExpertsMetricsPage({ params }: { params: Promise<{
           })}
         </section>
 
-        <section className="card" aria-labelledby="budget-h">
+        <section className="card copyable" aria-labelledby="budget-h">
+          <CopyButton tables={budgetCopy} />
           <h2 id="budget-h" style={{ fontSize: 18 }}>
             Case budget
           </h2>
@@ -174,7 +231,8 @@ export default async function ExpertsMetricsPage({ params }: { params: Promise<{
         </section>
       </div>
 
-      <section className="card" aria-labelledby="topic-h">
+      <section className="card copyable" aria-labelledby="topic-h">
+          <CopyButton tables={topicCopy} />
         <h2 id="topic-h" style={{ fontSize: 18 }}>
           Topic coverage
         </h2>

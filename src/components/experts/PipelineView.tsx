@@ -1,5 +1,6 @@
 "use client";
 
+import { CopyButton } from "@/components/CopyButton";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { coverage, money, shortDate, STATUS_LABEL, STATUS_ORDER, type Status } from "@/lib/experts/calc";
@@ -247,7 +248,7 @@ export function PipelineView({
         )}
 
         {groups.map((g) => (
-          <div className="group" key={g.id || "none"}>
+          <div className="group copyable" key={g.id || "none"}>
             <div className="group-head">
               <h2>{g.name}</h2>
               <span className="muted" style={{ fontSize: 13 }}>
@@ -267,6 +268,7 @@ export function PipelineView({
                   <span className="seg-proposed" style={{ width: pct(g.cov.proposed, g.target) }} />
                 </div>
               )}
+              {g.rows.length > 0 && <CopyButton inline title={g.name} />}
             </div>
             {g.rows.length === 0 ? (
               <p className="muted" style={{ padding: "12px 16px", margin: 0, fontSize: 13 }}>
