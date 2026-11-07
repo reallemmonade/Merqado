@@ -113,7 +113,6 @@ export default async function ExpertsMetricsPage({ params }: { params: Promise<{
             <span><i className="seg-scheduled" />Scheduled</span>
             <span><i className="seg-approved" />Approved</span>
             <span><i className="seg-proposed" />Proposed</span>
-            <span><i style={{ background: "var(--track)" }} />Still needed</span>
           </div>
           {typeRows.length === 0 && <p className="muted">Add interviewee types and targets in {setupLink}.</p>}
           {typeRows.map((t) => {
@@ -178,14 +177,6 @@ export default async function ExpertsMetricsPage({ params }: { params: Promise<{
                     Budget
                   </span>
                 )}
-                <span>
-                  <i style={{ background: "var(--track)" }} />
-                  {over > 0 ? (
-                    <span style={{ color: "var(--bad)" }}>Over budget</span>
-                  ) : (
-                    <>Left over</>
-                  )}
-                </span>
               </div>
             </>
           )}
@@ -219,7 +210,6 @@ export default async function ExpertsMetricsPage({ params }: { params: Promise<{
         <div className="legend">
           <span><i className="seg-completed" />Discussed in an interview</span>
           <span><i style={{ background: "var(--st-approved)", border: "1px solid var(--st-scheduled)", boxSizing: "border-box" }} />Know it, not discussed yet</span>
-          <span><i style={{ background: "var(--track)" }} />Still needed</span>
         </div>
         {topicRows.length === 0 && <p className="muted">Add the case topics in {setupLink}.</p>}
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 380px), 1fr))", gap: "16px 40px" }}>
