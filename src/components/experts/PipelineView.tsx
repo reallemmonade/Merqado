@@ -282,10 +282,11 @@ export function PipelineView({
                   role="img"
                   aria-label={`${g.cov.completed} completed, ${g.cov.scheduled} scheduled, ${g.cov.approved} approved, ${g.cov.proposed} proposed, of ${g.target}`}
                 >
-                  <span className="seg-completed" style={{ width: pct(g.cov.completed, g.target) }} />
-                  <span className="seg-scheduled" style={{ width: pct(g.cov.scheduled, g.target) }} />
-                  <span className="seg-approved" style={{ width: pct(g.cov.approved, g.target) }} />
-                  <span className="seg-proposed" style={{ width: pct(g.cov.proposed, g.target) }} />
+                  {(["completed", "scheduled", "approved", "proposed"] as const)
+                    .filter((st) => g.cov[st] > 0)
+                    .map((st) => (
+                      <span key={st} className={`seg-${st}`} style={{ width: pct(g.cov[st], g.target) }} />
+                    ))}
                 </div>
               )}
               {g.rows.length > 0 && <CopyButton inline title={g.name} />}

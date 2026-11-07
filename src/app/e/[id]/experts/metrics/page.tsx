@@ -150,7 +150,7 @@ export default async function ExpertsMetricsPage({ params }: { params: Promise<{
               </div>
               <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
                 <div className="budget-bar">
-                  <Seg focus="budget:spent" n={b.spent > 0 ? 1 : 0} width={pct(b.spent, scale)} style={{ background: "var(--st-completed)", borderRadius: "6px 0 0 6px" }} title={`Spent ${money(b.spent)}`} />
+                  <Seg focus="budget:spent" n={b.spent > 0 ? 1 : 0} width={pct(b.spent, scale)} style={{ background: "var(--st-completed)" }} title={`Spent ${money(b.spent)}`} />
                   <Seg focus="budget:booked" n={b.booked > 0 ? 1 : 0} width={pct(b.booked, scale)} style={{ background: "var(--st-scheduled)" }} title={`Booked ${money(b.booked)}`} />
                   <Seg focus="budget:expected" n={stillExpected > 0 ? 1 : 0} width={pct(stillExpected, scale)} style={{ background: "var(--st-approved)", outline: "1px solid var(--st-scheduled)", outlineOffset: -1 }} title={`Still expected ${money(stillExpected)}`} />
                   {over > 0 && (
