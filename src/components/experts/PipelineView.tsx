@@ -1,16 +1,22 @@
 "use client";
 
+import { CopyButton } from "@/components/CopyButton";
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { coverage, money, shortDate, STATUS_LABEL, STATUS_ORDER, type Status } from "@/lib/experts/calc";
 import type { ExpertRow, ExpertsData } from "@/lib/experts/data";
 import { TRANSCRIPT_ACCEPT } from "@/lib/experts/transcript-text";
 import { ExpertForm, type ExpertFormValues } from "./ExpertForm";
+import { FullTable, useTableLayout } from "./FullTable";
 import { SourceLink } from "./SourceLink";
 import { useApi } from "./useApi";
 
 type Tab = "overview" | "guide" | "takeaways";
-const VERDICT_LABEL = { supports: "Supports", challenges: "Challenges", new: "New point" } as const;
+const VERDICT_LABEL = {
+  supports: "Supports",
+  challenges: "Challenges",
+  new: "New point",
+} as const;
 
 export function PipelineView({
   engagementId,
@@ -33,6 +39,12 @@ export function PipelineView({
   const [sel, setSel] = useState<string | null>(initialExpert ?? data.experts[0]?.id ?? null);
   const [mode, setMode] = useState<"view" | "edit" | "new">(data.experts.length ? "view" : "new");
   const [tab, setTab] = useState<Tab>(initialTab ?? "overview");
+  // In Full table mode the details open as a pop-out panel over the table instead of beside it.
+  const [drawer, setDrawer] = useState(false);
+  const layout = useTableLayout(
+    engagementId,
+    useMemo(() => data.experts.map((e) => e.id), [data.experts]),
+  );
   const api = useApi();
   const base = `/api/engagements/${engagementId}`;
 
@@ -47,13 +59,24 @@ export function PipelineView({
   }, [data, query, statusFilter]);
 
   const groups = useMemo(() => {
-    const list = data.types.map((t) => ({ id: t.id, name: t.name, target: t.target }));
+    const list = data.types.map((t) => ({
+      id: t.id,
+      name: t.name,
+      target: t.target,
+    }));
     if (data.experts.some((e) => !e.typeId || !data.types.some((t) => t.id === e.typeId))) {
       list.push({ id: "", name: "No type yet", target: 0 });
     }
     return list.map((g) => {
       const all = data.experts.filter((e) => (g.id ? e.typeId === g.id : !e.typeId || !data.types.some((t) => t.id === e.typeId)));
-      return { ...g, cov: coverage(all.map((e) => e.status), g.target), rows: visible.filter((e) => all.includes(e)) };
+      return {
+        ...g,
+        cov: coverage(
+          all.map((e) => e.status),
+          g.target,
+        ),
+        rows: visible.filter((e) => all.includes(e)),
+      };
     });
   }, [data, visible]);
 
@@ -76,10 +99,89 @@ export function PipelineView({
   }
   async function save(v: ExpertFormValues) {
     if (!expert) return;
-    const res = await api.call("save", `${base}/experts/${expert.id}`, { method: "PATCH", json: v });
+    const res = await api.call("save", `${base}/experts/${expert.id}`, {
+      method: "PATCH",
+      json: v,
+    });
     if (res) setMode("view");
   }
-  const setStatus = (e: ExpertRow, status: Status) => api.call("status", `${base}/experts/${e.id}`, { method: "PATCH", json: { status } });
+  async function patch(id: string, fields: Partial<ExpertFormValues> & { status?: Status }) {
+    return !!(await api.call("cell", `${base}/experts/${id}`, {
+      method: "PATCH",
+      json: fields,
+    }));
+  }
+  function openExpert(id: string) {
+    setSel(id);
+    setMode("view");
+    setDrawer(true);
+  }
+
+  useEffect(() => {
+    if (!full || !drawer) return;
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && setDrawer(false);
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [full, drawer]);
+
+  const setStatus = (e: ExpertRow, status: Status) =>
+    api.call("status", `${base}/experts/${e.id}`, {
+      method: "PATCH",
+      json: { status },
+    });
+
+  const details =
+    mode === "new" || !expert ? (
+      <div className="panel-body">
+        <h2 style={{ fontSize: 20 }}>Propose an expert</h2>
+        {canEdit ? (
+          <ExpertForm
+            types={data.types}
+            topics={data.topics}
+            submitLabel="Propose"
+            busy={api.busy === "create"}
+            onSubmit={create}
+            onCancel={() => {
+              setMode("view");
+              setSel(data.experts[0]?.id ?? null);
+              if (full) setDrawer(false);
+            }}
+          />
+        ) : (
+          <p className="muted">You have view access on this engagement.</p>
+        )}
+        {api.error && <p className="error">{api.error}</p>}
+      </div>
+    ) : mode === "edit" ? (
+      <div className="panel-body">
+        <h2 style={{ fontSize: 20 }}>Edit {expert.name}</h2>
+        <ExpertForm
+          key={expert.id}
+          types={data.types}
+          topics={data.topics}
+          initial={expert}
+          submitLabel="Save"
+          busy={api.busy === "save"}
+          onSubmit={save}
+          onCancel={() => setMode("view")}
+        />
+        {api.error && <p className="error">{api.error}</p>}
+      </div>
+    ) : (
+      <ExpertTile
+        key={expert.id}
+        expert={expert}
+        data={data}
+        tab={tab}
+        setTab={setTab}
+        canEdit={canEdit}
+        canApprove={canApprove}
+        engagementId={engagementId}
+        onEdit={() => setMode("edit")}
+        onStatus={(s) => setStatus(expert, s)}
+        api={api}
+      />
+    );
 
   const pct = (n: number, d: number) => (d > 0 ? `${(n / d) * 100}%` : "0%");
 
@@ -113,7 +215,14 @@ export function PipelineView({
             <button type="button" aria-pressed={!full} onClick={() => setFull(false)}>
               Simple
             </button>
-            <button type="button" aria-pressed={full} onClick={() => setFull(true)}>
+            <button
+              type="button"
+              aria-pressed={full}
+              onClick={() => {
+                setFull(true);
+                setDrawer(false);
+              }}
+            >
               Full table
             </button>
           </div>
@@ -124,6 +233,7 @@ export function PipelineView({
               onClick={() => {
                 setMode("new");
                 setSel(null);
+                setDrawer(true);
               }}
             >
               + Propose expert
@@ -139,7 +249,7 @@ export function PipelineView({
         )}
 
         {groups.map((g) => (
-          <div className="group" key={g.id || "none"}>
+          <div className="group copyable" key={g.id || "none"}>
             <div className="group-head">
               <h2>{g.name}</h2>
               <span className="muted" style={{ fontSize: 13 }}>
@@ -159,43 +269,52 @@ export function PipelineView({
                   <span className="seg-proposed" style={{ width: pct(g.cov.proposed, g.target) }} />
                 </div>
               )}
+              {g.rows.length > 0 && <CopyButton inline title={g.name} />}
             </div>
             {g.rows.length === 0 ? (
               <p className="muted" style={{ padding: "12px 16px", margin: 0, fontSize: 13 }}>
                 {query || statusFilter !== "all" ? "No matches." : "No experts yet."}
               </p>
+            ) : full ? (
+              <div className="scroll-x">
+                <FullTable
+                  rows={layout.sortRows(g.rows)}
+                  data={data}
+                  sel={drawer ? sel : null}
+                  canEdit={canEdit}
+                  canApprove={canApprove}
+                  cols={layout.cols}
+                  onMoveColumn={layout.moveColumn}
+                  onMoveRow={layout.moveRow}
+                  onOpen={openExpert}
+                  onPatch={patch}
+                />
+              </div>
             ) : (
               <div className="scroll-x">
-                <table className="grid" style={{ minWidth: full ? 1500 : 640, tableLayout: full ? "auto" : "fixed" }}>
-                  {!full && (
-                    <colgroup>
-                      <col />
-                      <col style={{ width: 120 }} />
-                      <col style={{ width: 100 }} />
-                      <col style={{ width: 120 }} />
-                      <col style={{ width: 80 }} />
-                      <col style={{ width: 110 }} />
-                    </colgroup>
-                  )}
+                <table className="grid" style={{ minWidth: 640, tableLayout: "fixed" }}>
+                  <colgroup>
+                    <col />
+                    <col style={{ width: 120 }} />
+                    <col style={{ width: 100 }} />
+                    <col style={{ width: 120 }} />
+                    <col style={{ width: 80 }} />
+                    <col style={{ width: 110 }} />
+                  </colgroup>
                   <thead>
                     <tr>
                       <th scope="col" style={{ paddingLeft: 16 }}>
                         Expert
                       </th>
-                      {full && <th scope="col">Company</th>}
-                      {full && <th scope="col">Full title</th>}
                       <th scope="col">Status</th>
                       <th scope="col">Date</th>
                       <th scope="col">Network</th>
-                      {full && <th scope="col" className="num">Call</th>}
-                      {full && <th scope="col" className="num">Follow-up</th>}
-                      {full && <th scope="col" className="num">Survey</th>}
-                      <th scope="col" className="num">Minutes</th>
-                      {full && <th scope="col" className="num">Rate / hr</th>}
+                      <th scope="col" className="num">
+                        Minutes
+                      </th>
                       <th scope="col" className="num" style={{ paddingRight: 16 }}>
                         Honorarium
                       </th>
-                      {full && <th scope="col">Topics</th>}
                     </tr>
                   </thead>
                   <tbody>
@@ -204,42 +323,25 @@ export function PipelineView({
                       return (
                         <tr key={e.id} className={e.id === sel ? "selected" : undefined}>
                           <td style={{ paddingLeft: 16 }}>
-                            <button
-                              type="button"
-                              className="linklike"
-                              aria-pressed={e.id === sel}
-                              onClick={() => {
-                                setSel(e.id);
-                                setMode("view");
-                              }}
-                            >
+                            <button type="button" className="linklike" aria-pressed={e.id === sel} onClick={() => openExpert(e.id)}>
                               <span style={{ fontWeight: 500 }}>{e.anonTitle || e.name}</span>
                               <span className="muted" style={{ fontSize: 12 }}>
                                 {e.name}
                               </span>
                             </button>
                           </td>
-                          {full && <td>{e.company}</td>}
-                          {full && <td style={{ minWidth: 200 }}>{e.title}</td>}
                           <td>
                             <span className={`pill pill-${e.status}`}>{STATUS_LABEL[e.status]}</span>
                           </td>
                           <td style={{ whiteSpace: "nowrap" }}>{shortDate(e.interviewDate) || <span className="muted">Not booked</span>}</td>
                           <td>{e.network}</td>
-                          {full && <td className="num">{e.callMinutes || "—"}</td>}
-                          {full && <td className="num">{e.followupMinutes || "—"}</td>}
-                          {full && <td className="num">{e.surveyMinutes || "—"}</td>}
                           <td className={`num ${e.billed ? "" : "est"}`}>
                             {est}
                             {e.minutes || (e.billed ? 0 : 60)}
                           </td>
-                          {full && <td className="num">{e.hourlyRate ? money(e.hourlyRate) : "—"}</td>}
                           <td className={`num ${e.billed ? "" : "est"}`} style={{ paddingRight: 16, fontWeight: 500 }}>
                             {e.status === "declined" ? "—" : est + money(e.honorarium)}
                           </td>
-                          {full && (
-                            <td style={{ minWidth: 200 }}>{e.topicIds.map(topicName).filter(Boolean).join(", ")}</td>
-                          )}
                         </tr>
                       );
                     })}
@@ -249,64 +351,51 @@ export function PipelineView({
             )}
           </div>
         ))}
+        {full && (
+          <p className="muted" style={{ fontSize: 12, margin: 0 }}>
+            {canEdit && <>Click any cell to change it. Enter saves, Esc cancels. </>}
+            Drag a column heading, or the ⋮⋮ beside a name, to rearrange the table your way (only you see your arrangement). Click an expert&rsquo;s
+            name to open their details.
+            {layout.customised && (
+              <>
+                {" "}
+                <button type="button" className="secondary small" onClick={layout.reset} style={{ marginLeft: 6 }}>
+                  Reset layout
+                </button>
+              </>
+            )}
+          </p>
+        )}
+        {full && !drawer && api.error && (
+          <p className="error" style={{ margin: 0 }}>
+            {api.error}
+          </p>
+        )}
         <p className="muted" style={{ fontSize: 12, margin: 0 }}>
-          Minutes = call + follow-up + survey. Honorarium = minutes ÷ 60 × hourly rate. &ldquo;~&rdquo; marks an estimate for a call
-          that hasn&rsquo;t happened yet (an hour if no length is set).
+          Minutes = call + follow-up + survey. Honorarium = minutes ÷ 60 × hourly rate. &ldquo;~&rdquo; marks an estimate for a call that hasn&rsquo;t
+          happened yet (an hour if no length is set).
         </p>
       </section>
 
-      <aside className="side panel" aria-label="Expert details">
-        {mode === "new" || !expert ? (
-          <div className="panel-body">
-            <h2 style={{ fontSize: 20 }}>Propose an expert</h2>
-            {canEdit ? (
-              <ExpertForm
-                types={data.types}
-                topics={data.topics}
-                submitLabel="Propose"
-                busy={api.busy === "create"}
-                onSubmit={create}
-                onCancel={() => {
-                  setMode("view");
-                  setSel(data.experts[0]?.id ?? null);
-                }}
-              />
-            ) : (
-              <p className="muted">You have view access on this engagement.</p>
-            )}
-            {api.error && <p className="error">{api.error}</p>}
-          </div>
-        ) : mode === "edit" ? (
-          <div className="panel-body">
-            <h2 style={{ fontSize: 20 }}>Edit {expert.name}</h2>
-            <ExpertForm
-              key={expert.id}
-              types={data.types}
-              topics={data.topics}
-              initial={expert}
-              submitLabel="Save"
-              busy={api.busy === "save"}
-              onSubmit={save}
-              onCancel={() => setMode("view")}
-            />
-            {api.error && <p className="error">{api.error}</p>}
-          </div>
-        ) : (
-          <ExpertTile
-            key={expert.id}
-            expert={expert}
-            data={data}
-            tab={tab}
-            setTab={setTab}
-            canEdit={canEdit}
-            canApprove={canApprove}
-            engagementId={engagementId}
-            onEdit={() => setMode("edit")}
-            onStatus={(s) => setStatus(expert, s)}
-            api={api}
-          />
-        )}
-      </aside>
+      {!full ? (
+        <aside className="side panel" aria-label="Expert details">
+          {details}
+        </aside>
+      ) : (
+        drawer && (
+          <>
+            <div className="drawer-backdrop" onClick={() => setDrawer(false)} />
+            <aside className="drawer panel" role="dialog" aria-modal="true" aria-label="Expert details">
+              <div className="drawer-close">
+                <button type="button" className="secondary small" onClick={() => setDrawer(false)}>
+                  Close
+                </button>
+              </div>
+              {details}
+            </aside>
+          </>
+        )
+      )}
     </div>
   );
 }
@@ -456,7 +545,18 @@ function ExpertTile({
                   </button>
                 )}
                 {transcripts.length > 0 && (
-                  <Link className="button secondary" style={{ display: "inline-flex", alignItems: "center", textDecoration: "none", border: "1px solid var(--line)", background: "var(--surface)", color: "var(--ink)" }} href={`/e/${engagementId}/experts/transcripts?t=${transcripts[0]!.id}`}>
+                  <Link
+                    className="button secondary"
+                    style={{
+                      display: "inline-flex",
+                      alignItems: "center",
+                      textDecoration: "none",
+                      border: "1px solid var(--line)",
+                      background: "var(--surface)",
+                      color: "var(--ink)",
+                    }}
+                    href={`/e/${engagementId}/experts/transcripts?t=${transcripts[0]!.id}`}
+                  >
                     Open transcript
                   </Link>
                 )}
@@ -485,7 +585,10 @@ function ExpertTile({
                     type="button"
                     disabled={api.busy === "guide-save"}
                     onClick={async () => {
-                      const ok = await api.call("guide-save", `${base}/experts/${expert.id}`, { method: "PATCH", json: { guide: guideDraft } });
+                      const ok = await api.call("guide-save", `${base}/experts/${expert.id}`, {
+                        method: "PATCH",
+                        json: { guide: guideDraft },
+                      });
                       if (ok) setGuideDraft(null);
                     }}
                   >
@@ -509,7 +612,13 @@ function ExpertTile({
             {canEdit && guideDraft === null && (
               <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
                 <button type="button" disabled={api.busy === "guide"} onClick={() => api.call("guide", `${base}/experts/${expert.id}/guide`)}>
-                  {api.busy === "guide" ? "Writing…" : expert.guide ? (expert.status === "completed" ? "Generate follow-up guide" : "Regenerate") : "Generate guide"}
+                  {api.busy === "guide"
+                    ? "Writing…"
+                    : expert.guide
+                      ? expert.status === "completed"
+                        ? "Generate follow-up guide"
+                        : "Regenerate"
+                      : "Generate guide"}
                 </button>
                 <button type="button" className="secondary" onClick={() => setGuideDraft(expert.guide ?? "")}>
                   {expert.guide ? "Edit" : "Write my own"}
@@ -553,7 +662,12 @@ function ExpertTile({
                         <input
                           type="checkbox"
                           checked={k.included}
-                          onChange={(e) => api.call("kta", `${base}/takeaways/${k.id}`, { method: "PATCH", json: { included: e.target.checked } })}
+                          onChange={(e) =>
+                            api.call("kta", `${base}/takeaways/${k.id}`, {
+                              method: "PATCH",
+                              json: { included: e.target.checked },
+                            })
+                          }
                         />
                         Use in hypotheses
                       </label>
@@ -605,18 +719,21 @@ function ExpertTile({
   );
 }
 
-export function TranscriptUpload({
-  engagementId,
-  expertId,
-  api,
-}: {
-  engagementId: string;
-  expertId: string;
-  api: ReturnType<typeof useApi>;
-}) {
+export function TranscriptUpload({ engagementId, expertId, api }: { engagementId: string; expertId: string; api: ReturnType<typeof useApi> }) {
   const inputId = `upload-${expertId}`;
   return (
-    <label className="button secondary" htmlFor={inputId} style={{ display: "inline-flex", alignItems: "center", cursor: "pointer", border: "1px solid var(--line)", background: "var(--surface)", color: "var(--ink)" }}>
+    <label
+      className="button secondary"
+      htmlFor={inputId}
+      style={{
+        display: "inline-flex",
+        alignItems: "center",
+        cursor: "pointer",
+        border: "1px solid var(--line)",
+        background: "var(--surface)",
+        color: "var(--ink)",
+      }}
+    >
       {api.busy === "upload" ? "Uploading…" : api.busy === "clean" ? "Cleaning with AI…" : "Upload transcript"}
       <input
         id={inputId}

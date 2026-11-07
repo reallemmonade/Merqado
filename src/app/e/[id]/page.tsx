@@ -1,3 +1,4 @@
+import { CopyButton } from "@/components/CopyButton";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { count, desc, eq } from "drizzle-orm";
@@ -55,7 +56,19 @@ export default async function EngagementPage({ params }: { params: Promise<{ id:
           <Link href={`/e/${id}/experts`}>Experts</Link>
         </nav>
 
-        <section className="tiles" aria-label="Status">
+        <section className="tiles copyable" aria-label="Status">
+          <CopyButton
+            tables={[
+              {
+                title: engagement.title,
+                columns: ["Item", "Count"],
+                rows: [
+                  ["Findings", findingCount?.n ?? 0],
+                  ["Sources", sourceCount?.n ?? 0],
+                ],
+              },
+            ]}
+          />
           <div className="card">
             <span className="muted">Findings</span>
             <span className="tile-value">{findingCount?.n ?? 0}</span>
