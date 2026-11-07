@@ -409,6 +409,9 @@ button.x:hover { color: var(--bad); }
 .rail .rail-user { margin-top: 8px; }
 .rail .rail-user .avatar { width: 30px; height: 30px; font-size: 11px; }
 .settings { max-width: 760px; }
+.settings-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; position: sticky; top: 0; z-index: 5; background: var(--bg); padding: 8px 0; margin: -8px 0; }
+button.settings-close { width: 40px; padding: 0; display: inline-flex; align-items: center; justify-content: center; background: var(--surface); color: var(--ink); border: 1px solid var(--line); border-radius: 99px; }
+button.settings-close:hover { background: var(--soft); }
 .profile { display: flex; align-items: center; gap: 14px; }
 .setting { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 16px; padding: 4px 0; }
 .setting-label { font-weight: 500; }

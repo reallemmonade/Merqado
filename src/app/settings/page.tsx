@@ -4,6 +4,7 @@ import { getDb } from "@/db/client";
 import { engagementMembers, engagements } from "@/db/schema";
 import { AppNav } from "@/components/AppNav";
 import { NavTitleSwitch } from "@/components/NavTitleSwitch";
+import { SettingsClose } from "@/components/SettingsClose";
 import { SettingsForm } from "@/components/SettingsForm";
 import { initials } from "@/lib/prefs";
 import { getPrefs } from "@/lib/prefs.server";
@@ -11,7 +12,8 @@ import { getSessionUser } from "@/lib/session";
 
 export const dynamic = "force-dynamic";
 
-export default async function SettingsPage() {
+export default async function SettingsPage({ searchParams }: { searchParams: Promise<{ from?: string | string[] }> }) {
+  const { from } = await searchParams;
   const db = getDb();
   const user = await getSessionUser(db);
   if (!user) redirect("/welcome");
@@ -29,7 +31,10 @@ export default async function SettingsPage() {
     <div className="shell">
       <AppNav engagements={rows} />
       <main className="main settings">
-        <h1 style={{ fontSize: 28 }}>Settings</h1>
+        <header className="settings-head">
+          <h1 style={{ fontSize: 28 }}>Settings</h1>
+          <SettingsClose from={typeof from === "string" ? from : undefined} />
+        </header>
 
         <section className="card">
           <h2 style={{ fontSize: 18 }}>Profile</h2>
