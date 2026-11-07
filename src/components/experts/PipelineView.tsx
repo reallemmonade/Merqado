@@ -8,6 +8,7 @@ import type { ExpertRow, ExpertsData } from "@/lib/experts/data";
 import { TRANSCRIPT_ACCEPT } from "@/lib/experts/transcript-text";
 import { ExpertForm, type ExpertFormValues } from "./ExpertForm";
 import { FullTable, useTableLayout } from "./FullTable";
+import { SourceLink } from "./SourceLink";
 import { useApi } from "./useApi";
 
 type Tab = "overview" | "guide" | "takeaways";
@@ -652,7 +653,9 @@ function ExpertTile({
                   <div className="meta">
                     <span className={`tag v-${k.verdict}`}>{VERDICT_LABEL[k.verdict]}</span>
                     {h && <span>{[h.slideRef, h.statement].filter(Boolean).join(" · ")}</span>}
-                    {k.locator && <span>{k.locator}</span>}
+                    {k.locator && (
+                      <SourceLink engagementId={engagementId} transcripts={transcripts} locator={k.locator} />
+                    )}
                     <span style={{ flex: 1 }} />
                     {canEdit && (
                       <label className="check" style={{ fontSize: 12 }}>
@@ -694,16 +697,11 @@ function ExpertTile({
                 </form>
                 <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
                   {transcripts.length > 0 && (
-                    <button
-                      type="button"
-                      disabled={api.busy === "kta-gen"}
-                      onClick={() => api.call("kta-gen", `${base}/experts/${expert.id}/takeaways?generate=1`)}
-                    >
-                      {api.busy === "kta-gen"
-                        ? "Reading the transcript…"
-                        : takeaways.some((k) => k.source === "ai")
-                          ? "Regenerate from transcript"
-                          : "Generate from transcript"}
+                    <button type="button" disabled={api.busy === "kta-gen"} onClick={async () => {
+                        const res = await api.call("kta-gen", `${base}/experts/${expert.id}/takeaways?generate=1`);
+                        if (res?.note) api.setError(res.note);
+                      }}>
+                      {api.busy === "kta-gen" ? "Reading the transcript…" : takeaways.some((k) => k.source === "ai") ? "Regenerate from transcript" : "Generate from transcript"}
                     </button>
                   )}
                   <TranscriptUpload engagementId={engagementId} expertId={expert.id} api={api} />

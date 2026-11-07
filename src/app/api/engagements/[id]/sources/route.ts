@@ -1,9 +1,8 @@
 import { NextResponse } from "next/server";
 import { getDb } from "@/db/client";
-import { sources } from "@/db/schema";
 import { can } from "@/lib/roles";
 import { getEngagementAccess, getSessionUser } from "@/lib/session";
-import { resolveStorage } from "@/lib/storage";
+import { saveSourceFile } from "@/lib/storage/files";
 
 const MAX_BYTES = 100 * 1024 * 1024;
 
@@ -24,26 +23,17 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   if (!(file instanceof File)) return NextResponse.json({ error: "Attach a file." }, { status: 400 });
   if (file.size > MAX_BYTES) return NextResponse.json({ error: "Files are limited to 100 MB." }, { status: 413 });
 
-  const { storage, connectionId } = await resolveStorage(
-    db,
-    user.firmId,
-    membership.engagement.storageConnectionId,
-  );
-  const safeName = file.name.replace(/[^\w.\- ]+/g, "_").slice(0, 200) || "upload";
-  const key = `engagements/${id}/${crypto.randomUUID()}/${safeName}`;
-  await storage.put(key, new Uint8Array(await file.arrayBuffer()), file.type || undefined);
-
-  const [row] = await db
-    .insert(sources)
-    .values({
+  try {
+    const source = await saveSourceFile(db, {
+      firmId: user.firmId,
       engagementId: id,
-      storageConnectionId: connectionId,
-      objectKey: key,
-      filename: file.name,
-      mimeType: file.type || null,
-      sizeBytes: file.size,
+      storageConnectionId: membership.engagement.storageConnectionId,
+      file,
       uploadedBy: user.id,
-    })
-    .returning();
-  return NextResponse.json({ source: row }, { status: 201 });
+    });
+    return NextResponse.json({ source }, { status: 201 });
+  } catch (err) {
+    console.error("source upload failed", err);
+    return NextResponse.json({ error: err instanceof Error ? err.message : "Upload failed." }, { status: 400 });
+  }
 }
