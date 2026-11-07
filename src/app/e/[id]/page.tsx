@@ -6,7 +6,7 @@ import { getDb } from "@/db/client";
 import { engagementMembers, engagements, findings, sources } from "@/db/schema";
 import { AppNav } from "@/components/AppNav";
 import { AskBox } from "@/components/AskBox";
-import { can, PERSONA_HOME } from "@/lib/roles";
+import { can } from "@/lib/roles";
 import { getEngagementAccess, getSessionUser } from "@/lib/session";
 
 export const dynamic = "force-dynamic";
@@ -44,7 +44,7 @@ export default async function EngagementPage({ params }: { params: Promise<{ id:
       <main className="main">
         <header>
           <div className="muted">
-            Engagements / {engagement.clientName} · You land on: {PERSONA_HOME[user.archetype].label}
+            {engagement.clientName}
           </div>
           <h1 style={{ fontSize: 30 }}>{engagement.title}</h1>
         </header>
@@ -93,7 +93,7 @@ export default async function EngagementPage({ params }: { params: Promise<{ id:
               <span className={`status-${f.status}`}>{STATUS_LABEL[f.status]}</span>
             </div>
           ))}
-          {latest.length === 0 && <p className="muted">No findings yet. Pin an answer to start.</p>}
+          {latest.length === 0 && <p className="muted">No findings</p>}
         </section>
       </main>
     </div>

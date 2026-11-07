@@ -78,7 +78,7 @@ export function CopyButton({
       type="button"
       className={`secondary small copy-btn${inline ? " inline" : ""}${state !== "idle" ? " shown" : ""}`}
       onClick={copy}
-      title="Copy as a table you can paste into an email, Word, PowerPoint or Excel"
+      title="Copy"
       data-copy-skip
     >
       <svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.5">
