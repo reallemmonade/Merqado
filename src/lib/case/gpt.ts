@@ -15,6 +15,7 @@ export async function loadGptList(db: DB, engagementId: string, userId: string):
     title: c.title,
     folder: c.folder,
     shared: c.shared,
+    pinned: c.pinned,
     mine: c.userId === userId,
     owner: nameOf.get(c.userId) ?? "",
     updated: shortDate(c.updatedAt ? c.updatedAt.toISOString().slice(0, 10) : ""),

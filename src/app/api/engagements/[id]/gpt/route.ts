@@ -6,15 +6,17 @@ import { aiError, notFoundJson, ok, parseOp, runAi } from "@/lib/case/api";
 import type { Authorized } from "@/lib/experts/api";
 import { loadCorpus } from "@/lib/case/corpus";
 import { gptName } from "@/lib/case/names";
+import { SOURCE_KINDS, type SourceKind } from "@/lib/case/gptSources";
 import { chunk, topSnippets, type Snippet } from "@/lib/case/search";
 
 const ref = z.string().min(1).max(64);
 const question = z.string().trim().min(1, "Ask a question.").max(4000);
+const kinds = z.array(z.enum(SOURCE_KINDS.map((s) => s.kind) as [SourceKind, ...SourceKind[]])).max(20).optional();
 
 const Op = z.discriminatedUnion("op", [
-  z.object({ op: z.literal("new"), question }),
-  z.object({ op: z.literal("ask"), chatId: ref, question }),
-  z.object({ op: z.literal("answer"), chatId: ref }),
+  z.object({ op: z.literal("new"), question, shared: z.boolean().optional() }),
+  z.object({ op: z.literal("ask"), chatId: ref, question, kinds }),
+  z.object({ op: z.literal("answer"), chatId: ref, kinds }),
   z.object({ op: z.literal("rename"), chatId: ref, title: z.string().trim().min(1).max(200) }),
   z.object({ op: z.literal("folder"), chatId: ref, folder: z.string().trim().max(60) }),
   z.object({ op: z.literal("share"), chatId: ref, shared: z.boolean() }),
@@ -30,7 +32,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   const { db, user } = auth;
 
   if (op.op === "new") {
-    const [chat] = await db.insert(gptChats).values({ engagementId: id, userId: user.id, title: titleFrom(op.question) }).returning();
+    const [chat] = await db.insert(gptChats).values({ engagementId: id, userId: user.id, title: titleFrom(op.question), shared: op.shared ?? false }).returning();
     await db.insert(gptMessages).values({ chatId: chat!.id, role: "user", body: op.question });
     return ok({ id: chat!.id });
   }
@@ -44,9 +46,9 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     case "ask":
       await db.insert(gptMessages).values({ chatId: chat.id, role: "user", body: op.question });
       await touch();
-      return answer(auth, chat.id);
+      return answer(auth, chat.id, op.kinds);
     case "answer":
-      return answer(auth, chat.id);
+      return answer(auth, chat.id, op.kinds);
     case "rename":
       await db.update(gptChats).set({ title: op.title }).where(eq(gptChats.id, chat.id));
       return ok();
@@ -83,13 +85,14 @@ function titleFrom(q: string) {
 }
 
 /** Answers the chat's latest question from the case's own material, citing it. */
-async function answer(auth: Authorized, chatId: string) {
+async function answer(auth: Authorized, chatId: string, only: SourceKind[] = []) {
   const { db, user, engagement } = auth;
   const msgs = await db.select().from(gptMessages).where(eq(gptMessages.chatId, chatId)).orderBy(asc(gptMessages.createdAt));
   const last = msgs[msgs.length - 1];
   if (!last || last.role !== "user") return ok();
 
-  const corpus = await loadCorpus(db, engagement.id, user);
+  const all = await loadCorpus(db, engagement.id, user);
+  const corpus = only.length ? all.filter((s) => only.includes(s.kind)) : all;
   const pieces: Snippet[] = corpus.flatMap((s) => (s.kind === "transcript" ? chunk(s.text).map((text) => ({ ...s, text })) : [s]));
   const priorQuestion = [...msgs].reverse().find((m) => m.role === "user" && m.id !== last.id)?.body ?? "";
   const picked = topSnippets(pieces, `${last.body} ${priorQuestion}`, 30, 40000);

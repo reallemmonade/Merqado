@@ -42,7 +42,7 @@ export function AppNav({
         ))}
         {engagements.length === 0 && <p className="muted">No engagements</p>}
       </div>
-      <div style={{ marginTop: "auto" }}>
+      <div className="nav-foot">
         <NavUser />
       </div>
     </nav>

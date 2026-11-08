@@ -52,7 +52,7 @@ export async function SettingsShell({
             </Link>
           ))}
         </div>
-        <div style={{ marginTop: "auto", display: "flex", flexDirection: "column", gap: 10 }}>
+        <div className="nav-foot">
           <div className="nav-user">
             <span className="avatar" aria-hidden="true">
               {initials(user.name)}
