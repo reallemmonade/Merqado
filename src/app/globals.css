@@ -93,7 +93,7 @@ input[type="text"]:focus, textarea:focus, button:focus-visible, a:focus-visible 
 .subtabs a { padding: 10px 0; color: var(--muted); text-decoration: none; border-bottom: 2px solid transparent; margin-bottom: -1px; }
 .subtabs a[aria-current="page"] { color: var(--ink); font-weight: 600; border-bottom-color: var(--accent); }
 .toolbar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
-.toolbar .grow { flex: 1; }
+.toolbar .grow, .group-head .grow { flex: 1; }
 .toolbar input[type="text"], .toolbar select { width: auto; min-height: 40px; }
 select { font: inherit; color: var(--ink); background: var(--surface); border: 1.5px solid var(--line); border-radius: 8px; padding: 8px 10px; }
 input[type="number"], input[type="date"] { font: inherit; color: var(--ink); background: var(--surface); border: 1.5px solid var(--line); border-radius: 8px; padding: 8px 10px; width: 100%; }

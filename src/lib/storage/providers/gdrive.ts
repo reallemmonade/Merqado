@@ -64,6 +64,21 @@ export class GDriveStorage implements StorageProvider {
     return (res.status === 204 ? undefined : await res.json()) as T;
   }
 
+  private static inFlight = new Map<string, Promise<string>>();
+
+  private async findOrCreateFolder(parent: string, name: string): Promise<string> {
+    const found = await this.call<{ files: { id: string }[] }>(
+      `${API}/files?${ALL}&includeItemsFromAllDrives=true&fields=files(id)&q=${encodeURIComponent(`'${q(parent)}' in parents and name = '${q(name)}' and mimeType = '${FOLDER}' and trashed = false`)}`,
+    );
+    if (found.files[0]) return found.files[0].id;
+    const made = await this.call<{ id: string }>(`${API}/files?${ALL}&fields=id`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ name, mimeType: FOLDER, parents: [parent] }),
+    });
+    return made.id;
+  }
+
   /** The id of a folder path under the root, created as needed. */
   async folderId(parts: string[]): Promise<string> {
     let parent = this.config.rootFolderId;
@@ -75,18 +90,15 @@ export class GDriveStorage implements StorageProvider {
         parent = cached;
         continue;
       }
-      const found = await this.call<{ files: { id: string }[] }>(
-        `${API}/files?${ALL}&includeItemsFromAllDrives=true&fields=files(id)&q=${encodeURIComponent(`'${q(parent)}' in parents and name = '${q(name)}' and mimeType = '${FOLDER}' and trashed = false`)}`,
-      );
-      const id =
-        found.files[0]?.id ??
-        (
-          await this.call<{ id: string }>(`${API}/files?${ALL}&fields=id`, {
-            method: "POST",
-            headers: { "content-type": "application/json" },
-            body: JSON.stringify({ name, mimeType: FOLDER, parents: [parent] }),
-          })
-        ).id;
+      // Uploads run in parallel; they share one lookup-or-create per folder, or Drive ends up
+      // with several "To file" folders side by side.
+      const key = `${parent}\u0000${name}`;
+      let work = GDriveStorage.inFlight.get(key);
+      if (!work) {
+        work = this.findOrCreateFolder(parent, name).finally(() => GDriveStorage.inFlight.delete(key));
+        GDriveStorage.inFlight.set(key, work);
+      }
+      const id = await work;
       this.folders.set(path, id);
       parent = id;
     }

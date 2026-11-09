@@ -147,11 +147,34 @@ export async function fileSources(
   const rows = await db.select(sourceMeta).from(sources).where(and(eq(sources.engagementId, engagement.id), inArray(sources.id, ids)));
   const byId = new Map(rows.map((r) => [r.id, r]));
   await addCaseFolders(db, engagement.id, items.map((i) => cleanPath(i.folder)));
-  let n = 0;
-  for (const item of items) {
+  const todo = items.flatMap((item) => {
     const src = byId.get(item.sourceId);
-    if (!src) continue;
-    const folder = cleanPath(item.folder);
+    return src ? [{ item, src, folder: cleanPath(item.folder) }] : [];
+  });
+
+  // Move the files in storage a few at a time: hundreds of Drive moves one by one can run
+  // past the request's time limit.
+  const keys = new Map<string, string>();
+  const failed: string[] = [];
+  let next = 0;
+  const mover = async () => {
+    while (next < todo.length) {
+      const { src, folder } = todo[next++]!;
+      try {
+        keys.set(src.id, await placeSourceFile(db, user.firmId, src, [caseFolderName(engagement), ...folder.split("/").filter(Boolean)]));
+      } catch (err) {
+        console.error("moving file in storage failed", src.id, err);
+        failed.push(src.filename);
+      }
+    }
+  };
+  await Promise.all(Array.from({ length: Math.min(5, todo.length) }, mover));
+
+  // Then record each one in order, so version numbers in one stack never collide.
+  let n = 0;
+  for (const { item, src, folder } of todo) {
+    const objectKey = keys.get(src.id);
+    if (objectKey === undefined) continue;
     let versionOf: string | null = src.versionOf;
     let version = src.version;
     if (item.asVersion && src.versionCandidate) {
@@ -165,18 +188,14 @@ export async function fileSources(
         version = (m?.v ?? 1) + 1;
       }
     }
-    let objectKey = src.objectKey;
-    try {
-      objectKey = await placeSourceFile(db, user.firmId, src, [caseFolderName(engagement), ...folder.split("/").filter(Boolean)]);
-    } catch (err) {
-      console.error("moving file in storage failed", src.id, err);
-      throw new Error(`Couldn't move ${src.filename} in the firm's storage.`);
-    }
     await db
       .update(sources)
       .set({ filing: "filed", folder, versionOf, version, versionCandidate: null, objectKey })
       .where(eq(sources.id, src.id));
     n++;
+  }
+  if (failed.length) {
+    throw new Error(`Couldn't move ${failed.length === 1 ? failed[0] : `${failed.length} files`} in the firm's storage.`);
   }
   return n;
 }

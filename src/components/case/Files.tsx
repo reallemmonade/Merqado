@@ -430,21 +430,26 @@ export function ReviewTable({
 }
 
 export function MoveFile({ engagementId, sourceId, folder }: { engagementId: string; sourceId: string; folder: string }) {
-  const { call, busy } = useApi();
+  const { call, busy, error } = useApi();
   const [value, setValue] = useState(folder);
+  // Follow the saved folder when the page refreshes.
+  useEffect(() => setValue(folder), [folder]);
   return (
-    <input
-      type="text"
-      aria-label="Folder"
-      list={`folders-${engagementId}`}
-      value={value}
-      disabled={busy !== null}
-      placeholder="Unfiled"
-      className="cell-input"
-      onChange={(e) => setValue(e.target.value)}
-      onBlur={() => value !== folder && call("mv", `/api/engagements/${engagementId}/files`, { json: { op: "move", sourceId, folder: value } })}
-      onKeyDown={(e) => e.key === "Enter" && e.currentTarget.blur()}
-    />
+    <>
+      <input
+        type="text"
+        aria-label="Folder"
+        list={`folders-${engagementId}`}
+        value={value}
+        disabled={busy !== null}
+        placeholder="Unfiled"
+        className="cell-input"
+        onChange={(e) => setValue(e.target.value)}
+        onBlur={() => value !== folder && call("mv", `/api/engagements/${engagementId}/files`, { json: { op: "move", sourceId, folder: value } })}
+        onKeyDown={(e) => e.key === "Enter" && e.currentTarget.blur()}
+      />
+      {error && <span className="error">{error}</span>}
+    </>
   );
 }
 
@@ -476,5 +481,26 @@ export function NewFolder({ engagementId, parent }: { engagementId: string; pare
       </button>
       {error && <span className="error">{error}</span>}
     </form>
+  );
+}
+
+/** Removes a folder (and its subfolders) that holds no files. */
+export function DeleteFolder({ engagementId, path, parent }: { engagementId: string; path: string; parent: string }) {
+  const router = useRouter();
+  const { call, busy, error } = useApi();
+  return (
+    <>
+      {error && <span className="error">{error}</span>}
+      <button
+        type="button"
+        className="secondary small"
+        disabled={busy !== null}
+        onClick={async () => {
+          if (await call("del", `/api/engagements/${engagementId}/files`, { json: { op: "folder.delete", path } })) router.push(parent);
+        }}
+      >
+        Delete folder
+      </button>
+    </>
   );
 }
