@@ -59,6 +59,14 @@ describe("findLinks", () => {
   });
 });
 
+describe("dropped folder names", () => {
+  it("don't push every file in an Interviews folder into Transcripts", () => {
+    const folders = [...DEFAULT_FOLDERS];
+    expect(suggestFolders({ name: "Expenses Sept.csv", relPath: "Interviews/Expenses Sept.csv" }, folders).folders[0]).toBe("Interviews");
+    expect(suggestFolders({ name: "Person 21 OEM 16 call.txt", relPath: "Interviews/Person 21 OEM 16 call.txt" }, folders).folders[0]).toBe("Interviews/Transcripts");
+  });
+});
+
 describe("folders", () => {
   it("cleans typed paths", () => {
     expect(cleanPath(" Models / OEM  deep dive /")).toBe("Models/OEM deep dive");

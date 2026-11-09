@@ -39,6 +39,11 @@ export function cleanPath(path: string): string {
     .join("/");
 }
 
+/** A LIKE pattern for everything inside a folder, with the folder's own % and _ taken literally. */
+export function insideFolder(path: string): string {
+  return `${path.replace(/[\\%_]/g, (c) => "\\" + c)}/%`;
+}
+
 /** Every folder path plus its parents, e.g. "A/B/C" gives "A", "A/B", "A/B/C". */
 export function withParents(path: string): string[] {
   const parts = path.split("/");

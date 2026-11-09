@@ -14,6 +14,8 @@ export async function extractText(filename: string, bytes: Uint8Array): Promise<
       text = await xlsxText(bytes);
     } else if (ext === "pptx") {
       text = await pptxText(bytes);
+    } else if (ext === "pdf") {
+      text = await pdfText(bytes);
     }
     return text.replace(/\r\n?/g, "\n").replace(/\n{3,}/g, "\n\n").trim().slice(0, MAX_TEXT_CHARS);
   } catch {
@@ -83,4 +85,16 @@ async function pptxText(bytes: Uint8Array): Promise<string> {
     out.push(`## Slide ${i + 1}`, ...paras);
   }
   return out.join("\n");
+}
+
+/** Text from a PDF's pages; scanned PDFs without a text layer give nothing. Gives up after 20 s. */
+async function pdfText(bytes: Uint8Array): Promise<string> {
+  const { extractText, getDocumentProxy } = await import("unpdf");
+  const work = (async () => {
+    // pdf.js takes ownership of the buffer it reads, so give it a copy.
+    const pdf = await getDocumentProxy(new Uint8Array(bytes));
+    const { text } = await extractText(pdf, { mergePages: false });
+    return text.map((t, i) => `## Page ${i + 1}\n${t}`).join("\n");
+  })();
+  return Promise.race([work, new Promise<string>((res) => setTimeout(() => res(""), 20_000))]);
 }

@@ -9,7 +9,7 @@ import { anonymizeTitle } from "@/lib/experts/calc";
 import { sourceVisibility } from "@/lib/files/access";
 import { removeWaitingDuplicates } from "@/lib/files/dedupe";
 import { sourceMeta } from "@/lib/storage/files";
-import { loadCaseFolders } from "@/lib/files/folders";
+import { loadCaseFolders, withParents } from "@/lib/files/folders";
 import { allows } from "@/lib/roles";
 
 export const dynamic = "force-dynamic";
@@ -60,11 +60,18 @@ export default async function FilesPage({ params, searchParams }: { params: Prom
 
   // Chat files wait in their chat for the sender to file; everything else waits here.
   const pendingRows = files.filter((f) => f.filing === "pending");
+  // One pass over every file, so a case with thousands of files stays quick.
+  const byId = new Map(all.map((x) => [x.id, x]));
+  const topVersion = new Map<string, number>();
+  for (const x of all) {
+    const k = x.versionOf ?? x.id;
+    topVersion.set(k, Math.max(topVersion.get(k) ?? 0, x.version));
+  }
   const pending: PendingFile[] = pendingRows
     .filter((f) => !f.messageId || f.uploadedBy === user.id)
     .map((f) => {
-      const cand = f.versionCandidate ? all.find((x) => x.id === f.versionCandidate) : null;
-      const top = cand ? Math.max(...all.filter((x) => x.id === (cand.versionOf ?? cand.id) || x.versionOf === (cand.versionOf ?? cand.id)).map((x) => x.version)) : 0;
+      const cand = f.versionCandidate ? byId.get(f.versionCandidate) : null;
+      const top = cand ? (topVersion.get(cand.versionOf ?? cand.id) ?? cand.version) : 0;
       return {
         id: f.id,
         filename: f.filename,
@@ -86,7 +93,13 @@ export default async function FilesPage({ params, searchParams }: { params: Prom
     if (!cur || f.version > cur.version) newest.set(k, f);
   }
   const latest = [...newest.values()].sort((a, b) => (b.createdAt?.getTime() ?? 0) - (a.createdAt?.getTime() ?? 0));
-  const older = (f: (typeof filed)[number]) => filed.filter((x) => stackOf(x) === stackOf(f) && x.id !== f.id).sort((a, b) => b.version - a.version);
+  const stacks = new Map<string, (typeof filed)[number][]>();
+  for (const f of filed) {
+    const list = stacks.get(stackOf(f));
+    if (list) list.push(f);
+    else stacks.set(stackOf(f), [f]);
+  }
+  const older = (f: (typeof filed)[number]) => (stacks.get(stackOf(f)) ?? []).filter((x) => x.id !== f.id).sort((a, b) => b.version - a.version);
 
   const current = sp.folder ?? "";
   const inFolder = (f: { folder: string }, path: string) => f.folder === path || f.folder.startsWith(path + "/");
@@ -96,6 +109,9 @@ export default async function FilesPage({ params, searchParams }: { params: Prom
   const iso = (d: Date | null) => (d ? d.toISOString().slice(0, 10) : "");
   const href = (key: string) => (key ? `${base}?folder=${encodeURIComponent(key)}` : base);
   const unfiled = latest.filter((f) => !f.folder).length;
+  // Files per folder, counting everything in its subfolders.
+  const count = new Map<string, number>();
+  for (const f of latest) if (f.folder) for (const p of withParents(f.folder)) count.set(p, (count.get(p) ?? 0) + 1);
   // Show a folder's children only when it, or one of its children, is open.
   const openRoot = current.split("/")[0];
   const tree = folders.filter((f) => !f.includes("/") || f.split("/")[0] === openRoot);
@@ -122,7 +138,7 @@ export default async function FilesPage({ params, searchParams }: { params: Prom
             <hr />
             {tree.map((f) => {
               const depth = f.split("/").length - 1;
-              const n = latest.filter((x) => inFolder(x, f)).length;
+              const n = count.get(f) ?? 0;
               return (
                 <Link key={f} href={href(f)} data-drop-folder={f} aria-current={current === f ? "page" : undefined} style={{ paddingLeft: 10 + depth * 16 }}>
                   <span className="row-between">

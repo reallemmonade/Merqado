@@ -694,6 +694,16 @@ button.settings-close:hover { background: var(--soft); }
 .folder-tree hr { border: 0; border-top: 1px solid var(--line); margin: 6px 4px; width: auto; }
 .folder-tree .review-link { background: var(--chal); color: var(--chal-ink); font-weight: 600; }
 .folder-tree .linkbtn { align-self: flex-start; margin: 6px 10px 0; }
+/* Phones: folders become one scrolling row above the files, so the table gets the full width. */
+@media (max-width: 640px) {
+  .channel:has(> .folder-tree) { flex-direction: column; align-items: stretch; min-width: 0; max-width: 100%; }
+  .channel:has(> .folder-tree) > * { min-width: 0; max-width: 100%; }
+  .folder-tree { flex: none; flex-direction: row; overflow-x: auto; align-items: center; }
+  .folder-tree a { flex: none; padding-left: 10px !important; white-space: nowrap; }
+  .folder-tree .row-between { gap: 10px; }
+  .folder-tree hr { border-top: 0; border-left: 1px solid var(--line); align-self: stretch; margin: 4px 2px; }
+  .folder-tree .linkbtn, .folder-tree .new-folder { flex: none; margin: 0 6px; }
+}
 .new-folder { display: flex; flex-wrap: wrap; gap: 6px; padding: 6px 4px 0; }
 .new-folder input { flex: 1; min-width: 0; }
 .crumbs a { color: var(--ink); }

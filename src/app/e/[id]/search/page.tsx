@@ -23,7 +23,7 @@ export default async function SearchPage({ params, searchParams }: { params: Pro
   const sp = await searchParams;
   const q = (sp.q ?? "").trim().slice(0, 200);
   const ctx = await loadCase(id, "/search");
-  const corpus = q ? await loadCorpus(ctx.db, id, ctx.user) : [];
+  const corpus = q ? await loadCorpus(ctx.db, id, ctx.user, q) : [];
   const hits = corpus.flatMap((s) => {
     const h = phraseHits(s.text, q);
     return h ? [{ s, h }] : [];
