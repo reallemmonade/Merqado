@@ -14,7 +14,7 @@ import {
   workplanTasks,
   type Archetype,
 } from "@/db/schema";
-import { canSeeRoom } from "./rooms";
+import { canSeeChat } from "./rooms";
 
 export async function loadWorkplan(db: DB, engagementId: string) {
   const [modules, milestones, tasks] = await Promise.all([
@@ -27,9 +27,10 @@ export async function loadWorkplan(db: DB, engagementId: string) {
 export type Workplan = Awaited<ReturnType<typeof loadWorkplan>>;
 
 /** The chats this person's role can see. */
-export async function visibleRooms(db: DB, engagementId: string, archetype: Archetype) {
+/** Rooms this person's role can see, plus their own 1:1 and group chats. */
+export async function visibleRooms(db: DB, engagementId: string, viewer: { id: string; archetype: Archetype }) {
   const rooms = await db.select().from(chatRooms).where(eq(chatRooms.engagementId, engagementId)).orderBy(asc(chatRooms.sort), asc(chatRooms.createdAt));
-  return rooms.filter((r) => canSeeRoom(r.archetypes, archetype));
+  return rooms.filter((r) => canSeeChat(r, viewer));
 }
 
 export async function loadRoomMessages(db: DB, roomId: string) {
