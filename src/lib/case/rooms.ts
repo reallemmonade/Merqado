@@ -38,3 +38,77 @@ export function roomMembersLabel(archetypesJson: string): string {
     .map((a) => ARCHETYPE_LABEL[a])
     .join(" + ");
 }
+
+export interface ChatAccess {
+  kind: string;
+  archetypes: string;
+  memberIds: string;
+}
+
+export function parseIds(json: string): string[] {
+  try {
+    const v = JSON.parse(json);
+    return Array.isArray(v) ? v.filter((x): x is string => typeof x === "string") : [];
+  } catch {
+    return [];
+  }
+}
+
+/** Rooms go by role; 1:1 and group chats only to the people in them. */
+export function canSeeChat(chat: ChatAccess, viewer: { id: string; archetype: Archetype }): boolean {
+  if (chat.kind === "room") return canSeeRoom(chat.archetypes, viewer.archetype);
+  return parseIds(chat.memberIds).includes(viewer.id);
+}
+
+/** The same people, in any order, means the same chat. */
+export function sameMembers(a: string[], b: string[]): boolean {
+  const x = [...new Set(a)].sort();
+  const y = [...new Set(b)].sort();
+  return x.length === y.length && x.every((v, i) => v === y[i]);
+}
+
+export const QUICK_REACTIONS = ["👍", "❤️", "😂", "😮", "✅", "👀"] as const;
+
+/** Ids of people @mentioned by full name or first name, longest names first so "Ana Reyes" wins over "Ana". */
+export function findMentions(body: string, people: { id: string; name: string }[]): string[] {
+  const text = body.toLowerCase();
+  const found = new Set<string>();
+  const names = people
+    .flatMap((p) => {
+      const full = p.name.trim();
+      const first = full.split(/\s+/)[0] ?? "";
+      return [{ id: p.id, name: full }, ...(first && first !== full ? [{ id: p.id, name: first }] : [])];
+    })
+    .sort((a, b) => b.name.length - a.name.length);
+  for (const n of names) {
+    const needle = "@" + n.name.toLowerCase();
+    let at = text.indexOf(needle);
+    while (at !== -1) {
+      const after = text[at + needle.length];
+      if (after === undefined || !/[\p{L}\p{N}]/u.test(after)) {
+        found.add(n.id);
+        break;
+      }
+      at = text.indexOf(needle, at + 1);
+    }
+  }
+  return [...found];
+}
+
+export type Presence = "available" | "busy" | "dnd" | "away" | "offline";
+
+/** What the green / yellow / red dot shows. */
+export function presenceOf(status: string, lastSeen: Date | null, now = new Date()): Presence {
+  const mins = lastSeen ? (now.getTime() - lastSeen.getTime()) / 60000 : Infinity;
+  if (mins > 30) return "offline";
+  if (status === "busy" || status === "dnd" || status === "away") return status;
+  return mins <= 5 ? "available" : "away";
+}
+
+export const PRESENCE_LABEL: Record<Presence, string> = {
+  available: "Available",
+  busy: "Busy",
+  dnd: "Do not disturb",
+  away: "Away",
+  offline: "Offline",
+};

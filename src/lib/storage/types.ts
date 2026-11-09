@@ -9,6 +9,14 @@ export interface StorageProvider {
   get(key: string): Promise<Uint8Array>;
   delete(key: string): Promise<void>;
   list(prefix?: string): Promise<StoredObject[]>;
+  /**
+   * Moves a stored file to a new path and returns its (possibly new) key. Only stores that
+   * keep a real folder tree people browse (Google Drive) implement it; for others the key is
+   * an opaque id and filing is tracked in Merqado alone.
+   */
+  move?(key: string, newPath: string): Promise<string>;
+  /** True when keys passed to put() should be readable paths (case/folder/file). */
+  readonly pathKeys?: boolean;
 }
 
 /** Rejects keys that could escape a prefix or root. */

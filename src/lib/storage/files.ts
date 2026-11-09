@@ -16,10 +16,21 @@ export type Source = typeof sources.$inferSelect;
  */
 export async function saveSourceFile(
   db: DB,
-  opts: { firmId: string; engagementId: string; storageConnectionId?: string | null; file: File; uploadedBy: string },
+  opts: {
+    firmId: string;
+    engagementId: string;
+    storageConnectionId?: string | null;
+    file: File;
+    uploadedBy: string;
+    /** Folder path in stores people browse (Google Drive), e.g. ["Project Atlas", "To file"]. */
+    place?: string[];
+    bytes?: Uint8Array;
+    /** Extra columns for the new row (filing state, suggestions, text...). */
+    values?: Partial<typeof sources.$inferInsert>;
+  },
 ): Promise<Source> {
   const { file } = opts;
-  const bytes = new Uint8Array(await file.arrayBuffer());
+  const bytes = opts.bytes ?? new Uint8Array(await file.arrayBuffer());
   const mimeType = file.type || guessType(file.name) || null;
 
   let storage: Awaited<ReturnType<typeof resolveStorage>> | null = null;
@@ -31,14 +42,18 @@ export async function saveSourceFile(
 
   if (storage) {
     const safeName = file.name.replace(/[^\w.\- ]+/g, "_").slice(0, 200) || "upload";
-    const key = `engagements/${opts.engagementId}/${crypto.randomUUID()}/${safeName}`;
-    await storage.storage.put(key, bytes, mimeType ?? undefined);
+    const key =
+      storage.storage.pathKeys && opts.place
+        ? [...opts.place, file.name].map(safeSegment).join("/")
+        : `engagements/${opts.engagementId}/${crypto.randomUUID()}/${safeName}`;
+    const stored = await storage.storage.put(key, bytes, mimeType ?? undefined);
     const [row] = await db
       .insert(sources)
       .values({
+        ...opts.values,
         engagementId: opts.engagementId,
         storageConnectionId: storage.connectionId,
-        objectKey: key,
+        objectKey: stored.key || key,
         filename: file.name,
         mimeType,
         sizeBytes: file.size,
@@ -55,6 +70,7 @@ export async function saveSourceFile(
   const [row] = await db
     .insert(sources)
     .values({
+      ...opts.values,
       id,
       engagementId: opts.engagementId,
       storageConnectionId: null,
@@ -67,6 +83,29 @@ export async function saveSourceFile(
     .returning();
   await db.insert(sourceBlobs).values({ sourceId: id, data: Buffer.from(bytes) });
   return row!;
+}
+
+/** A folder or case name made safe for a storage path. */
+export function safeSegment(name: string): string {
+  return name.replace(/[\\/:*?"<>|\u0000-\u001f]+/g, " ").replace(/\s+/g, " ").trim().slice(0, 120) || "Untitled";
+}
+
+/**
+ * Puts a file into its folder in stores people browse (Google Drive). Elsewhere the folder
+ * lives only in Merqado and the stored object stays where it is.
+ */
+export async function placeSourceFile(db: DB, firmId: string, source: Source, place: string[]): Promise<string> {
+  if (source.objectKey.startsWith(DB_PREFIX)) return source.objectKey;
+  const { storage } = await resolveStorage(db, firmId, source.storageConnectionId);
+  if (!storage.move || !storage.pathKeys) return source.objectKey;
+  return storage.move(source.objectKey, [...place, source.filename].map(safeSegment).join("/"));
+}
+
+/** Removes a file's bytes from wherever they were saved (Drive: to its trash). */
+export async function deleteSourceBytes(db: DB, firmId: string, source: Source): Promise<void> {
+  if (source.objectKey.startsWith(DB_PREFIX)) return; // the row's cascade removes the blob
+  const { storage } = await resolveStorage(db, firmId, source.storageConnectionId);
+  await storage.delete(source.objectKey);
 }
 
 /** A source in this engagement, or undefined. */

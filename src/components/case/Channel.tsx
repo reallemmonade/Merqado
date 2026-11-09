@@ -86,75 +86,50 @@ export function NewRoom({ engagementId }: { engagementId: string }) {
   );
 }
 
-export interface ChatLine {
+export interface ChatFile {
   id: string;
-  body: string;
-  pinned: boolean;
+  filename: string;
+  folder: string;
+  pending: boolean;
   mine: boolean;
-  author: string;
-  initials: string;
-  time: string;
+  suggestions: string[];
+  links: string[];
 }
 
-export function RoomView({ engagementId, roomId, lines }: { engagementId: string; roomId: string; lines: ChatLine[] }) {
+/** A file in a message: its folder, or (for the sender) a suggested folder to confirm. */
+export function ChatFileCard({ engagementId, file, folders }: { engagementId: string; file: ChatFile; folders: string[] }) {
   const { call, busy, error } = useApi();
-  const [body, setBody] = useState("");
-  const url = `/api/engagements/${engagementId}/channel`;
+  const [folder, setFolder] = useState(file.suggestions[0] ?? "");
   return (
-    <div className="chat">
-      <div className="chat-log">
-        {lines.map((m) => (
-          <div key={m.id} id={`m-${m.id}`} className={`chat-msg${m.pinned ? " pinned" : ""}`}>
-            <span className="avatar">{m.initials}</span>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div className="meta">
-                <strong style={{ color: "var(--ink)" }}>{m.author}</strong>
-                <span>{m.time}</span>
-                {m.pinned && <span className="tag">Pinned</span>}
-              </div>
-              <div className="chat-body">{m.body}</div>
-            </div>
-            <div className="chat-actions">
-              <button type="button" className="linkbtn" disabled={busy !== null} onClick={() => call(m.id, url, { json: { op: "message.pin", id: m.id, pinned: !m.pinned } })}>
-                {m.pinned ? "Unpin" : "Pin"}
-              </button>
-              {m.mine && (
-                <button type="button" className="x" aria-label="Delete message" disabled={busy !== null} onClick={() => call(m.id, url, { json: { op: "message.delete", id: m.id } })}>
-                  ×
-                </button>
-              )}
-            </div>
-          </div>
-        ))}
-        {lines.length === 0 && <p className="muted">No messages</p>}
+    <div className="chat-file">
+      <div className="name">
+        <a href={`/api/engagements/${engagementId}/sources/${file.id}`} target="_blank" rel="noreferrer">
+          {file.filename}
+        </a>
+        <div className="chips">
+          {!file.pending && file.folder && <span className="tag tag-good">{file.folder}</span>}
+          {file.links.map((l) => (
+            <span key={l} className="tag tag-accent">
+              {l}
+            </span>
+          ))}
+        </div>
       </div>
-      <form
-        className="composer"
-        onSubmit={async (e) => {
-          e.preventDefault();
-          if (!body.trim()) return;
-          const res = await call("post", url, { json: { op: "message.post", roomId, body } });
-          if (res) setBody("");
-        }}
-      >
-        <textarea
-          rows={2}
-          value={body}
-          placeholder="Message"
-          aria-label="Message"
-          onChange={(e) => setBody(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" && !e.shiftKey) {
-              e.preventDefault();
-              e.currentTarget.form?.requestSubmit();
-            }
+      {file.pending && file.mine && (
+        <form
+          className="toolbar"
+          onSubmit={(e) => {
+            e.preventDefault();
+            call("place", `/api/engagements/${engagementId}/channel`, { json: { op: "file.place", sourceId: file.id, folder } });
           }}
-        />
-        <button type="submit" disabled={busy !== null || !body.trim()}>
-          Send
-        </button>
-      </form>
-      {error && <span className="error">{error}</span>}
+        >
+          <input type="text" list={`folders-${engagementId}`} aria-label="Folder" placeholder="Folder" value={folder} onChange={(e) => setFolder(e.target.value)} />
+          <button type="submit" className="small" disabled={busy !== null || !folder.trim()}>
+            File
+          </button>
+          {error && <span className="error">{error}</span>}
+        </form>
+      )}
     </div>
   );
 }
