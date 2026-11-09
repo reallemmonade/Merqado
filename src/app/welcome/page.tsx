@@ -21,7 +21,7 @@ export default function Welcome() {
   return (
     <PublicPage>
       <section style={{ padding: "48px 0 24px", display: "flex", flexDirection: "column", gap: 16, maxWidth: 680 }}>
-        <h1 style={{ fontSize: 40, lineHeight: 1.15, margin: 0 }}>The engagement workspace for consulting teams</h1>
+        <h1 className="serif" style={{ fontSize: 48, lineHeight: 1.1, margin: 0 }}>The engagement workspace for consulting teams</h1>
         <p className="muted" style={{ fontSize: 18, margin: 0, lineHeight: 1.5 }}>
           Merqado keeps an engagement's client data, findings and team conversation in one place, answers questions
           straight from the data, and turns your storyline into a deck.
