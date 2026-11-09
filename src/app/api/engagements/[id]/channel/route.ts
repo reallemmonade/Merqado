@@ -6,6 +6,7 @@ import { fileSources } from "@/lib/files/intake";
 import { notFoundJson, ok, parseOp } from "@/lib/case/api";
 import { loadMembers } from "@/lib/case/page";
 import { canSeeChat, findMentions, parseIds, ROOM_TEMPLATES, sameMembers } from "@/lib/case/rooms";
+import { notifyLater } from "@/lib/push/notify";
 import { allows } from "@/lib/roles";
 import { getEngagementAccess } from "@/lib/session";
 
@@ -75,6 +76,19 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   async function audience(chat: NonNullable<Awaited<ReturnType<typeof room>>>) {
     const members = await loadMembers(id, user.firmId);
     return members.filter((m) => canSeeChat(chat, m));
+  }
+  /** iPhone notifications: @mentions anywhere, and every message in a 1:1 or group chat. */
+  function notifyMessage(chat: NonNullable<Awaited<ReturnType<typeof room>>>, mentions: string[], body: string) {
+    const direct = chat.kind === "room" ? [] : parseIds(chat.memberIds);
+    const to = [...new Set([...mentions, ...direct])].filter((u) => u !== user.id);
+    if (!to.length) return;
+    notifyLater(db, to, {
+      title: chat.kind === "room" ? `${user.name} · ${chat.name}` : user.name,
+      body: (body || "Sent a file").slice(0, 300),
+      threadId: `room-${chat.id}`,
+      category: "MESSAGE",
+      data: { url: `/case/${id}/room/${chat.id}`, caseId: id, roomId: chat.id },
+    });
   }
   const now = () => new Date();
   const markRead = (roomId: string) =>
@@ -164,6 +178,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
           .where(and(eq(sources.engagementId, id), eq(sources.roomId, chat.id), eq(sources.uploadedBy, user.id), isNull(sources.messageId), inArray(sources.id, ids)));
       }
       await markRead(chat.id);
+      notifyMessage(chat, mentions, op.body);
       return ok({ id: row!.id });
     }
     case "message.edit": {

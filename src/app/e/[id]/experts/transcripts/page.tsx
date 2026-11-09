@@ -138,7 +138,7 @@ export default async function ExpertsTranscriptsPage({
                 <ul style={{ margin: "8px 0 0", paddingLeft: 18, color: "var(--ink)", lineHeight: 1.5 }}>
                   {flags.map((f, i) => (
                     <li key={i}>
-                      &ldquo;{f.quote}&rdquo; <span className="muted">{f.reason}</span>
+                      <span className="serif" style={{ fontStyle: "italic", fontSize: 15 }}>&ldquo;{f.quote}&rdquo;</span> <span className="muted">{f.reason}</span>
                     </li>
                   ))}
                 </ul>
