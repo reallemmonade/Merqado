@@ -6,6 +6,9 @@ import { notFoundJson, ok, parseOp } from "@/lib/case/api";
 import { canSeeRoom, ROOM_TEMPLATES } from "@/lib/case/rooms";
 import { can } from "@/lib/roles";
 import { getEngagementAccess } from "@/lib/session";
+import { caseMembers, roomAudience } from "@/lib/mobile/data";
+import { findMentions } from "@/lib/mobile/mentions";
+import { notifyLater } from "@/lib/push/notify";
 
 const ref = z.string().min(1).max(64);
 
@@ -63,8 +66,19 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       await db.delete(chatRooms).where(and(eq(chatRooms.id, op.id), eq(chatRooms.engagementId, id)));
       return ok();
     case "message.post": {
-      if (!(await room(op.roomId))) return notFoundJson();
+      const rm = await room(op.roomId);
+      if (!rm) return notFoundJson();
       const [row] = await db.insert(chatMessages).values({ roomId: op.roomId, engagementId: id, userId: user.id, body: op.body }).returning();
+      if (op.body.includes("@")) {
+        const audience = roomAudience(await caseMembers(db, id, user.firmId), rm.archetypes).filter((m) => m.id !== user.id);
+        notifyLater(db, findMentions(op.body, audience), {
+          title: `${user.name} · ${rm.name}`,
+          body: op.body.slice(0, 300),
+          threadId: `room-${rm.id}`,
+          category: "MESSAGE",
+          data: { url: `/case/${id}/room/${rm.id}`, caseId: id, roomId: rm.id },
+        });
+      }
       return ok({ id: row!.id });
     }
     case "message.pin": {

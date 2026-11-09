@@ -3,6 +3,8 @@ import { and, eq, max } from "drizzle-orm";
 import { z } from "zod";
 import { TASK_STATUSES, workplanMilestones, workplanModules, workplanTasks } from "@/db/schema";
 import { notFoundJson, ok, parseOp } from "@/lib/case/api";
+import type { Authorized } from "@/lib/experts/api";
+import { notifyLater } from "@/lib/push/notify";
 
 const date = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Pick a date.");
 const name = z.string().trim().min(1, "Add a name.").max(200);
@@ -77,9 +79,11 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
         .insert(workplanTasks)
         .values({ engagementId: id, moduleId: op.moduleId, milestoneId: op.milestoneId ?? null, title: op.title, assigneeId: op.assigneeId ?? null })
         .returning();
+      if (op.assigneeId) notifyAssignee(auth, op.assigneeId, op.title, mod.name);
       return ok({ id: row!.id });
     }
     case "task.update": {
+      const before = await db.query.workplanTasks.findFirst({ where: and(eq(workplanTasks.id, op.id), eq(workplanTasks.engagementId, id)) });
       const res = await db
         .update(workplanTasks)
         .set({
@@ -90,10 +94,26 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
         })
         .where(and(eq(workplanTasks.id, op.id), eq(workplanTasks.engagementId, id)))
         .returning({ id: workplanTasks.id });
+      if (res.length && before && op.assigneeId && op.assigneeId !== before.assigneeId) {
+        const mod = await db.query.workplanModules.findFirst({ where: eq(workplanModules.id, before.moduleId) });
+        notifyAssignee(auth, op.assigneeId, op.title ?? before.title, mod?.name ?? "");
+      }
       return res.length ? ok() : notFoundJson();
     }
     case "task.delete":
       await db.delete(workplanTasks).where(and(eq(workplanTasks.id, op.id), eq(workplanTasks.engagementId, id)));
       return ok();
   }
+}
+
+/** Tells someone on their iPhone that a task was given to them (not when they took it themselves). */
+function notifyAssignee(auth: Authorized, assigneeId: string, title: string, moduleName: string) {
+  if (assigneeId === auth.user.id) return;
+  notifyLater(auth.db, [assigneeId], {
+    title: `${auth.user.name} gave you a task`,
+    body: moduleName ? `${title} · ${moduleName}` : title,
+    threadId: `tasks-${auth.engagement.id}`,
+    category: "TASK",
+    data: { url: "/tasks", caseId: auth.engagement.id },
+  });
 }

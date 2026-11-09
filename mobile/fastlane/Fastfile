@@ -1,0 +1,62 @@
+# Builds the iPhone app and uploads it to TestFlight. Runs on GitHub's Mac machines
+# (.github/workflows/ios-testflight.yml), so nobody needs a Mac or Xcode.
+default_platform(:ios)
+
+BUNDLE_ID = "ai.merqado.app"
+
+platform :ios do
+  lane :beta do
+    api_key = app_store_connect_api_key(
+      key_id: ENV.fetch("ASC_KEY_ID"),
+      issuer_id: ENV.fetch("ASC_ISSUER_ID"),
+      key_content: ENV.fetch("ASC_KEY_P8"),
+      in_house: false,
+    )
+
+    ensure_push_capability
+
+    # Signing certificate + App Store profile, kept encrypted (MATCH_PASSWORD) on the
+    # repo's `fastlane-match` branch so every build reuses the same ones.
+    setup_ci
+    match(
+      type: "appstore",
+      app_identifier: BUNDLE_ID,
+      team_id: ENV.fetch("APPLE_TEAM_ID"),
+      api_key: api_key,
+      git_url: ENV.fetch("MATCH_GIT_URL"),
+      git_branch: "fastlane-match",
+      git_basic_authorization: ENV.fetch("MATCH_GIT_BASIC_AUTH"),
+      readonly: false,
+    )
+
+    update_code_signing_settings(
+      path: "ios/Merqado.xcodeproj",
+      use_automatic_signing: false,
+      team_id: ENV.fetch("APPLE_TEAM_ID"),
+      targets: ["Merqado"],
+      bundle_identifier: BUNDLE_ID,
+      code_sign_identity: "Apple Distribution",
+      profile_name: ENV.fetch("sigh_#{BUNDLE_ID}_appstore_profile-name"),
+    )
+
+    build_app(
+      workspace: "ios/Merqado.xcworkspace",
+      scheme: "Merqado",
+      configuration: "Release",
+      export_method: "app-store",
+      output_directory: "build",
+      clean: true,
+    )
+
+    upload_to_testflight(api_key: api_key, skip_waiting_for_build_processing: true)
+  end
+
+  # Makes sure the app's identifier exists and can receive notifications.
+  private_lane :ensure_push_capability do
+    require "spaceship"
+    bundle = Spaceship::ConnectAPI::BundleId.find(BUNDLE_ID)
+    bundle ||= Spaceship::ConnectAPI::BundleId.create(name: "Merqado", platform: "IOS", identifier: BUNDLE_ID)
+    has_push = bundle.get_capabilities.any? { |c| c.capability_type == "PUSH_NOTIFICATIONS" }
+    bundle.create_capability("PUSH_NOTIFICATIONS") unless has_push
+  end
+end
