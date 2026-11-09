@@ -229,42 +229,9 @@ export default async function OverviewPage({
               <TodoSuggestions engagementId={id} items={todo.suggested} showAssignee={team} />
             </div>
           </section>
-
-          <section className="panel">
-            <div className="group-head">
-              <h2>
-                <Link href={`${base}/experts/ktas`} className="plain">
-                  Hypotheses
-                </Link>
-              </h2>
-            </div>
-            <div className="panel-body" style={{ gap: 0 }}>
-              {hyps.map((h) => {
-                const mine = takeaways.filter((k) => k.hypothesisId === h.id);
-                const sup = mine.filter((k) => k.verdict === "supports").length;
-                const chal = mine.filter((k) => k.verdict === "challenges").length;
-                return (
-                  <div className="row" key={h.id}>
-                    <Link href={kta(h.id)} style={{ flex: 1 }}>
-                      {h.statement}
-                    </Link>
-                    <span className="meta">
-                      <Link href={kta(h.id, "supports")} className="tag v-supports">
-                        {sup} supports
-                      </Link>
-                      <Link href={kta(h.id, "challenges")} className="tag v-challenges">
-                        {chal} challenges
-                      </Link>
-                    </span>
-                  </div>
-                );
-              })}
-              {hyps.length === 0 && <p className="muted">No hypotheses</p>}
-            </div>
-          </section>
         </div>
 
-        <div className="side" style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+        <aside className="side">
           <section className="card">
             <div className="toolbar">
               <h2 style={{ fontSize: 16 }}>
@@ -303,7 +270,46 @@ export default async function OverviewPage({
               );
             })}
           </section>
+        </aside>
+      </div>
 
+      <div className="split">
+        <div className="primary">
+          <section className="panel">
+            <div className="group-head">
+              <h2>
+                <Link href={`${base}/experts/ktas`} className="plain">
+                  Hypotheses
+                </Link>
+              </h2>
+            </div>
+            <div className="panel-body" style={{ gap: 0 }}>
+              {hyps.map((h) => {
+                const mine = takeaways.filter((k) => k.hypothesisId === h.id);
+                const sup = mine.filter((k) => k.verdict === "supports").length;
+                const chal = mine.filter((k) => k.verdict === "challenges").length;
+                return (
+                  <div className="row" key={h.id}>
+                    <Link href={kta(h.id)} style={{ flex: 1 }}>
+                      {h.statement}
+                    </Link>
+                    <span className="meta">
+                      <Link href={kta(h.id, "supports")} className="tag v-supports">
+                        {sup} supports
+                      </Link>
+                      <Link href={kta(h.id, "challenges")} className="tag v-challenges">
+                        {chal} challenges
+                      </Link>
+                    </span>
+                  </div>
+                );
+              })}
+              {hyps.length === 0 && <p className="muted">No hypotheses</p>}
+            </div>
+          </section>
+        </div>
+
+        <aside className="side">
           <section className="card">
             <h2 style={{ fontSize: 16 }}>
               <Link href={`${base}/notes`} className="plain">
@@ -336,7 +342,7 @@ export default async function OverviewPage({
               ))}
             </div>
           </section>
-        </div>
+        </aside>
       </div>
     </CaseShell>
   );
