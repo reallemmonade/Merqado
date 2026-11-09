@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { and, eq } from "drizzle-orm";
 import { chatRooms } from "@/db/schema";
-import { canSeeRoom } from "@/lib/case/rooms";
+import { canSeeChat } from "@/lib/case/rooms";
 import { authorize } from "@/lib/experts/api";
 import { intakeFile } from "@/lib/files/intake";
 
@@ -26,7 +26,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
 
   if (roomId) {
     const room = await auth.db.query.chatRooms.findFirst({ where: and(eq(chatRooms.id, roomId), eq(chatRooms.engagementId, id)) });
-    if (!room || !canSeeRoom(room.archetypes, auth.user.archetype)) return NextResponse.json({ error: "Not found." }, { status: 404 });
+    if (!room || !canSeeChat(room, auth.user)) return NextResponse.json({ error: "Not found." }, { status: 404 });
   }
   const str = (k: string) => (typeof form?.get(k) === "string" ? String(form!.get(k)).slice(0, 500) : null);
 

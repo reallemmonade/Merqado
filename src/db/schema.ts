@@ -50,10 +50,17 @@ export const firmRoles = sqliteTable(
   (t) => [uniqueIndex("firm_roles_firm_title").on(t.firmId, t.title)],
 );
 
+export const PRESENCE_STATUSES = ["auto", "busy", "dnd", "away"] as const;
+export type PresenceStatus = (typeof PRESENCE_STATUSES)[number];
+
 export const users = sqliteTable("users", {
   id: id(),
   email: text("email").notNull().unique(),
   name: text("name").notNull(),
+  /** Last time the person had Merqado open; drives available / away / offline. */
+  lastSeenAt: integer("last_seen_at", { mode: "timestamp" }),
+  /** "auto" follows activity; the others are set by the person. */
+  presence: text("presence", { enum: PRESENCE_STATUSES }).notNull().default("auto"),
   createdAt: createdAt(),
 });
 
@@ -571,7 +578,13 @@ export const workplanTasks = sqliteTable(
   (t) => [index("workplan_tasks_engagement").on(t.engagementId)],
 );
 
-/** A team chat; only people whose archetype is listed can see it. */
+export const CHAT_KINDS = ["room", "dm", "group"] as const;
+export type ChatKind = (typeof CHAT_KINDS)[number];
+
+/**
+ * A team chat. Rooms are seen by the roles in `archetypes`; 1:1 and group chats ("dm", "group")
+ * are seen only by the people in `memberIds`.
+ */
 export const chatRooms = sqliteTable(
   "chat_rooms",
   {
@@ -580,8 +593,12 @@ export const chatRooms = sqliteTable(
       .notNull()
       .references(() => engagements.id, { onDelete: "cascade" }),
     name: text("name").notNull(),
+    kind: text("kind", { enum: CHAT_KINDS }).notNull().default("room"),
     /** JSON array of archetypes allowed in the room. */
     archetypes: text("archetypes").notNull().default("[]"),
+    /** JSON array of user ids in a 1:1 or group chat. */
+    memberIds: text("member_ids").notNull().default("[]"),
+    createdBy: text("created_by").references(() => users.id, { onDelete: "set null" }),
     sort: integer("sort").notNull().default(0),
     createdAt: createdAt(),
   },
@@ -601,9 +618,48 @@ export const chatMessages = sqliteTable(
     userId: text("user_id").references(() => users.id, { onDelete: "set null" }),
     body: text("body").notNull(),
     pinned: integer("pinned", { mode: "boolean" }).notNull().default(false),
+    /** Set on thread replies: the message they answer. */
+    parentId: text("parent_id"),
+    /** "text", or a meeting / call card whose details are in `meta`. */
+    kind: text("kind", { enum: ["text", "meeting", "call"] }).notNull().default("text"),
+    /** JSON: meeting { title, startsAt, minutes, link } or call { video, endedAt, link }. */
+    meta: text("meta").notNull().default("{}"),
+    /** JSON array of user ids @mentioned. */
+    mentions: text("mentions").notNull().default("[]"),
+    editedAt: integer("edited_at", { mode: "timestamp" }),
     createdAt: createdAt(),
   },
-  (t) => [index("chat_messages_room").on(t.roomId, t.createdAt)],
+  (t) => [index("chat_messages_room").on(t.roomId, t.createdAt), index("chat_messages_parent").on(t.parentId)],
+);
+
+export const chatReactions = sqliteTable(
+  "chat_reactions",
+  {
+    messageId: text("message_id")
+      .notNull()
+      .references(() => chatMessages.id, { onDelete: "cascade" }),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    emoji: text("emoji").notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => [primaryKey({ columns: [t.messageId, t.userId, t.emoji] })],
+);
+
+/** How far each person has read in each chat, for unread counts. */
+export const chatReads = sqliteTable(
+  "chat_reads",
+  {
+    roomId: text("room_id")
+      .notNull()
+      .references(() => chatRooms.id, { onDelete: "cascade" }),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    lastReadAt: integer("last_read_at", { mode: "timestamp" }).notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.roomId, t.userId] })],
 );
 
 export const NOTE_KINDS = ["note", "decision", "open"] as const;

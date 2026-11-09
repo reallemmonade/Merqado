@@ -46,7 +46,7 @@ export default async function FilesPage({ params, searchParams }: { params: Prom
       .orderBy(desc(expertTranscripts.createdAt)),
     db.select({ id: experts.id, company: experts.company, title: experts.title, anonTitle: experts.anonTitle, isFormer: experts.isFormer }).from(experts).where(eq(experts.engagementId, id)),
     loadCaseFolders(db, id),
-    sourceVisibility(db, id, user.archetype),
+    sourceVisibility(db, id, user),
   ]);
   const files = all.filter(visible);
   const uploaderIds = [...new Set(files.map((f) => f.uploadedBy).filter((x): x is string => !!x))];
