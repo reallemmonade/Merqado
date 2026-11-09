@@ -5,6 +5,7 @@ import { GptChat, type GptLine, type GptSource } from "@/components/case/GptChat
 import { GptList } from "@/components/case/GptList";
 import { gptChats, gptMessages } from "@/db/schema";
 import { loadGptList } from "@/lib/case/gpt";
+import { parseKinds } from "@/lib/case/gptSources";
 import { loadCase } from "@/lib/case/page";
 
 export const dynamic = "force-dynamic";
@@ -18,7 +19,7 @@ function parseSources(json: string): GptSource[] {
   }
 }
 
-export default async function GptChatPage({ params, searchParams }: { params: Promise<{ id: string; chatId: string }>; searchParams: Promise<{ tab?: string }> }) {
+export default async function GptChatPage({ params, searchParams }: { params: Promise<{ id: string; chatId: string }>; searchParams: Promise<{ src?: string }> }) {
   const { id, chatId } = await params;
   const sp = await searchParams;
   const ctx = await loadCase(id, `/gpt/${chatId}`);
@@ -37,19 +38,15 @@ export default async function GptChatPage({ params, searchParams }: { params: Pr
   return (
     <CaseShell ctx={ctx} section="gpt" hideGptBar>
       <div className="gpt-layout">
-        <GptList engagementId={id} chats={chats} team={sp.tab === "team" || (!mine && sp.tab !== "mine")} activeId={chatId} />
+        <GptList engagementId={id} name={ctx.gpt} chats={chats} folders={folders} activeId={chatId} />
         <GptChat
           key={chat.id}
           engagementId={id}
           name={ctx.gpt}
-          chat={{ id: chat.id, title: chat.title, folder: chat.folder, shared: chat.shared, pinned: chat.pinned, mine }}
+          chat={{ id: chat.id, title: chat.title, shared: chat.shared, mine }}
           lines={lines}
+          initialKinds={parseKinds(sp.src)}
         />
-        <datalist id="gpt-folders">
-          {folders.map((f) => (
-            <option key={f} value={f} />
-          ))}
-        </datalist>
       </div>
     </CaseShell>
   );

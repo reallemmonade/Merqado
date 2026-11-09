@@ -1,4 +1,6 @@
 import type { Metadata } from "next";
+import { htmlAttrs, THEME_SCRIPT } from "@/lib/prefs";
+import { getPrefs } from "@/lib/prefs.server";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -6,10 +8,12 @@ export const metadata: Metadata = {
   description: "The engagement workspace for consulting teams",
 };
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  const prefs = await getPrefs();
   return (
-    <html lang="en">
+    <html lang="en" {...htmlAttrs(prefs)} suppressHydrationWarning>
       <head>
+        <script dangerouslySetInnerHTML={{ __html: THEME_SCRIPT }} />
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link
           rel="stylesheet"

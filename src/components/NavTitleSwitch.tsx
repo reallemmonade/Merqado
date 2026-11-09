@@ -4,7 +4,7 @@ import { firmRoles } from "@/db/schema";
 import { canSwitchOwnTitle, getSessionUser } from "@/lib/session";
 import { TitlePicker } from "./TitlePicker";
 
-/** Shown in the side nav to firm admins and personal test accounts. */
+/** Shown in Settings to firm admins and personal test accounts. */
 export async function NavTitleSwitch() {
   const db = getDb();
   const user = await getSessionUser(db);
