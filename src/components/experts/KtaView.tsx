@@ -106,7 +106,7 @@ export function KtaView({
                         style={{ width: 18, height: 18, marginTop: 2 }}
                       />
                       <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 6 }}>
-                        <label htmlFor={`inc-${k.id}`} style={{ lineHeight: 1.5 }}>
+                        <label htmlFor={`inc-${k.id}`} className="kta" style={{ lineHeight: 1.5 }}>
                           {k.body}
                         </label>
                         <div className="meta">
@@ -182,7 +182,7 @@ export function KtaView({
                 <ul style={{ margin: 0, paddingLeft: 18, fontSize: 13, lineHeight: 1.5, display: "flex", flexDirection: "column", gap: 4 }}>
                   {ks.map((k) => (
                     <li key={k.id}>
-                      {k.body} <span className="muted">({anonOf(k.expertId)})</span>
+                      <span className="kta">{k.body}</span> <span className="muted">({anonOf(k.expertId)})</span>
                     </li>
                   ))}
                 </ul>
@@ -195,7 +195,7 @@ export function KtaView({
               <ul style={{ margin: 0, paddingLeft: 18, fontSize: 13, lineHeight: 1.5 }}>
                 {unlinked.map((k) => (
                   <li key={k.id}>
-                    {k.body} <span className="muted">({anonOf(k.expertId)})</span>
+                    <span className="kta">{k.body}</span> <span className="muted">({anonOf(k.expertId)})</span>
                   </li>
                 ))}
               </ul>

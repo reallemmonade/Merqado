@@ -4,8 +4,8 @@ import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { CASE_MENUS, PREFS_COOKIE, TEXT_SIZES, serializePrefs, type GuavaCity, type GuavaPrefs, type Prefs } from "@/lib/prefs";
-import { GUAVA_CITIES, GUAVA_PREFS_EVENT, computeGuava, htmlVars, type GuavaResult } from "@/lib/guava/apply";
-import { FONTS, LOOKS, fmtHour, sunTimes } from "@/lib/guava/sky";
+import { APP_FONTS, GUAVA_CITIES, GUAVA_PREFS_EVENT, computeGuava, computeNormal, htmlVars, systemScheme, type GuavaResult } from "@/lib/guava/apply";
+import { LOOKS, fmtHour, sunTimes } from "@/lib/guava/sky";
 
 const LABELS: Record<string, string> = {
   small: "Small",
@@ -74,9 +74,13 @@ export function SettingsForm({ initial }: { initial: Prefs }) {
   );
 }
 
-type Look = { id: GuavaPrefs["look"]; label: string };
-type Font = { label: string; family: string; fallback: string; google: string };
-const FONT_LIST = Object.entries(FONTS as Record<GuavaPrefs["font"], Font>) as [GuavaPrefs["font"], Font][];
+type Look = { id: GuavaPrefs["look"]; label: string; tag: string };
+const FONT_LIST = Object.entries(APP_FONTS) as [GuavaPrefs["font"], (typeof APP_FONTS)[GuavaPrefs["font"]]][];
+const MODES: [GuavaPrefs["mode"], string][] = [
+  ["light", "Light"],
+  ["dark", "Dark"],
+  ["system", "System"],
+];
 const MARKS: [number, string][] = [
   [0, "12am"],
   [6, "6am"],
@@ -142,10 +146,70 @@ function AppearanceControls({ value, onChange }: { value: GuavaPrefs; onChange: 
   }
 
   const timeLabel = value.cycle ? "Preview a time" : "Stick to";
+  const normal = value.style === "normal";
+
+  const styleSwitch = (
+    <div className="gv-style" role="radiogroup" aria-label="Style">
+      <button type="button" role="radio" aria-checked={!normal} onClick={() => onChange({ ...value, style: "guava" })}>
+        <i className="gv-sky" style={htmlVars(computeGuava(value, { at: shownAt, look: value.look }).vars)} />
+        Guava
+      </button>
+      <button type="button" role="radio" aria-checked={normal} onClick={() => onChange({ ...value, style: "normal" })}>
+        <i className="sw-normal" />
+        Normal
+      </button>
+    </div>
+  );
+
+  const textPicker = (
+    <div className="setting-stack">
+      <span className="setting-label">Text</span>
+      <div className="looks fonts" role="radiogroup" aria-label="Text">
+        {FONT_LIST.map(([id, f]) => (
+          <button
+            key={id}
+            type="button"
+            role="radio"
+            aria-checked={value.font === id}
+            className="look"
+            style={{ fontFamily: `"${f.family}", ${f.fallback}` }}
+            onClick={() => onChange({ ...value, font: id })}
+          >
+            <span className="look-aa">Aa</span>
+            <b>{f.label}</b>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+
+  if (normal)
+    return (
+      <div className="gv-appearance">
+        <div className="gv-choices">
+          {styleSwitch}
+          <div className="setting">
+            <span className="setting-label">Mode</span>
+            <div className="seg" role="group" aria-label="Mode">
+              {MODES.map(([m, label]) => (
+                <button key={m} type="button" aria-pressed={value.mode === m} onClick={() => onChange({ ...value, mode: m })}>
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
+          {textPicker}
+        </div>
+        <div className="gv-preview">
+          <SkyPhone r={computeNormal(value, value.mode === "system" ? systemScheme() : value.mode)} normal />
+        </div>
+      </div>
+    );
 
   return (
     <div className="gv-appearance">
       <div className="gv-choices">
+        {styleSwitch}
         <div className="setting-stack">
           <span className="setting-label">Look</span>
           <div className="looks" role="radiogroup" aria-label="Look">
@@ -160,29 +224,12 @@ function AppearanceControls({ value, onChange }: { value: GuavaPrefs; onChange: 
               >
                 <LookSwatch value={value} look={l.id} at={shownAt} tick={tick} />
                 <b>{l.label}</b>
+                <small>{l.tag}</small>
               </button>
             ))}
           </div>
         </div>
-        <div className="setting-stack">
-          <span className="setting-label">Text</span>
-          <div className="looks fonts" role="radiogroup" aria-label="Text">
-            {FONT_LIST.map(([id, f]) => (
-              <button
-                key={id}
-                type="button"
-                role="radio"
-                aria-checked={value.font === id}
-                className="look"
-                style={{ fontFamily: `"${f.family}", ${f.fallback}` }}
-                onClick={() => onChange({ ...value, font: id })}
-              >
-                <span className="look-aa">Aa</span>
-                <b>{f.label}</b>
-              </button>
-            ))}
-          </div>
-        </div>
+        {textPicker}
         <div className="setting">
           <span className="setting-label" id="guava-cycle">
             Change through the day
@@ -251,16 +298,22 @@ function LookSwatch({ value, look, at, tick }: { value: GuavaPrefs; look: GuavaP
 }
 
 /** A phone showing a case page under the sky; its colors are scoped to the phone. */
-function SkyPhone({ r, big = false }: { r: GuavaResult; big?: boolean }) {
+function SkyPhone({ r, big = false, normal = false }: { r: GuavaResult; big?: boolean; normal?: boolean }) {
   return (
-    <div className={`gv-phone${big ? " gv-phone-big" : ""}`} data-theme={r.scheme} style={htmlVars(r.vars)} aria-hidden="true">
+    <div
+      className={`gv-phone${big ? " gv-phone-big" : ""}`}
+      data-theme={r.scheme}
+      data-style={normal ? "normal" : "guava"}
+      style={htmlVars(r.vars)}
+      aria-hidden="true"
+    >
       <div className="gv-screen">
         <div className="gv-sky">
           <i className="gv-sun" />
         </div>
         <div className="gv-ui">
           <div className="gv-status">
-            <span>{fmtHour(r.localHour).replace("Noon", "12pm")}</span>
+            <span>{normal ? "9:41" : fmtHour(r.localHour).replace("Noon", "12pm")}</span>
             <span>●●● ▮</span>
           </div>
           <div className="gv-title">Atlas</div>

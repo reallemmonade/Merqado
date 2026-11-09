@@ -216,7 +216,7 @@ export function PipelineView({
           <input
             id="expert-search"
             type="text"
-            placeholder="Search name, company, topic…"
+            placeholder="Search"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             style={{ flex: "0 1 260px" }}
@@ -278,7 +278,7 @@ export function PipelineView({
             </Link>
           </div>
         )}
-        {focus && focus.ids.length === 0 && <p className="muted">No experts in this group yet.</p>}
+        {focus && focus.ids.length === 0 && <p className="muted">No experts</p>}
 
         {groups.filter((g) => !focus || g.rows.length > 0).map((g) => (
           <div className="group copyable" key={g.id || "none"}>
@@ -673,7 +673,7 @@ function ExpertTile({
               const h = data.hypotheses.find((x) => x.id === k.hypothesisId);
               return (
                 <div key={k.id} className={`item ${k.included ? "" : "off"}`}>
-                  <div style={{ lineHeight: 1.5 }}>{k.body}</div>
+                  <div className="kta" style={{ lineHeight: 1.5 }}>{k.body}</div>
                   <div className="meta">
                     <span className={`tag v-${k.verdict}`}>{VERDICT_LABEL[k.verdict]}</span>
                     {h && <span>{[h.slideRef, h.statement].filter(Boolean).join(" · ")}</span>}
@@ -714,7 +714,7 @@ function ExpertTile({
                   <label htmlFor="new-kta" className="sr-only">
                     Add a takeaway
                   </label>
-                  <input id="new-kta" type="text" placeholder="Add a takeaway by hand" value={newKta} onChange={(e) => setNewKta(e.target.value)} />
+                  <input id="new-kta" type="text" placeholder="New takeaway" value={newKta} onChange={(e) => setNewKta(e.target.value)} />
                   <button type="submit" className="secondary" disabled={api.busy === "kta-add"}>
                     Add
                   </button>

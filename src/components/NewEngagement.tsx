@@ -45,7 +45,7 @@ export function NewEngagement() {
         </label>
         <label className="field">
           Engagement title
-          <input type="text" required value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Commercial due diligence" />
+          <input type="text" required value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Title" />
         </label>
       </div>
       <label className="check">

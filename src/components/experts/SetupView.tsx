@@ -200,7 +200,7 @@ function Hypotheses({
           <label className="sr-only" htmlFor="new-h">
             Hypothesis
           </label>
-          <input id="new-h" type="text" required placeholder="Customers rarely switch suppliers" value={statement} onChange={(e) => setStatement(e.target.value)} style={{ flex: "1 1 220px" }} />
+          <input id="new-h" type="text" required placeholder="Hypothesis" value={statement} onChange={(e) => setStatement(e.target.value)} style={{ flex: "1 1 220px" }} />
           <button type="submit" disabled={api.busy === "add-h"}>
             Add
           </button>

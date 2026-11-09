@@ -135,7 +135,7 @@ export function GptAsk({
         id="gpt-input"
         rows={rows}
         value={value}
-        placeholder="Ask about this project"
+        placeholder={`Ask ${name}`}
         autoFocus={autoFocus}
         onChange={(e) => onChange(e.target.value)}
         onKeyDown={(e) => {
