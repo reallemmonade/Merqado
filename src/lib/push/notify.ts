@@ -1,3 +1,4 @@
+import { after } from "next/server";
 import { inArray } from "drizzle-orm";
 import type { DB } from "@/db/client";
 import { pushDevices } from "@/db/schema";
@@ -30,6 +31,11 @@ export async function notifyUsers(db: DB, userIds: string[], msg: ApnsMessage): 
 }
 
 /** Fire and forget, so the person who acted doesn't wait on Apple. */
-export function notifyLater(db: DB, userIds: string[], msg: ApnsMessage): void {
-  void notifyUsers(db, userIds, msg);
+export function notifyLater(db: DB, userIds: string[] | (() => Promise<string[]>), msg: ApnsMessage): void {
+  const run = async () => notifyUsers(db, typeof userIds === "function" ? await userIds() : userIds, msg);
+  try {
+    after(run);
+  } catch {
+    void run().catch(() => {});
+  }
 }

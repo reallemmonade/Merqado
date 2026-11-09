@@ -1,13 +1,13 @@
 import { useCallback, useEffect, useState } from "react";
-import { ActionSheetIOS, FlatList, KeyboardAvoidingView, Platform, Pressable, Text, View } from "react-native";
+import { ActionSheetIOS, Alert, FlatList, KeyboardAvoidingView, Platform, Pressable, Text, View } from "react-native";
 import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import * as Haptics from "expo-haptics";
-import { api, QUICK_REACTIONS, type Member, type Message } from "@/lib/api";
+import { api, ApiError, QUICK_REACTIONS, type Member, type Message } from "@/lib/api";
 import { C, F, shortTime } from "@/lib/theme";
 import { Icon } from "@/components/Icon";
 import { Composer } from "@/components/Composer";
-import { Avatar } from "@/components/ui";
+import { Avatar, ListState } from "@/components/ui";
 
 type Payload = { room: { id: string; kind: string; name: string }; members: Member[]; parent: Message | null; messages: Message[] };
 
@@ -15,22 +15,33 @@ export default function RoomScreen() {
   const { id, roomId, thread } = useLocalSearchParams<{ id: string; roomId: string; thread?: string }>();
   const path = `/api/mobile/cases/${id}/rooms/${roomId}${thread ? `?thread=${thread}` : ""}`;
   const [data, setData] = useState<Payload | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  // A chat that is gone or no longer mine stops polling.
+  const [gone, setGone] = useState(false);
 
   const load = useCallback(async () => {
-    const d = await api<Payload>(path).catch(() => null);
-    if (d) setData(d);
+    try {
+      setData(await api<Payload>(path));
+      setError(null);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Error");
+      if (e instanceof ApiError && (e.status === 403 || e.status === 404)) setGone(true);
+    }
   }, [path]);
 
   useEffect(() => {
     setData(null);
+    setError(null);
+    setGone(false);
     void load();
   }, [load]);
 
   useFocusEffect(
     useCallback(() => {
+      if (gone) return;
       const t = setInterval(load, 4000);
       return () => clearInterval(t);
-    }, [load]),
+    }, [load, gone]),
   );
 
   const channel = (body: Record<string, unknown>) => api(`/api/engagements/${id}/channel`, { body });
@@ -48,15 +59,44 @@ export default function RoomScreen() {
 
   function actions(m: Message) {
     void Haptics.selectionAsync();
-    const extra = [...(thread ? [] : ["Reply in thread"]), m.pinned ? "Unpin" : "Pin", "Ask GPT"];
+    const own = m.mine && m.kind === "text";
+    const extra = [...(thread ? [] : ["Reply in thread"]), m.pinned ? "Unpin" : "Pin", ...(m.body ? ["Ask GPT"] : []), ...(own && m.body ? ["Edit"] : []), ...(m.mine ? ["Delete"] : [])];
     const options = [...QUICK_REACTIONS, ...extra, "Cancel"];
-    ActionSheetIOS.showActionSheetWithOptions({ options, cancelButtonIndex: options.length - 1 }, async (i) => {
+    const del = options.indexOf("Delete");
+    ActionSheetIOS.showActionSheetWithOptions({ options, cancelButtonIndex: options.length - 1, destructiveButtonIndex: del >= 0 ? del : undefined }, async (i) => {
       const choice = options[i];
       if (i < QUICK_REACTIONS.length) return react(m, choice!);
       if (choice === "Reply in thread") router.push(`/case/${id}/room/${roomId}?thread=${m.id}`);
       if (choice === "Pin" || choice === "Unpin") {
         await channel({ op: "message.pin", id: m.id, pinned: !m.pinned }).catch(() => {});
         await load();
+      }
+      if (choice === "Edit") {
+        Alert.prompt(
+          "Edit",
+          undefined,
+          async (body) => {
+            if (!body?.trim() || body.trim() === m.body) return;
+            await channel({ op: "message.edit", id: m.id, body: body.trim() }).catch((e) => Alert.alert(e instanceof Error ? e.message : "Error"));
+            await load();
+          },
+          "plain-text",
+          m.body,
+        );
+      }
+      if (choice === "Delete") {
+        Alert.alert("Delete message?", undefined, [
+          { text: "Cancel", style: "cancel" },
+          {
+            text: "Delete",
+            style: "destructive",
+            onPress: async () => {
+              await channel({ op: "message.delete", id: m.id }).catch((e) => Alert.alert(e instanceof Error ? e.message : "Error"));
+              if (thread === m.id) router.back();
+              else await load();
+            },
+          },
+        ]);
       }
       if (choice === "Ask GPT") {
         const r = await api<{ id: string }>(`/api/engagements/${id}/gpt`, { body: { op: "new", question: m.body } }).catch(() => null);
@@ -89,11 +129,12 @@ export default function RoomScreen() {
           data={reversed}
           keyExtractor={(m) => m.id}
           style={{ backgroundColor: C.bg }}
+          ListEmptyComponent={<View style={{ transform: [{ scaleY: -1 }] }}><ListState loading={!data && !error} error={error} onRetry={load} empty={thread ? "" : "No messages"} /></View>}
           contentContainerStyle={{ padding: 14, gap: 6 }}
           ListFooterComponent={
             data?.parent ? (
               <View style={{ paddingBottom: 12, marginBottom: 6, borderBottomWidth: 1, borderBottomColor: C.line }}>
-                <Bubble m={data.parent} grouped={false} onLongPress={() => {}} onReact={(e) => react(data.parent!, e)} inThread />
+                <Bubble m={data.parent} grouped={false} onLongPress={() => actions(data.parent!)} onReact={(e) => react(data.parent!, e)} inThread />
               </View>
             ) : undefined
           }
@@ -112,7 +153,7 @@ export default function RoomScreen() {
             );
           }}
         />
-        <Composer placeholder={thread ? "Reply" : "Message"} members={data?.members ?? []} onSend={send} />
+        {!gone && <Composer placeholder={thread ? "Reply" : "Message"} members={data?.members ?? []} onSend={send} />}
       </KeyboardAvoidingView>
     </SafeAreaView>
   );

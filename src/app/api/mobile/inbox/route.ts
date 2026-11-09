@@ -1,3 +1,4 @@
+import { reviewerOf } from "@/lib/case/tasks";
 import { NextResponse } from "next/server";
 import { and, desc, eq, gt, inArray, like, ne, or } from "drizzle-orm";
 import { chatMessages, chatRooms, users, workplanModules, workplanTasks } from "@/db/schema";
@@ -44,6 +45,8 @@ export async function GET() {
       status: workplanTasks.status,
       assigneeId: workplanTasks.assigneeId,
       reviewerId: workplanTasks.reviewerId,
+      createdBy: workplanTasks.createdBy,
+      moduleLead: workplanModules.leadId,
       module: workplanModules.name,
       at: workplanTasks.createdAt,
     })
@@ -54,12 +57,14 @@ export async function GET() {
         inArray(workplanTasks.engagementId, caseIds),
         or(
           and(eq(workplanTasks.assigneeId, user.id), gt(workplanTasks.createdAt, since), ne(workplanTasks.status, "done")),
-          and(eq(workplanTasks.reviewerId, user.id), eq(workplanTasks.status, "almost_done")),
+          // Reviewer falls back to whoever made the task, then the module lead (reviewerOf).
+          and(eq(workplanTasks.status, "almost_done"), or(eq(workplanTasks.reviewerId, user.id), eq(workplanTasks.createdBy, user.id), eq(workplanModules.leadId, user.id))),
         ),
       ),
     );
   for (const t of tasks) {
-    const review = t.reviewerId === user.id && t.status === "almost_done";
+    const review = t.status === "almost_done" && reviewerOf(t, t.moduleLead) === user.id && t.assigneeId !== user.id;
+    if (!review && t.assigneeId !== user.id) continue;
     items.push({ id: `t-${t.id}`, kind: review ? "review" : "task", caseId: t.caseId, caseName: caseOf.get(t.caseId)?.codeName ?? "", title: t.title, body: t.module, at: t.at.toISOString(), taskId: t.id });
   }
 

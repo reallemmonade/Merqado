@@ -120,3 +120,7 @@ export type InboxItem = {
 };
 
 export const QUICK_REACTIONS = ["👍", "❤️", "😂", "😮", "✅", "👀"] as const;
+
+export type Todo = { id: string; title: string; assigneeId: string | null; assignee: string; due: string | null; source: string; mine: boolean };
+export type RoomTemplate = { name: string; who: string };
+export type ChatList = { chats: Chat[]; people: Person[]; canSetup: boolean; templates: RoomTemplate[] };

@@ -16,6 +16,8 @@ const PATHS = {
   menu: [<Path key="a" d="M4 7h16M4 12h16M4 17h10" />],
   edit: [<Path key="a" d="M4 20h4L19 9l-4-4L4 16z" />],
   copy: [<Rect key="a" x="8" y="8" width="12" height="12" rx="2" />, <Path key="b" d="M16 8V4H4v12h4" />],
+  compose: [<Path key="a" d="M12 20h9" />, <Path key="b" d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z" />],
+  trash: [<Path key="a" d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3" />],
   share: [<Path key="a" d="M4 12v7h16v-7M12 3v12M7 8l5-5 5 5" />],
 } as const;
 

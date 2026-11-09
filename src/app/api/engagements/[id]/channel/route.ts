@@ -80,8 +80,13 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   /** iPhone notifications: @mentions anywhere, and every message in a 1:1 or group chat. */
   function notifyMessage(chat: NonNullable<Awaited<ReturnType<typeof room>>>, mentions: string[], body: string) {
     const direct = chat.kind === "room" ? [] : parseIds(chat.memberIds);
-    const to = [...new Set([...mentions, ...direct])].filter((u) => u !== user.id);
-    if (!to.length) return;
+    const wanted = [...new Set([...mentions, ...direct])].filter((u) => u !== user.id);
+    if (!wanted.length) return;
+    // Only people still on the case and able to see this chat, worked out after the response.
+    const to = async () => {
+      const allowed = new Set((await audience(chat)).map((m) => m.id));
+      return wanted.filter((u) => allowed.has(u));
+    };
     notifyLater(db, to, {
       title: chat.kind === "room" ? `${user.name} · ${chat.name}` : user.name,
       body: (body || "Sent a file").slice(0, 300),

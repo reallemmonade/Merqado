@@ -3,10 +3,11 @@ import { FlatList, Pressable, RefreshControl, ScrollView, Text, View } from "rea
 import { router } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import type { InboxItem } from "@/lib/api";
+import { useCase } from "@/lib/auth";
 import { useApi } from "@/lib/useApi";
 import { C, colorFor, F, initials, shortTime } from "@/lib/theme";
 import { CaseSwitch } from "@/components/CaseSwitch";
-import { LargeTitle, Pill } from "@/components/ui";
+import { LargeTitle, ListState, Pill } from "@/components/ui";
 
 const FILTERS = [
   { key: "all", label: "All" },
@@ -16,9 +17,11 @@ const FILTERS = [
 ] as const;
 
 export default function Inbox() {
-  const { data, refreshing, refresh } = useApi<{ items: InboxItem[] }>("/api/mobile/inbox", 30000);
+  const c = useCase();
+  const { data, error, loading, refreshing, refresh, reload } = useApi<{ items: InboxItem[] }>("/api/mobile/inbox", 30000);
   const [filter, setFilter] = useState<(typeof FILTERS)[number]["key"]>("all");
-  const items = useMemo(() => (data?.items ?? []).filter((i) => filter === "all" || i.kind === filter), [data, filter]);
+  // The case pill picks the case, as on every other tab.
+  const items = useMemo(() => (data?.items ?? []).filter((i) => (!c || i.caseId === c.id) && (filter === "all" || i.kind === filter)), [data, filter, c]);
 
   return (
     <SafeAreaView edges={["top"]} style={{ flex: 1, backgroundColor: C.bg }}>
@@ -32,6 +35,7 @@ export default function Inbox() {
         data={items}
         keyExtractor={(i) => i.id}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={C.orchid} />}
+        ListEmptyComponent={<ListState loading={loading} error={error} onRetry={reload} empty="Nothing new" />}
         renderItem={({ item }) => <Row item={item} />}
       />
     </SafeAreaView>

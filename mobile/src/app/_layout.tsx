@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { ActivityIndicator, View } from "react-native";
 import { Stack, useRouter, useSegments } from "expo-router";
 import { StatusBar } from "expo-status-bar";
@@ -33,8 +33,13 @@ function Gate() {
     void registerForPush().catch(() => {});
   }, [me]);
 
+  const handled = useRef<string | null>(null);
   useEffect(() => {
-    if (me && lastResponse) void handleResponse(lastResponse);
+    if (!me || !lastResponse) return;
+    const key = `${lastResponse.notification.request.identifier}:${lastResponse.actionIdentifier}`;
+    if (handled.current === key) return;
+    handled.current = key;
+    void handleResponse(lastResponse);
   }, [me, lastResponse]);
 
   if (!ready) {
@@ -49,6 +54,8 @@ function Gate() {
       <Stack.Screen name="(tabs)" />
       <Stack.Screen name="sign-in" options={{ animation: "fade" }} />
       <Stack.Screen name="cases" options={{ presentation: "formSheet", sheetAllowedDetents: [0.5, 1], sheetGrabberVisible: true }} />
+      <Stack.Screen name="case/[id]/new-chat" options={{ presentation: "modal" }} />
+      <Stack.Screen name="case/[id]/setup-rooms" options={{ presentation: "modal" }} />
     </Stack>
   );
 }
