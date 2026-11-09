@@ -28,7 +28,6 @@ export function GptBar({ engagementId, name }: { engagementId: string; name: str
 
   return (
     <form className="gpt-bar" onSubmit={submit} aria-label={name}>
-      <span className="gpt-chip">{name}</span>
       <label htmlFor="gpt-bar-input" className="sr-only">
         Ask {name}
       </label>

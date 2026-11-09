@@ -243,7 +243,6 @@ kbd { font-family: var(--font-data); font-size: 11px; color: inherit; opacity: 0
 .gpt-bar input[type="text"] { border: 0; padding: 10px 4px; flex: 1; min-width: 0; background: transparent; }
 .gpt-bar input[type="text"]:focus { outline: none; }
 .gpt-bar:focus-within { border-color: var(--accent); }
-.gpt-chip { flex: 0 0 auto; font-size: 12px; font-weight: 600; padding: 5px 10px; border-radius: 99px; background: var(--accent-soft); color: var(--accent); }
 .gpt-send { width: 44px; padding: 0; background: var(--ink); color: var(--surface); font-size: 18px; border-radius: 10px; }
 @media (max-width: 640px) { .gpt-bar kbd { display: none; } .rail-user { margin-top: 0 !important; } .rail { flex-basis: 100%; flex-direction: row; overflow-x: auto; } .rail-foot { flex-direction: row; margin: 0 0 0 auto; } }
 
