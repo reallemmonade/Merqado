@@ -27,6 +27,15 @@ export const storageConfigSchema = z.discriminatedUnion("kind", [
     prefix: z.string().default(""),
   }),
   z.object({
+    kind: z.literal("gdrive"),
+    refreshToken: z.string().min(1),
+    rootFolderId: z.string().min(1),
+    /** Shown in Settings, e.g. "Merqado" or a shared drive folder's name. */
+    rootName: z.string().default("Merqado"),
+    /** Who connected it. */
+    account: z.string().default(""),
+  }),
+  z.object({
     kind: z.literal("local"),
     root: z.string().default(".data/uploads"),
   }),
