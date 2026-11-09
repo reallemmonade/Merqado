@@ -52,7 +52,7 @@ export async function CaseShell({
       {full ? (
         <nav className="nav" aria-label="Case sections">
           <Link href="/" className="brand" style={{ padding: 0 }}>
-            merqado
+            Merqado
           </Link>
           <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
             <Link href="/" style={{ fontSize: 13 }}>
