@@ -3,6 +3,7 @@ import Svg, { Circle, Path, Rect } from "react-native-svg";
 
 const PATHS = {
   inbox: [<Path key="a" d="M4 13h4l2 3h4l2-3h4" />, <Path key="b" d="M5 5h14l1 8v6H4v-6z" />],
+  bell: [<Path key="a" d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9" />, <Path key="b" d="M10.3 21a1.9 1.9 0 0 0 3.4 0" />],
   chats: [<Path key="a" d="M4 5h16v11H9l-5 4z" />],
   spark: [<Path key="a" d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8z" />],
   tasks: [<Rect key="a" x="4" y="4" width="16" height="16" rx="3" />, <Path key="b" d="m8 12 3 3 5-6" />],

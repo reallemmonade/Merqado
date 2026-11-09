@@ -38,7 +38,7 @@ type Todos = { todos: Todo[]; suggested: Todo[]; people: { id: string; name: str
 export default function Tasks() {
   const c = useCase();
   const { data, error, loading, refreshing, refresh, reload, setData } = useApi<{ tasks: Task[] }>("/api/mobile/tasks");
-  const [view, setView] = useState<"mine" | "review" | "todos">("mine");
+  const [view, setView] = useState<"mine" | "review" | "todos">("todos");
   const sections = useMemo(() => {
     const all = (data?.tasks ?? []).filter((t) => !c || t.caseId === c.id);
     if (view === "review") {
@@ -94,11 +94,11 @@ export default function Tasks() {
 
   return (
     <SafeAreaView edges={["top"]} style={{ flex: 1, backgroundColor: C.bg }}>
-      <LargeTitle title="Tasks" right={<CaseSwitch />} />
+      <LargeTitle title="To-dos" right={<CaseSwitch />} />
       <ScrollView horizontal style={{ flexGrow: 0 }} contentContainerStyle={{ gap: 8, paddingHorizontal: 20, paddingVertical: 8 }}>
-        <Pill label="Mine" active={view === "mine"} onPress={() => setView("mine")} />
-        <Pill label="To review" active={view === "review"} onPress={() => setView("review")} />
         <Pill label="To-dos" active={view === "todos"} onPress={() => setView("todos")} />
+        <Pill label="Tasks" active={view === "mine"} onPress={() => setView("mine")} />
+        <Pill label="To review" active={view === "review"} onPress={() => setView("review")} />
       </ScrollView>
       {view === "todos" ? (
         <TodoList caseId={c?.id ?? null} />

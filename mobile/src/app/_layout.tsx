@@ -14,7 +14,7 @@ import { C } from "@/lib/theme";
 void SplashScreen.preventAutoHideAsync();
 
 function Gate() {
-  const { ready, me } = useAuth();
+  const { ready, me, setCaseId } = useAuth();
   const segments = useSegments();
   const router = useRouter();
   const lastResponse = Notifications.useLastNotificationResponse();
@@ -39,8 +39,11 @@ function Gate() {
     const key = `${lastResponse.notification.request.identifier}:${lastResponse.actionIdentifier}`;
     if (handled.current === key) return;
     handled.current = key;
+    // Lists follow the case pill, so open the case the notification is about.
+    const caseId = (lastResponse.notification.request.content.data as { caseId?: unknown } | undefined)?.caseId;
+    if (typeof caseId === "string" && me.cases.some((c) => c.id === caseId)) setCaseId(caseId);
     void handleResponse(lastResponse);
-  }, [me, lastResponse]);
+  }, [me, lastResponse, setCaseId]);
 
   if (!ready) {
     return (
