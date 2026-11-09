@@ -691,7 +691,7 @@ button.settings-close:hover { background: var(--soft); }
 .review-head { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; padding: 18px 20px; border-bottom: 1px solid var(--line); }
 .review-head h2 { font-size: 20px; flex-grow: 1; }
 .review-foot { display: flex; flex-wrap: wrap; gap: 10px; justify-content: flex-end; align-items: center; padding: 14px 20px; border-top: 1px solid var(--line); }
-.review input.needs { border-color: var(--warn); }
+.review :is(input, select).needs { border-color: var(--warn); }
 .muted-row td { color: var(--muted); }
 .tag-good { background: var(--sup); color: var(--sup-ink); }
 .tag-bad { background: var(--chal); color: var(--chal-ink); }

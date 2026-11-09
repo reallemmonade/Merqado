@@ -42,6 +42,7 @@ async function readDrop(dt: DataTransfer): Promise<Dropped[]> {
   return out;
 }
 
+const NEW = "\u0000new";
 const plural = (n: number, w: string) => `${n} ${w}${n === 1 ? "" : "s"}`;
 
 /**
@@ -239,6 +240,7 @@ export function ReviewTable({
   const { call, busy, error } = useApi();
   const [choice, setChoice] = useState<Record<string, string>>({});
   const [asVersion, setAsVersion] = useState<Record<string, boolean>>({});
+  const [typing, setTyping] = useState<Record<string, boolean>>({});
   // Dropped on a folder: that folder, unless a suggestion is one of its subfolders.
   const folderOf = (r: PendingFile) =>
     choice[r.id] ?? (target ? (r.suggestions.find((s) => s.startsWith(target + "/")) ?? target) : r.suggestions[0] || "");
@@ -271,7 +273,7 @@ export function ReviewTable({
           <thead>
             <tr>
               <th>Name</th>
-              <th style={{ minWidth: 240 }}>Folder</th>
+              <th style={{ width: "45%", minWidth: 240 }}>Folder</th>
               <th>Linked to</th>
               <th />
             </tr>
@@ -279,12 +281,11 @@ export function ReviewTable({
           <tbody>
             {rows.map((r) => {
               const f = folderOf(r);
-              const alt = r.suggestions.find((s) => s !== f);
               return (
                 <tr key={r.id}>
                   <td title={r.relPath ?? undefined}>{r.filename}</td>
                   <td>
-                    <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
+                    {typing[r.id] ? (
                       <input
                         type="text"
                         list={listId}
@@ -293,14 +294,29 @@ export function ReviewTable({
                         placeholder="Folder"
                         className={f ? undefined : "needs"}
                         onChange={(e) => setChoice({ ...choice, [r.id]: e.target.value })}
-                        style={{ minWidth: 200, flex: 1 }}
+                        autoFocus
+                        style={{ width: "100%" }}
                       />
-                      {alt && (
-                        <button type="button" className="secondary small" onClick={() => setChoice({ ...choice, [r.id]: alt })}>
-                          {alt}
-                        </button>
-                      )}
-                    </div>
+                    ) : (
+                      <select
+                        aria-label={`Folder for ${r.filename}`}
+                        value={f}
+                        className={f ? undefined : "needs"}
+                        onChange={(e) =>
+                          e.target.value === NEW ? setTyping({ ...typing, [r.id]: true }) : setChoice({ ...choice, [r.id]: e.target.value })
+                        }
+                        style={{ width: "100%" }}
+                      >
+                        {!f && <option value="">Folder</option>}
+                        {/* The AI's picks first, then every folder. */}
+                        {[...new Set([...r.suggestions, f, ...folders])].filter(Boolean).map((o) => (
+                          <option key={o} value={o}>
+                            {o}
+                          </option>
+                        ))}
+                        <option value={NEW}>New folder…</option>
+                      </select>
+                    )}
                   </td>
                   <td>
                     <div className="chips">
