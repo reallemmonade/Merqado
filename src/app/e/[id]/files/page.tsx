@@ -7,6 +7,8 @@ import { loadCase } from "@/lib/case/page";
 import { shortDate } from "@/lib/case/progress";
 import { anonymizeTitle } from "@/lib/experts/calc";
 import { sourceVisibility } from "@/lib/files/access";
+import { removeWaitingDuplicates } from "@/lib/files/dedupe";
+import { sourceMeta } from "@/lib/storage/files";
 import { loadCaseFolders } from "@/lib/files/folders";
 import { allows } from "@/lib/roles";
 
@@ -37,8 +39,9 @@ export default async function FilesPage({ params, searchParams }: { params: Prom
   const ctx = await loadCase(id, "/files");
   const { db, user } = ctx;
   const canUpload = allows(ctx.membership, "upload");
+  await removeWaitingDuplicates(db, id).catch((err) => console.warn("duplicate cleanup failed", err));
   const [all, transcripts, people, folders, visible] = await Promise.all([
-    db.select().from(sources).where(eq(sources.engagementId, id)).orderBy(desc(sources.createdAt)),
+    db.select(sourceMeta).from(sources).where(eq(sources.engagementId, id)).orderBy(desc(sources.createdAt)),
     db
       .select({ id: expertTranscripts.id, filename: expertTranscripts.filename, kind: expertTranscripts.kind, expertId: expertTranscripts.expertId, sourceId: expertTranscripts.sourceId, createdAt: expertTranscripts.createdAt })
       .from(expertTranscripts)

@@ -1,4 +1,4 @@
-import { and, eq } from "drizzle-orm";
+import { and, eq, getTableColumns } from "drizzle-orm";
 import type { DB } from "@/db/client";
 import { sourceBlobs, sources } from "@/db/schema";
 import { resolveStorage } from "./index";
@@ -9,6 +9,12 @@ const DB_PREFIX = "db:";
 export const MAX_DB_FILE_BYTES = 20 * 1024 * 1024;
 
 export type Source = typeof sources.$inferSelect;
+
+/** Every column except the file's extracted text, which can run to hundreds of KB per file. */
+const { textBody: _text, ...sourceMetaColumns } = getTableColumns(sources);
+export const sourceMeta = sourceMetaColumns;
+export type SourceMeta = Omit<Source, "textBody">;
+type Stored = Pick<Source, "id" | "objectKey" | "storageConnectionId" | "filename">;
 
 /**
  * Saves an uploaded file as a source: into the firm's own storage when one is connected,
@@ -94,7 +100,7 @@ export function safeSegment(name: string): string {
  * Puts a file into its folder in stores people browse (Google Drive). Elsewhere the folder
  * lives only in Merqado and the stored object stays where it is.
  */
-export async function placeSourceFile(db: DB, firmId: string, source: Source, place: string[]): Promise<string> {
+export async function placeSourceFile(db: DB, firmId: string, source: Stored, place: string[]): Promise<string> {
   if (source.objectKey.startsWith(DB_PREFIX)) return source.objectKey;
   const { storage } = await resolveStorage(db, firmId, source.storageConnectionId);
   if (!storage.move || !storage.pathKeys) return source.objectKey;
@@ -102,7 +108,7 @@ export async function placeSourceFile(db: DB, firmId: string, source: Source, pl
 }
 
 /** Removes a file's bytes from wherever they were saved (Drive: to its trash). */
-export async function deleteSourceBytes(db: DB, firmId: string, source: Source): Promise<void> {
+export async function deleteSourceBytes(db: DB, firmId: string, source: Stored): Promise<void> {
   if (source.objectKey.startsWith(DB_PREFIX)) return; // the row's cascade removes the blob
   const { storage } = await resolveStorage(db, firmId, source.storageConnectionId);
   await storage.delete(source.objectKey);
