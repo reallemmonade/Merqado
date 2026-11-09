@@ -4,7 +4,9 @@ import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useApi } from "@/components/experts/useApi";
+import type { SourceKind } from "@/lib/case/gptSources";
 import { splitCitations } from "@/lib/case/search";
+import { Greeting, GptAsk, ScopeMenu } from "./GptAsk";
 
 export interface GptSource {
   n: number;
@@ -61,19 +63,20 @@ export function GptChat({
   chat,
   lines,
   name,
+  initialKinds,
 }: {
   engagementId: string;
-  chat: { id: string; title: string; folder: string; shared: boolean; pinned: boolean; mine: boolean };
+  chat: { id: string; title: string; shared: boolean; mine: boolean };
   lines: GptLine[];
   name: string;
+  initialKinds: SourceKind[];
 }) {
-  const router = useRouter();
   const { call, busy, error } = useApi();
   const url = `/api/engagements/${engagementId}/gpt`;
   const [q, setQ] = useState("");
+  const [kinds, setKinds] = useState<SourceKind[]>(initialKinds);
   const [pending, setPending] = useState<string | null>(null);
   const [title, setTitle] = useState(chat.title);
-  const [folder, setFolder] = useState(chat.folder);
   const asked = useRef(false);
   const end = useRef<HTMLDivElement>(null);
   const waiting = lines[lines.length - 1]?.role === "user";
@@ -81,7 +84,7 @@ export function GptChat({
   useEffect(() => {
     if (waiting && chat.mine && !asked.current) {
       asked.current = true;
-      call("answer", url, { json: { op: "answer", chatId: chat.id } });
+      call("answer", url, { json: { op: "answer", chatId: chat.id, kinds } });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [waiting]);
@@ -90,18 +93,17 @@ export function GptChat({
     end.current?.scrollIntoView({ block: "end" });
   }, [lines.length, pending]);
 
-  async function ask(e: React.FormEvent) {
-    e.preventDefault();
-    if (!q.trim()) return;
-    setPending(q);
+  async function ask() {
+    const question = q;
+    setPending(question);
     setQ("");
-    await call("ask", url, { json: { op: "ask", chatId: chat.id, question: q } });
+    await call("ask", url, { json: { op: "ask", chatId: chat.id, question, kinds } });
     setPending(null);
   }
 
   return (
     <section className="panel gpt-main">
-      <div className="group-head">
+      <div className="gpt-head">
         {chat.mine ? (
           <input
             type="text"
@@ -112,129 +114,75 @@ export function GptChat({
             onBlur={() => title.trim() && title !== chat.title && call("rename", url, { json: { op: "rename", chatId: chat.id, title } })}
           />
         ) : (
-          <h2 style={{ flex: 1 }}>{chat.title}</h2>
+          <h2 className="gpt-head-title">{chat.title}</h2>
         )}
-        {chat.mine && (
-          <div className="toolbar">
-            <input
-              type="text"
-              aria-label="Folder"
-              placeholder="Folder"
-              value={folder}
-              list="gpt-folders"
-              style={{ width: 120, minHeight: 34 }}
-              onChange={(e) => setFolder(e.target.value)}
-              onBlur={() => folder !== chat.folder && call("folder", url, { json: { op: "folder", chatId: chat.id, folder } })}
-            />
-            <button type="button" className="secondary small" aria-pressed={chat.shared} disabled={busy !== null} onClick={() => call("share", url, { json: { op: "share", chatId: chat.id, shared: !chat.shared } })}>
-              {chat.shared ? "Shared" : "Share"}
-            </button>
-            <button type="button" className="secondary small" disabled={busy !== null || chat.pinned} onClick={() => call("pin", url, { json: { op: "pin", chatId: chat.id } })}>
-              {chat.pinned ? "Pinned" : "Pin to Notes"}
-            </button>
-            <button
-              type="button"
-              className="secondary small"
-              disabled={busy !== null}
-              onClick={async () => {
-                if (await call("delete", url, { json: { op: "delete", chatId: chat.id } })) router.push(`/e/${engagementId}/gpt`);
-              }}
-            >
-              Delete
-            </button>
-          </div>
-        )}
+        {chat.mine && <ScopeMenu shared={chat.shared} disabled={busy !== null} onChange={(shared) => call("share", url, { json: { op: "share", chatId: chat.id, shared } })} />}
       </div>
       <div className="gpt-log">
-        {lines.map((m) =>
-          m.role === "user" ? (
-            <div key={m.id} className="gpt-q">
-              {m.body}
+        <div className="gpt-col">
+          {lines.map((m) =>
+            m.role === "user" ? (
+              <div key={m.id} className="gpt-q">
+                {m.body}
+              </div>
+            ) : (
+              <Answer key={m.id} m={m} />
+            ),
+          )}
+          {pending && <div className="gpt-q">{pending}</div>}
+          {(busy === "answer" || busy === "ask") && <div className="muted gpt-thinking">{name}…</div>}
+          {error && (
+            <div className="toolbar">
+              <span className="error">{error}</span>
+              {waiting && chat.mine && (
+                <button type="button" className="secondary small" onClick={() => call("answer", url, { json: { op: "answer", chatId: chat.id, kinds } })}>
+                  Retry
+                </button>
+              )}
             </div>
-          ) : (
-            <Answer key={m.id} m={m} />
-          ),
-        )}
-        {pending && <div className="gpt-q">{pending}</div>}
-        {(busy === "answer" || busy === "ask") && <div className="muted gpt-thinking">{name}…</div>}
-        {error && (
-          <div className="toolbar">
-            <span className="error">{error}</span>
-            {waiting && chat.mine && (
-              <button type="button" className="secondary small" onClick={() => call("answer", url, { json: { op: "answer", chatId: chat.id } })}>
-                Retry
-              </button>
-            )}
-          </div>
-        )}
-        <div ref={end} />
+          )}
+          <div ref={end} />
+        </div>
       </div>
       {chat.mine && (
-        <form className="composer" onSubmit={ask}>
-          <label htmlFor="gpt-input" className="sr-only">
-            Ask {name}
-          </label>
-          <textarea
-            id="gpt-input"
-            rows={2}
-            value={q}
-            placeholder={`Ask ${name}`}
-            onChange={(e) => setQ(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && !e.shiftKey) {
-                e.preventDefault();
-                e.currentTarget.form?.requestSubmit();
-              }
-            }}
-          />
-          <button type="submit" disabled={busy !== null || !q.trim()}>
-            Ask
-          </button>
-        </form>
+        <div className="gpt-foot">
+          <GptAsk name={name} value={q} onChange={setQ} onSubmit={ask} disabled={busy !== null} kinds={kinds} onKinds={setKinds} />
+        </div>
       )}
     </section>
   );
 }
 
-/** Starts a new chat from the GPT home. */
-export function GptStart({ engagementId, name }: { engagementId: string; name: string }) {
+/** The GPT home: greeting and a fresh ask box. */
+export function GptStart({ engagementId, name, first }: { engagementId: string; name: string; first: string }) {
   const router = useRouter();
   const { call, busy, error } = useApi();
   const [q, setQ] = useState("");
+  const [kinds, setKinds] = useState<SourceKind[]>([]);
+  const [shared, setShared] = useState(true);
   return (
     <section className="panel gpt-main gpt-start">
-      <h2 style={{ fontSize: 24 }}>{name}</h2>
-      <form
-        className="composer"
-        style={{ border: "1.5px solid var(--line)", borderRadius: 14, width: "min(680px, 100%)" }}
-        onSubmit={async (e) => {
-          e.preventDefault();
-          const res = await call("new", `/api/engagements/${engagementId}/gpt`, { json: { op: "new", question: q } });
-          if (res?.id) router.push(`/e/${engagementId}/gpt/${res.id}`);
-        }}
-      >
-        <label htmlFor="gpt-input" className="sr-only">
-          Ask {name}
-        </label>
-        <textarea
-          id="gpt-input"
-          rows={3}
+      <div className="gpt-start-top">
+        <ScopeMenu shared={shared} onChange={setShared} />
+      </div>
+      <div className="gpt-start-mid">
+        <Greeting first={first} />
+        <GptAsk
+          name={name}
           value={q}
-          placeholder={`Ask ${name}`}
+          onChange={setQ}
+          rows={3}
           autoFocus
-          onChange={(e) => setQ(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" && !e.shiftKey) {
-              e.preventDefault();
-              e.currentTarget.form?.requestSubmit();
-            }
+          disabled={busy !== null}
+          kinds={kinds}
+          onKinds={setKinds}
+          onSubmit={async () => {
+            const res = await call("new", `/api/engagements/${engagementId}/gpt`, { json: { op: "new", question: q, shared } });
+            if (res?.id) router.push(`/e/${engagementId}/gpt/${res.id}${kinds.length ? `?src=${kinds.join(",")}` : ""}`);
           }}
         />
-        <button type="submit" disabled={busy !== null || !q.trim()}>
-          Ask
-        </button>
-      </form>
-      {error && <span className="error">{error}</span>}
+        {error && <span className="error">{error}</span>}
+      </div>
     </section>
   );
 }

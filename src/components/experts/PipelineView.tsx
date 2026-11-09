@@ -11,6 +11,9 @@ import { FullTable, useTableLayout } from "./FullTable";
 import { SourceLink } from "./SourceLink";
 import { useApi } from "./useApi";
 import type { Focus } from "@/lib/experts/focus";
+import { canPass, signoffFor, slots, type Signer } from "@/lib/experts/approval";
+
+type Member = Signer & { name: string };
 
 type Tab = "overview" | "guide" | "takeaways";
 const VERDICT_LABEL = {
@@ -24,6 +27,9 @@ export function PipelineView({
   data,
   canEdit,
   canApprove,
+  members,
+  me,
+  suggestedRequester,
   initialExpert,
   initialTab,
   focus,
@@ -32,6 +38,9 @@ export function PipelineView({
   data: ExpertsData;
   canEdit: boolean;
   canApprove: boolean;
+  members: Member[];
+  me: string;
+  suggestedRequester: string | null;
   initialExpert?: string;
   initialTab?: Tab;
   focus?: Focus | null;
@@ -145,6 +154,8 @@ export function PipelineView({
           <ExpertForm
             types={data.types}
             topics={data.topics}
+            people={members}
+            defaultRequester={suggestedRequester}
             submitLabel="Propose"
             busy={api.busy === "create"}
             onSubmit={create}
@@ -167,6 +178,7 @@ export function PipelineView({
           types={data.types}
           topics={data.topics}
           initial={expert}
+          people={expert.status === "proposed" ? members : undefined}
           submitLabel="Save"
           busy={api.busy === "save"}
           onSubmit={save}
@@ -183,6 +195,8 @@ export function PipelineView({
         setTab={setTab}
         canEdit={canEdit}
         canApprove={canApprove}
+        members={members}
+        me={me}
         engagementId={engagementId}
         onEdit={() => setMode("edit")}
         onStatus={(s) => setStatus(expert, s)}
@@ -410,6 +424,8 @@ function ExpertTile({
   setTab,
   canEdit,
   canApprove,
+  members,
+  me,
   engagementId,
   onEdit,
   onStatus,
@@ -421,6 +437,8 @@ function ExpertTile({
   setTab: (t: Tab) => void;
   canEdit: boolean;
   canApprove: boolean;
+  members: Member[];
+  me: string;
   engagementId: string;
   onEdit: () => void;
   onStatus: (s: Status) => void;
@@ -433,6 +451,10 @@ function ExpertTile({
   const transcripts = data.transcripts.filter((t) => t.expertId === expert.id);
   const [guideDraft, setGuideDraft] = useState<string | null>(null);
   const [newKta, setNewKta] = useState("");
+  const signoff = { requestedBy: expert.requestedBy, approvals: expert.approvals };
+  const mySignoff = expert.status === "proposed" ? signoffFor(signoff, me, members) : null;
+  const mayPass = expert.status === "proposed" && canPass(signoff, me, members);
+  const nameOf = (id: string | null) => members.find((m) => m.id === id)?.name ?? "";
 
   const tabs: [Tab, string][] = [
     ["overview", "Overview"],
@@ -456,7 +478,7 @@ function ExpertTile({
         {expert.status === "declined" ? (
           <p className="muted" style={{ margin: 0 }}>
             Passed on.{" "}
-            {canApprove && (
+            {(canApprove || expert.requestedBy === me) && (
               <button type="button" className="secondary small" onClick={() => onStatus("proposed")}>
                 Move back to proposed
               </button>
@@ -466,7 +488,7 @@ function ExpertTile({
           <ol className="steps" aria-label="Progress">
             {STATUS_ORDER.map((s, i) => (
               <li key={s} className={`${i <= at ? "done" : ""} ${i === at ? "current" : ""}`}>
-                <span />
+                <span className={i <= at ? `seg-${s}` : undefined} />
                 {STATUS_LABEL[s]}
               </li>
             ))}
@@ -523,19 +545,30 @@ function ExpertTile({
             {expert.proposedByName && (
               <p className="muted" style={{ margin: 0, fontSize: 12 }}>
                 Proposed by {expert.proposedByName}
+                {expert.requestedByName ? ` · Asked by ${expert.requestedByName}` : ""}
               </p>
+            )}
+            {expert.status === "proposed" && (
+              <ul className="signoffs" aria-label="Approvals">
+                {slots(signoff, members).map((s) => (
+                  <li key={s.slot} className={s.done ? "done" : ""}>
+                    <span aria-hidden>{s.done ? "✓" : "○"}</span>
+                    {s.slot === "consultant" ? (s.done ? nameOf(s.by) : "Consultant") : nameOf(expert.requestedBy)}
+                  </li>
+                ))}
+              </ul>
             )}
             {canEdit && (
               <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-                {expert.status === "proposed" && canApprove && (
-                  <>
-                    <button type="button" disabled={!!api.busy} onClick={() => onStatus("approved")}>
-                      Approve
-                    </button>
-                    <button type="button" className="secondary" disabled={!!api.busy} onClick={() => onStatus("declined")}>
-                      Pass
-                    </button>
-                  </>
+                {mySignoff && (
+                  <button type="button" className="act" disabled={!!api.busy} onClick={() => onStatus("approved")}>
+                    Approve
+                  </button>
+                )}
+                {mayPass && (
+                  <button type="button" className="secondary act" disabled={!!api.busy} onClick={() => onStatus("declined")}>
+                    Pass
+                  </button>
                 )}
                 {expert.status === "approved" && (
                   <button type="button" disabled={!!api.busy} onClick={() => onStatus("scheduled")}>

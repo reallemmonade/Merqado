@@ -5,6 +5,8 @@ import { sessions } from "@/db/schema";
 
 export const SESSION_COOKIE = "mq_session";
 export const SESSION_TTL_SECONDS = 12 * 60 * 60;
+/** The iPhone app stays signed in for 30 days (its token lives in the iOS Keychain). */
+export const MOBILE_SESSION_TTL_SECONDS = 30 * 24 * 60 * 60;
 
 export function hashToken(token: string): string {
   return createHash("sha256").update(token).digest("hex");
@@ -23,7 +25,7 @@ export function cookieOptions(maxAge: number, path = "/") {
 /** Creates a session and returns the raw token to set as a cookie. */
 export async function createSession(
   db: DB,
-  input: { userId: string; firmId: string; ssoConnectionId?: string },
+  input: { userId: string; firmId: string; ssoConnectionId?: string | null; ttlSeconds?: number },
 ): Promise<string> {
   const token = randomBytes(32).toString("base64url");
   await db.insert(sessions).values({
@@ -31,7 +33,7 @@ export async function createSession(
     userId: input.userId,
     firmId: input.firmId,
     ssoConnectionId: input.ssoConnectionId,
-    expiresAt: new Date(Date.now() + SESSION_TTL_SECONDS * 1000),
+    expiresAt: new Date(Date.now() + (input.ttlSeconds ?? SESSION_TTL_SECONDS) * 1000),
   });
   return token;
 }

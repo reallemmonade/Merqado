@@ -4,7 +4,8 @@ import { useState } from "react";
 import type { TaskStatus } from "@/db/schema";
 import type { Workplan } from "@/lib/case/data";
 import type { CaseMember } from "@/lib/case/page";
-import { nextStatus, shortDate, TASK_STATUS_LABEL, todayIso } from "@/lib/case/progress";
+import { shortDate, TASK_STATUS_LABEL, todayIso } from "@/lib/case/progress";
+import { MOVE_LABEL, primaryMove, reviewerOf } from "@/lib/case/tasks";
 import { useApi } from "@/components/experts/useApi";
 import { SampleButton } from "./SampleButton";
 
@@ -13,14 +14,14 @@ function initials(name: string) {
   return ((p[0]?.[0] ?? "") + (p.length > 1 ? p[p.length - 1]![0] : "")).toUpperCase();
 }
 
-export function WorkplanGrid({ engagementId, wp, members, canEdit }: { engagementId: string; wp: Workplan; members: CaseMember[]; canEdit: boolean }) {
+export function WorkplanGrid({ engagementId, wp, members, canEdit, canAssign, canPlan, me }: { engagementId: string; wp: Workplan; members: CaseMember[]; canEdit: boolean; canAssign: boolean; canPlan: boolean; me: string }) {
   const { call, busy, error } = useApi();
   const url = `/api/engagements/${engagementId}/workplan`;
   const [who, setWho] = useState<string>("all");
   const [newModule, setNewModule] = useState("");
   const [newDate, setNewDate] = useState({ label: "", date: "" });
   const [adding, setAdding] = useState<string | null>(null);
-  const [draft, setDraft] = useState({ title: "", assigneeId: "" });
+  const [draft, setDraft] = useState({ title: "", assigneeId: "", reviewerId: me, dueDate: "" });
 
   const columns = wp.milestones.filter((m) => m.isColumn);
   const hasUndated = wp.tasks.some((t) => !t.milestoneId || !columns.some((c) => c.id === t.milestoneId));
@@ -32,7 +33,7 @@ export function WorkplanGrid({ engagementId, wp, members, canEdit }: { engagemen
   const nextCol = columns.find((c) => c.date >= today)?.id;
   const memberName = new Map(members.map((m) => [m.id, m.name]));
 
-  if (wp.modules.length === 0 && !canEdit) return <p className="muted">No workplan</p>;
+  if (wp.modules.length === 0 && !canPlan) return <p className="muted">No workplan</p>;
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
@@ -83,7 +84,7 @@ export function WorkplanGrid({ engagementId, wp, members, canEdit }: { engagemen
                   <td>
                     <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                       <strong>{m.name}</strong>
-                      {canEdit ? (
+                      {canPlan ? (
                         <select
                           aria-label={`Lead for ${m.name}`}
                           value={m.leadId ?? ""}
@@ -102,7 +103,7 @@ export function WorkplanGrid({ engagementId, wp, members, canEdit }: { engagemen
                           {m.leadId ? memberName.get(m.leadId) : ""}
                         </span>
                       )}
-                      {canEdit && (
+                      {canPlan && (
                         <button
                           type="button"
                           className="linkbtn"
@@ -121,7 +122,11 @@ export function WorkplanGrid({ engagementId, wp, members, canEdit }: { engagemen
                     return (
                       <td key={key} className={c.id && c.id === nextCol ? "wp-next" : undefined}>
                         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                          {tasks.map((t) => (
+                          {tasks.map((t) => {
+                            const next = primaryMove(t, me, canEdit, m.leadId);
+                            const reviewer = reviewerOf(t, m.leadId);
+                            const manages = canAssign && (reviewer === null || reviewer === me || t.createdBy === me);
+                            return (
                             <div key={t.id} id={`task-${t.id}`} className="wp-task" style={{ opacity: who === "all" || t.assigneeId === who ? 1 : 0.35 }}>
                               <span className="avatar" title={t.assigneeId ? memberName.get(t.assigneeId) : "Unassigned"}>
                                 {t.assigneeId ? initials(memberName.get(t.assigneeId) ?? "?") : "–"}
@@ -130,29 +135,39 @@ export function WorkplanGrid({ engagementId, wp, members, canEdit }: { engagemen
                               <button
                                 type="button"
                                 className={`ts-btn ts-${t.status}`}
-                                disabled={!canEdit}
-                                aria-label={`${TASK_STATUS_LABEL[t.status]}. Change status`}
-                                onClick={() => call("st", url, { json: { op: "task.update", id: t.id, status: nextStatus(t.status) } })}
+                                disabled={!next || busy !== null}
+                                title={next ? MOVE_LABEL[next] : undefined}
+                                aria-label={next ? `${TASK_STATUS_LABEL[t.status]}. ${MOVE_LABEL[next]}` : TASK_STATUS_LABEL[t.status]}
+                                onClick={() => next && call("st", url, { json: { op: "task.update", id: t.id, status: next } })}
                               >
                                 {TASK_STATUS_LABEL[t.status]}
                               </button>
-                              {canEdit && (
+                              {manages && (
                                 <button type="button" className="x" aria-label={`Delete ${t.title}`} onClick={() => call("del", url, { json: { op: "task.delete", id: t.id } })}>
                                   ×
                                 </button>
                               )}
                             </div>
-                          ))}
-                          {canEdit &&
+                            );
+                          })}
+                          {canAssign &&
                             (adding === key ? (
                               <form
                                 onSubmit={async (e) => {
                                   e.preventDefault();
                                   const res = await call("add", url, {
-                                    json: { op: "task.add", moduleId: m.id, milestoneId: c.id, title: draft.title, assigneeId: draft.assigneeId || null },
+                                    json: {
+                                      op: "task.add",
+                                      moduleId: m.id,
+                                      milestoneId: c.id,
+                                      title: draft.title,
+                                      assigneeId: draft.assigneeId || null,
+                                      reviewerId: draft.reviewerId || null,
+                                      dueDate: draft.dueDate || null,
+                                    },
                                   });
                                   if (res) {
-                                    setDraft({ title: "", assigneeId: draft.assigneeId });
+                                    setDraft({ ...draft, title: "", dueDate: "" });
                                     setAdding(null);
                                   }
                                 }}
@@ -168,6 +183,16 @@ export function WorkplanGrid({ engagementId, wp, members, canEdit }: { engagemen
                                     {members.map((p) => (
                                       <option key={p.id} value={p.id}>
                                         {p.name}
+                                      </option>
+                                    ))}
+                                  </select>
+                                  <input type="date" aria-label="Due" value={draft.dueDate} onChange={(e) => setDraft({ ...draft, dueDate: e.target.value })} style={{ flex: 1 }} />
+                                </div>
+                                <div style={{ display: "flex", gap: 6 }}>
+                                  <select aria-label="Reviewer" value={draft.reviewerId} onChange={(e) => setDraft({ ...draft, reviewerId: e.target.value })} style={{ flex: 1 }}>
+                                    {members.map((p) => (
+                                      <option key={p.id} value={p.id}>
+                                        {p.id === me ? "Review: me" : `Review: ${p.name}`}
                                       </option>
                                     ))}
                                   </select>
@@ -195,7 +220,7 @@ export function WorkplanGrid({ engagementId, wp, members, canEdit }: { engagemen
         </div>
       )}
 
-      {canEdit && (
+      {canPlan && (
         <div className="toolbar">
           <form
             className="toolbar"

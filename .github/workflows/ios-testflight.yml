@@ -1,0 +1,76 @@
+name: iPhone app to TestFlight
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: ["mobile/**", ".github/workflows/ios-testflight.yml"]
+
+concurrency:
+  group: ios-testflight
+  cancel-in-progress: true
+
+permissions:
+  # match keeps the encrypted signing files on the `fastlane-match` branch.
+  contents: write
+
+jobs:
+  testflight:
+    runs-on: macos-latest
+    timeout-minutes: 60
+    defaults:
+      run:
+        working-directory: mobile
+    env:
+      ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+      ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+      ASC_KEY_P8: ${{ secrets.ASC_KEY_P8 }}
+      APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+      MATCH_PASSWORD: ${{ secrets.MATCH_PASSWORD }}
+      MATCH_GIT_URL: https://github.com/${{ github.repository }}.git
+      BUILD_NUMBER: ${{ github.run_number }}
+      FASTLANE_SKIP_UPDATE_CHECK: "1"
+      FASTLANE_HIDE_CHANGELOG: "1"
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check the Apple secrets are set
+        run: |
+          missing=""
+          for v in ASC_KEY_ID ASC_ISSUER_ID ASC_KEY_P8 APPLE_TEAM_ID MATCH_PASSWORD; do
+            [ -n "${!v}" ] || missing="$missing $v"
+          done
+          if [ -n "$missing" ]; then echo "::error::Add these repository secrets:$missing"; exit 1; fi
+
+      - uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest-stable
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: mobile/package-lock.json
+
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: "3.3"
+          bundler-cache: true
+          working-directory: mobile
+
+      - run: npm ci
+
+      - name: Typecheck
+        run: npx tsc --noEmit
+
+      - name: Generate the Xcode project
+        run: npx expo prebuild --platform ios --clean --no-install
+
+      - name: Install iOS libraries
+        run: bundle exec pod install
+        working-directory: mobile/ios
+
+      - name: Build, sign and upload to TestFlight
+        run: |
+          export MATCH_GIT_BASIC_AUTH=$(printf "x-access-token:%s" "${{ github.token }}" | base64)
+          bundle exec fastlane ios beta

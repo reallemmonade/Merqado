@@ -26,6 +26,7 @@ export const expertFields = z.object({
   topicIds: z.array(z.string()).max(100),
   notes: z.string().max(20000),
   guide: z.string().max(100000).nullable(),
+  requestedBy: z.string().nullable(),
 });
 
 export const expertCreate = expertFields.partial().extend({ firstName: z.string().trim().min(1).max(100) });
