@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "db99c6ad-12a5-462d-9493-2a956ae8aca3",
+  "id": "d9cd1aa7-46c6-4dcd-879d-43a0d9473021",
   "prevId": "b662c804-30a4-42b0-9318-218133df9149",
   "tables": {
     "ai_providers": {
@@ -1822,6 +1822,21 @@
           "notNull": false,
           "autoincrement": false
         },
+        "requested_by": {
+          "name": "requested_by",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "approvals": {
+          "name": "approvals",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'[]'"
+        },
         "approved_by": {
           "name": "approved_by",
           "type": "text",
@@ -1885,6 +1900,19 @@
             "id"
           ],
           "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "experts_requested_by_users_id_fk": {
+          "name": "experts_requested_by_users_id_fk",
+          "tableFrom": "experts",
+          "tableTo": "users",
+          "columnsFrom": [
+            "requested_by"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
           "onUpdate": "no action"
         },
         "experts_approved_by_users_id_fk": {
@@ -2837,177 +2865,6 @@
             "id"
           ],
           "onDelete": "set null",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "checkConstraints": {}
-    },
-    "mobile_auth_codes": {
-      "name": "mobile_auth_codes",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "text",
-          "primaryKey": true,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "code_hash": {
-          "name": "code_hash",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "challenge": {
-          "name": "challenge",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "user_id": {
-          "name": "user_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "firm_id": {
-          "name": "firm_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "expires_at": {
-          "name": "expires_at",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": "(unixepoch())"
-        }
-      },
-      "indexes": {
-        "mobile_auth_codes_code_hash_unique": {
-          "name": "mobile_auth_codes_code_hash_unique",
-          "columns": [
-            "code_hash"
-          ],
-          "isUnique": true
-        }
-      },
-      "foreignKeys": {
-        "mobile_auth_codes_user_id_users_id_fk": {
-          "name": "mobile_auth_codes_user_id_users_id_fk",
-          "tableFrom": "mobile_auth_codes",
-          "tableTo": "users",
-          "columnsFrom": [
-            "user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        },
-        "mobile_auth_codes_firm_id_firms_id_fk": {
-          "name": "mobile_auth_codes_firm_id_firms_id_fk",
-          "tableFrom": "mobile_auth_codes",
-          "tableTo": "firms",
-          "columnsFrom": [
-            "firm_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "checkConstraints": {}
-    },
-    "push_devices": {
-      "name": "push_devices",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "text",
-          "primaryKey": true,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "user_id": {
-          "name": "user_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "token": {
-          "name": "token",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "environment": {
-          "name": "environment",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": "'production'"
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": "(unixepoch())"
-        }
-      },
-      "indexes": {
-        "push_devices_token_unique": {
-          "name": "push_devices_token_unique",
-          "columns": [
-            "token"
-          ],
-          "isUnique": true
-        },
-        "push_devices_user": {
-          "name": "push_devices_user",
-          "columns": [
-            "user_id"
-          ],
-          "isUnique": false
-        }
-      },
-      "foreignKeys": {
-        "push_devices_user_id_users_id_fk": {
-          "name": "push_devices_user_id_users_id_fk",
-          "tableFrom": "push_devices",
-          "tableTo": "users",
-          "columnsFrom": [
-            "user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
           "onUpdate": "no action"
         }
       },

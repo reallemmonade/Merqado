@@ -397,6 +397,10 @@ export const experts = sqliteTable(
     guide: text("guide"),
     guideUpdatedAt: integer("guide_updated_at", { mode: "timestamp" }),
     proposedBy: text("proposed_by").references(() => users.id),
+    /** Who asked for this expert, if not a consultant. They sign off too, on top of a consultant. */
+    requestedBy: text("requested_by").references(() => users.id, { onDelete: "set null" }),
+    /** JSON array of user ids who have signed off so far (see lib/experts/approval). */
+    approvals: text("approvals").notNull().default("[]"),
     approvedBy: text("approved_by").references(() => users.id),
     createdAt: createdAt(),
   },
@@ -855,4 +859,41 @@ export const pushDevices = sqliteTable(
     createdAt: createdAt(),
   },
   (t) => [index("push_devices_user").on(t.userId)],
+);
+
+export const TODO_STATUSES = ["suggested", "open", "done", "dismissed"] as const;
+export type TodoStatus = (typeof TODO_STATUSES)[number];
+
+/** Where a to-do came from. Teams and email plug in later through src/lib/todos/sources. */
+export const TODO_SOURCES = ["manual", "channel", "teams", "email"] as const;
+export type TodoSourceKind = (typeof TODO_SOURCES)[number];
+
+/** A to-do on a case: added by hand, or suggested from chats and accepted. */
+export const todos = sqliteTable(
+  "todos",
+  {
+    id: id(),
+    engagementId: text("engagement_id")
+      .notNull()
+      .references(() => engagements.id, { onDelete: "cascade" }),
+    title: text("title").notNull(),
+    /** Null means anyone on the team. */
+    assigneeId: text("assignee_id").references(() => users.id, { onDelete: "set null" }),
+    /** ISO date (YYYY-MM-DD). */
+    dueDate: text("due_date"),
+    status: text("status", { enum: TODO_STATUSES }).notNull().default("open"),
+    source: text("source", { enum: TODO_SOURCES }).notNull().default("manual"),
+    /** e.g. the chat's name, "Outlook" or a Teams channel. */
+    sourceLabel: text("source_label").notNull().default(""),
+    /** In-app link back to the message it came from. */
+    sourceLink: text("source_link"),
+    /** Stable id of the source message, so a rescan never raises it twice. */
+    sourceKey: text("source_key"),
+    /** JSON array of archetypes who may see it (the source chat's members); null is everyone. */
+    audience: text("audience"),
+    createdBy: text("created_by").references(() => users.id, { onDelete: "set null" }),
+    createdAt: createdAt(),
+    doneAt: integer("done_at", { mode: "timestamp" }),
+  },
+  (t) => [index("todos_engagement").on(t.engagementId, t.status)],
 );
