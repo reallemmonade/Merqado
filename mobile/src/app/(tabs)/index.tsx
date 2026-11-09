@@ -12,6 +12,7 @@ const FILTERS = [
   { key: "all", label: "All" },
   { key: "mention", label: "Mentions" },
   { key: "task", label: "Tasks" },
+  { key: "review", label: "Reviews" },
 ] as const;
 
 export default function Inbox() {
@@ -38,8 +39,8 @@ export default function Inbox() {
 }
 
 function Row({ item }: { item: InboxItem }) {
-  const isTask = item.kind === "task";
-  const color = isTask ? C.rose : colorFor(item.title);
+  const isTask = item.kind !== "mention";
+  const color = item.kind === "review" ? C.slate : isTask ? C.rose : colorFor(item.title);
   const open = () => {
     if (item.roomId) router.push(`/case/${item.caseId}/room/${item.roomId}`);
     else router.push("/tasks");
@@ -56,7 +57,7 @@ function Row({ item }: { item: InboxItem }) {
           </Text>
           <Text style={{ fontFamily: F.regular, fontSize: 12, color: C.muted }}>{shortTime(item.at)}</Text>
         </View>
-        <Text style={{ fontFamily: F.medium, fontSize: 12, color }}>{isTask ? `Task · ${item.caseName}` : `Mention · ${item.caseName}`}</Text>
+        <Text style={{ fontFamily: F.medium, fontSize: 12, color }}>{`${item.kind === "review" ? "Review" : isTask ? "Task" : "Mention"} · ${item.caseName}`}</Text>
         <Text style={{ fontFamily: F.regular, fontSize: 14, color: C.text }} numberOfLines={2}>
           {item.body}
         </Text>

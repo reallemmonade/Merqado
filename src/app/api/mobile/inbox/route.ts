@@ -1,13 +1,14 @@
 import { NextResponse } from "next/server";
-import { and, desc, eq, gt, inArray, ne } from "drizzle-orm";
-import { chatMessages, chatRooms, engagements, users, workplanModules, workplanTasks } from "@/db/schema";
-import { canSeeRoom } from "@/lib/case/rooms";
-import { findMentions } from "@/lib/mobile/mentions";
-import { caseMembers, mobileAuth, myCases } from "@/lib/mobile/data";
+import { and, desc, eq, gt, inArray, like, ne, or } from "drizzle-orm";
+import { chatMessages, chatRooms, users, workplanModules, workplanTasks } from "@/db/schema";
+import { canSeeChat } from "@/lib/case/rooms";
+import { mobileAuth, myCases } from "@/lib/mobile/data";
 
 const WINDOW_MS = 14 * 24 * 60 * 60 * 1000;
 
-/** Mentions of me and tasks given to me, newest first. */
+type Item = { id: string; kind: "mention" | "task" | "review"; caseId: string; caseName: string; title: string; body: string; at: string; roomId?: string; messageId?: string; taskId?: string };
+
+/** Mentions of me, tasks given to me and tasks waiting on my review, newest first. */
 export async function GET() {
   const auth = await mobileAuth();
   if (auth instanceof NextResponse) return auth;
@@ -15,49 +16,51 @@ export async function GET() {
   const cases = await myCases(db, user);
   if (cases.length === 0) return NextResponse.json({ items: [] });
   const caseIds = cases.map((c) => c.id);
+  const caseOf = new Map(cases.map((c) => [c.id, c]));
   const since = new Date(Date.now() - WINDOW_MS);
+  const items: Item[] = [];
 
-  const rooms = (await db.select().from(chatRooms).where(inArray(chatRooms.engagementId, caseIds))).filter((r) => canSeeRoom(r.archetypes, user.archetype));
-  const roomById = new Map(rooms.map((r) => [r.id, r]));
-  const caseName = new Map(cases.map((c) => [c.id, c.codeName]));
-
-  const items: { id: string; kind: "mention" | "task"; caseId: string; caseName: string; title: string; body: string; at: string; roomId?: string; messageId?: string; taskId?: string }[] = [];
-
-  if (rooms.length) {
-    const msgs = await db
-      .select({ id: chatMessages.id, roomId: chatMessages.roomId, caseId: chatMessages.engagementId, body: chatMessages.body, at: chatMessages.createdAt, author: users.name })
-      .from(chatMessages)
-      .leftJoin(users, eq(users.id, chatMessages.userId))
-      .where(and(inArray(chatMessages.roomId, [...roomById.keys()]), gt(chatMessages.createdAt, since), ne(chatMessages.userId, user.id)))
-      .orderBy(desc(chatMessages.createdAt))
-      .limit(500);
-    const members = new Map<string, { id: string; name: string }[]>();
-    for (const m of msgs) {
-      if (!m.body.includes("@")) continue;
-      if (!members.has(m.caseId)) members.set(m.caseId, await caseMembers(db, m.caseId, user.firmId));
-      if (!findMentions(m.body, members.get(m.caseId)!).includes(user.id)) continue;
-      items.push({
-        id: `m-${m.id}`,
-        kind: "mention",
-        caseId: m.caseId,
-        caseName: caseName.get(m.caseId) ?? "",
-        title: m.author ?? "",
-        body: m.body,
-        at: m.at.toISOString(),
-        roomId: m.roomId,
-        messageId: m.id,
-      });
+  const mentions = await db
+    .select({ id: chatMessages.id, roomId: chatMessages.roomId, caseId: chatMessages.engagementId, body: chatMessages.body, at: chatMessages.createdAt, author: users.name })
+    .from(chatMessages)
+    .leftJoin(users, eq(users.id, chatMessages.userId))
+    .where(and(inArray(chatMessages.engagementId, caseIds), gt(chatMessages.createdAt, since), ne(chatMessages.userId, user.id), like(chatMessages.mentions, `%"${user.id}"%`)))
+    .orderBy(desc(chatMessages.createdAt))
+    .limit(100);
+  if (mentions.length) {
+    const rooms = await db.select().from(chatRooms).where(inArray(chatRooms.id, [...new Set(mentions.map((m) => m.roomId))]));
+    const visible = new Set(rooms.filter((r) => canSeeChat(r, { id: user.id, archetype: caseOf.get(r.engagementId)?.role ?? user.archetype })).map((r) => r.id));
+    for (const m of mentions) {
+      if (!visible.has(m.roomId)) continue;
+      items.push({ id: `m-${m.id}`, kind: "mention", caseId: m.caseId, caseName: caseOf.get(m.caseId)?.codeName ?? "", title: m.author ?? "", body: m.body, at: m.at.toISOString(), roomId: m.roomId, messageId: m.id });
     }
   }
 
   const tasks = await db
-    .select({ id: workplanTasks.id, caseId: workplanTasks.engagementId, title: workplanTasks.title, module: workplanModules.name, at: workplanTasks.createdAt })
+    .select({
+      id: workplanTasks.id,
+      caseId: workplanTasks.engagementId,
+      title: workplanTasks.title,
+      status: workplanTasks.status,
+      assigneeId: workplanTasks.assigneeId,
+      reviewerId: workplanTasks.reviewerId,
+      module: workplanModules.name,
+      at: workplanTasks.createdAt,
+    })
     .from(workplanTasks)
     .innerJoin(workplanModules, eq(workplanModules.id, workplanTasks.moduleId))
-    .innerJoin(engagements, eq(engagements.id, workplanTasks.engagementId))
-    .where(and(eq(workplanTasks.assigneeId, user.id), inArray(workplanTasks.engagementId, caseIds), gt(workplanTasks.createdAt, since), ne(workplanTasks.status, "done")));
+    .where(
+      and(
+        inArray(workplanTasks.engagementId, caseIds),
+        or(
+          and(eq(workplanTasks.assigneeId, user.id), gt(workplanTasks.createdAt, since), ne(workplanTasks.status, "done")),
+          and(eq(workplanTasks.reviewerId, user.id), eq(workplanTasks.status, "almost_done")),
+        ),
+      ),
+    );
   for (const t of tasks) {
-    items.push({ id: `t-${t.id}`, kind: "task", caseId: t.caseId, caseName: caseName.get(t.caseId) ?? "", title: t.title, body: t.module, at: t.at.toISOString(), taskId: t.id });
+    const review = t.reviewerId === user.id && t.status === "almost_done";
+    items.push({ id: `t-${t.id}`, kind: review ? "review" : "task", caseId: t.caseId, caseName: caseOf.get(t.caseId)?.codeName ?? "", title: t.title, body: t.module, at: t.at.toISOString(), taskId: t.id });
   }
 
   items.sort((a, b) => b.at.localeCompare(a.at));

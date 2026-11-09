@@ -1,12 +1,3 @@
-CREATE TABLE `chat_reads` (
-	`user_id` text NOT NULL,
-	`room_id` text NOT NULL,
-	`last_read_at` integer NOT NULL,
-	PRIMARY KEY(`user_id`, `room_id`),
-	FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON UPDATE no action ON DELETE cascade,
-	FOREIGN KEY (`room_id`) REFERENCES `chat_rooms`(`id`) ON UPDATE no action ON DELETE cascade
-);
---> statement-breakpoint
 CREATE TABLE `mobile_auth_codes` (
 	`id` text PRIMARY KEY NOT NULL,
 	`code_hash` text NOT NULL,

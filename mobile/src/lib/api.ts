@@ -54,19 +54,61 @@ export async function api<T = unknown>(path: string, init: { method?: string; bo
 // Shapes the server returns.
 export type Me = {
   user: { id: string; name: string; email: string; title: string; archetype: string };
-  cases: { id: string; codeName: string; title: string; status: string; access: string; gptName: string }[];
+  cases: { id: string; codeName: string; title: string; status: string; access: string; role: string; gptName: string }[];
 };
-export type Room = { id: string; name: string; lastBody: string; lastAuthor: string; lastAt: string | null; unread: number };
-export type Message = { id: string; body: string; pinned: boolean; at: string; userId: string | null; author: string; mine: boolean };
+export type Person = { id: string; name: string; initials: string; title: string; presence: "available" | "away" | "busy" | "offline" | string };
+export type Chat = {
+  id: string;
+  kind: "room" | "dm" | "group";
+  name: string;
+  sub: string;
+  memberIds: string[];
+  otherId: string | null;
+  last: { author: string; text: string; at: string } | null;
+  lastAt: string | null;
+  unread: number;
+  mentioned: number;
+};
+export type Reaction = { emoji: string; count: number; mine: boolean; names: string[] };
+export type Message = {
+  id: string;
+  authorId: string | null;
+  author: string;
+  initials: string;
+  at: string;
+  body: string;
+  kind: "text" | "meeting" | "call";
+  meta: { title?: string; startsAt?: string; minutes?: number; link?: string | null; video?: boolean; endedAt?: string | null };
+  pinned: boolean;
+  mine: boolean;
+  edited: boolean;
+  mentionsMe: boolean;
+  files: { id: string; filename: string; folder: string; pending: boolean }[];
+  reactions: Reaction[];
+  replies: { count: number; lastAt: string | null; authors: string[] };
+};
 export type Member = { id: string; name: string; title: string };
 export type GptChat = { id: string; title: string; shared: boolean; pinned: boolean; updatedAt: string; owner: string; mine: boolean };
 export type GptSource = { n: number; label: string; href: string; text: string };
 export type GptMessage = { id: string; role: "user" | "assistant"; body: string; sources: GptSource[]; at: string };
-export type Task = { id: string; caseId: string; caseName: string; title: string; status: TaskStatus; module: string; due: string | null; milestone: string | null };
 export type TaskStatus = "not_yet" | "in_progress" | "almost_done" | "done";
+export type Task = {
+  id: string;
+  caseId: string;
+  caseName: string;
+  title: string;
+  status: TaskStatus;
+  module: string;
+  due: string | null;
+  mine: boolean;
+  toReview: boolean;
+  assignee: string;
+  reviewNote: string;
+  moves: TaskStatus[];
+};
 export type InboxItem = {
   id: string;
-  kind: "mention" | "task";
+  kind: "mention" | "task" | "review";
   caseId: string;
   caseName: string;
   title: string;
@@ -76,3 +118,5 @@ export type InboxItem = {
   messageId?: string;
   taskId?: string;
 };
+
+export const QUICK_REACTIONS = ["👍", "❤️", "😂", "😮", "✅", "👀"] as const;

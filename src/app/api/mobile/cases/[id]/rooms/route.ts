@@ -1,11 +1,14 @@
 import { NextResponse } from "next/server";
+import { loadChatList, loadPeople } from "@/lib/case/chat";
+import { loadMembers } from "@/lib/case/page";
 import { authorize } from "@/lib/experts/api";
-import { roomsFor } from "@/lib/mobile/data";
 
-/** The team chats I can see on a case, with unread counts. */
+/** Every chat I can see on a case (rooms, 1:1s, groups), with unread and mention counts. */
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const auth = await authorize(id, "read");
   if (auth instanceof NextResponse) return auth;
-  return NextResponse.json({ rooms: await roomsFor(auth.db, auth.user, id) });
+  const people = await loadPeople(auth.db, await loadMembers(id, auth.user.firmId));
+  const chats = await loadChatList(auth.db, id, auth.user, people);
+  return NextResponse.json({ chats, people });
 }

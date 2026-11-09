@@ -57,9 +57,9 @@ export async function getEngagementAccess(
   db: DB,
   user: SessionUser,
   engagementId: string,
-): Promise<{ engagement: typeof engagements.$inferSelect; access: AccessLevel } | null> {
+): Promise<{ engagement: typeof engagements.$inferSelect; access: AccessLevel; role: Archetype } | null> {
   const [row] = await db
-    .select({ engagement: engagements, access: engagementMembers.access })
+    .select({ engagement: engagements, access: engagementMembers.access, caseRole: engagementMembers.caseRole })
     .from(engagements)
     .innerJoin(
       engagementMembers,
@@ -67,7 +67,7 @@ export async function getEngagementAccess(
     )
     .where(and(eq(engagements.id, engagementId), eq(engagements.firmId, user.firmId)))
     .limit(1);
-  return row ?? null;
+  return row ? { engagement: row.engagement, access: row.access, role: row.caseRole ?? user.archetype } : null;
 }
 
 /**

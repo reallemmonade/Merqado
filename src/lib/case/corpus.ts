@@ -12,7 +12,7 @@ import type { Snippet } from "./search";
  */
 export async function loadCorpus(db: DB, engagementId: string, viewer: { id: string; archetype: Archetype }): Promise<Snippet[]> {
   const base = `/e/${engagementId}`;
-  const rooms = await visibleRooms(db, engagementId, viewer.archetype);
+  const rooms = await visibleRooms(db, engagementId, viewer);
   const roomIds = rooms.map((r) => r.id);
   const [people, transcripts, takeaways, notes, messages, slides, terms, hyps, tasks, files] = await Promise.all([
     db.select({ id: experts.id, company: experts.company, title: experts.title, anonTitle: experts.anonTitle, isFormer: experts.isFormer }).from(experts).where(eq(experts.engagementId, engagementId)),

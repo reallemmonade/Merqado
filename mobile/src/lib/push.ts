@@ -44,7 +44,7 @@ export async function handleResponse(res: Notifications.NotificationResponse) {
     await api(`/api/engagements/${data.caseId}/channel`, { body: { op: "message.post", roomId: data.roomId, body: res.userText } }).catch(() => {});
   }
   if (res.actionIdentifier === "read" && data.caseId && data.roomId) {
-    await api(`/api/mobile/cases/${data.caseId}/rooms/${data.roomId}`, { body: {} }).catch(() => {});
+    await api(`/api/engagements/${data.caseId}/channel`, { body: { op: "read", roomId: data.roomId } }).catch(() => {});
     return;
   }
   if (typeof data.url === "string" && data.url.startsWith("/")) router.push(data.url as never);
