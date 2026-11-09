@@ -33,9 +33,9 @@ export default async function LoginPage({
   const providers = enabledPlatformProviders();
 
   return (
-    <main className="main" style={{ maxWidth: 440, margin: "10vh auto 0" }}>
-      <div className="brand" style={{ color: "var(--ink)" }}>
-        merqado
+    <main className="main public" style={{ maxWidth: 440, margin: "10vh auto 0" }}>
+      <div className="brand" style={{ fontSize: 32 }}>
+        Merqado
       </div>
       <section className="card">
         <h1 style={{ fontSize: 24 }}>Sign in</h1>
