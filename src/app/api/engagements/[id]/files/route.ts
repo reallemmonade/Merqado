@@ -5,7 +5,7 @@ import { caseFolders, sources } from "@/db/schema";
 import { notFoundJson, ok, parseOp } from "@/lib/case/api";
 import { addCaseFolders, cleanPath } from "@/lib/files/folders";
 import { caseFolderName, fileSources } from "@/lib/files/intake";
-import { deleteSourceBytes, placeSourceFile } from "@/lib/storage/files";
+import { deleteSourceBytes, placeSourceFile, sourceMeta } from "@/lib/storage/files";
 
 const ref = z.string().min(1).max(64);
 const folder = z.string().trim().max(250);
@@ -52,7 +52,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     }
     case "discard": {
       const rows = await db
-        .select()
+        .select(sourceMeta)
         .from(sources)
         .where(and(eq(sources.engagementId, id), eq(sources.filing, "pending"), inArray(sources.id, op.sourceIds)));
       for (const s of rows) {

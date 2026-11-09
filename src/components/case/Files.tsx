@@ -94,7 +94,7 @@ export function FilesWorkspace({
           form.set("file", file);
           form.set("relPath", relPath);
           form.set("batchId", id);
-          const res = await fetch(`/api/engagements/${engagementId}/sources`, { method: "POST", body: form }).catch(() => null);
+          const res = await fetch(`/api/engagements/${engagementId}/sources`, { method: "POST", body: form, signal: AbortSignal.timeout(180_000) }).catch(() => null);
           const data = res ? await res.json().catch(() => ({})) : {};
           if (!res?.ok) failed.push(`${file.name}${data.error ? `: ${data.error}` : ""}`);
           else if (data.duplicate) skipped.push(file.name);

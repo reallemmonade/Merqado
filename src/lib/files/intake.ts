@@ -4,8 +4,9 @@ import type { Authorized } from "@/lib/experts/api";
 import { runAi } from "@/lib/case/api";
 import { experts, sources } from "@/db/schema";
 import { anonymizeTitle } from "@/lib/experts/calc";
-import { placeSourceFile, saveSourceFile, type Source } from "@/lib/storage/files";
+import { placeSourceFile, saveSourceFile, sourceMeta, type Source, type SourceMeta } from "@/lib/storage/files";
 import { findLinks, suggestFolders, versionStem, type CaseRef } from "./classify";
+import { firstCopy, removeSource } from "./dedupe";
 import { extractText } from "./extract";
 import { addCaseFolders, cleanPath, loadCaseFolders } from "./folders";
 
@@ -17,7 +18,7 @@ export function caseFolderName(engagement: { clientName: string; title: string }
   return engagement.clientName || engagement.title || "Case";
 }
 
-export type IntakeResult = { duplicate: true; source: Source } | { duplicate: false; source: Source };
+export type IntakeResult = { duplicate: true; source: SourceMeta } | { duplicate: false; source: Source };
 
 /**
  * Takes in one dropped or attached file: skips exact duplicates, reads its text, suggests
@@ -34,7 +35,7 @@ export async function intakeFile(
   if (base !== input.file.name) input = { ...input, file: new File([bytes], base, { type: input.file.type }) };
   const hash = createHash("sha256").update(bytes).digest("hex");
 
-  const dup = await db.query.sources.findFirst({ where: and(eq(sources.engagementId, engagement.id), eq(sources.contentHash, hash)) });
+  const dup = await firstCopy(db, engagement.id, hash);
   if (dup) return { duplicate: true, source: dup };
 
   const text = await extractText(input.file.name, bytes);
@@ -74,16 +75,22 @@ export async function intakeFile(
       batchId: input.batchId ?? null,
     },
   });
+  // Another upload of the same bytes may have finished first; keep only the earliest copy.
+  const first = await firstCopy(db, engagement.id, hash);
+  if (first && first.id !== source.id) {
+    await removeSource(db, user.firmId, source);
+    return { duplicate: true, source: first };
+  }
   return { duplicate: false, source };
 }
 
 /** The newest filed file with the same name once version marks are removed. */
-async function findVersionCandidate(auth: Authorized, filename: string): Promise<Source | null> {
+async function findVersionCandidate(auth: Authorized, filename: string): Promise<SourceMeta | null> {
   const stem = versionStem(filename);
   const ext = filename.toLowerCase().split(".").pop();
   if (!stem) return null;
   const rows = await auth.db
-    .select()
+    .select(sourceMeta)
     .from(sources)
     .where(and(eq(sources.engagementId, auth.engagement.id), eq(sources.filing, "filed")))
     .orderBy(desc(sources.createdAt));
@@ -137,7 +144,7 @@ export async function fileSources(
   const { db, user, engagement } = auth;
   const ids = items.map((i) => i.sourceId);
   if (!ids.length) return 0;
-  const rows = await db.select().from(sources).where(and(eq(sources.engagementId, engagement.id), inArray(sources.id, ids)));
+  const rows = await db.select(sourceMeta).from(sources).where(and(eq(sources.engagementId, engagement.id), inArray(sources.id, ids)));
   const byId = new Map(rows.map((r) => [r.id, r]));
   await addCaseFolders(db, engagement.id, items.map((i) => cleanPath(i.folder)));
   let n = 0;
@@ -148,7 +155,7 @@ export async function fileSources(
     let versionOf: string | null = src.versionOf;
     let version = src.version;
     if (item.asVersion && src.versionCandidate) {
-      const prev = await db.query.sources.findFirst({ where: and(eq(sources.id, src.versionCandidate), eq(sources.engagementId, engagement.id)) });
+      const [prev] = await db.select(sourceMeta).from(sources).where(and(eq(sources.id, src.versionCandidate), eq(sources.engagementId, engagement.id)));
       if (prev) {
         versionOf = prev.versionOf ?? prev.id;
         const [m] = await db

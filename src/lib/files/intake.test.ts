@@ -9,6 +9,7 @@ import JSZip from "jszip";
 import { beforeAll, describe, expect, it, vi } from "vitest";
 import * as schema from "@/db/schema";
 import type { Authorized } from "@/lib/experts/api";
+import { removeWaitingDuplicates } from "./dedupe";
 import { extractText } from "./extract";
 import { loadCaseFolders } from "./folders";
 import { fileSources, intakeFile } from "./intake";
@@ -48,7 +49,7 @@ describe("intake", () => {
     expect(r.source.filing).toBe("pending");
     expect(JSON.parse(r.source.suggestions)[0]).toBe("Interviews/Transcripts");
     expect(JSON.parse(r.source.links)[0].label).toMatch(/OEM 16|Head/);
-    expect(r.source.textBody).toContain("Expert: hello");
+    expect(r.duplicate ? null : r.source.textBody).toContain("Expert: hello");
 
     await fileSources(auth, [{ sourceId: r.source.id, folder: "Interviews/Transcripts" }]);
     const row = await db.query.sources.findFirst({ where: eq(schema.sources.id, r.source.id) });
@@ -59,6 +60,21 @@ describe("intake", () => {
   it("skips an exact duplicate", async () => {
     const r = await intakeFile(auth, { file: file("copy of it.txt", "Interviewer: hi\nExpert: hello") });
     expect(r.duplicate).toBe(true);
+  });
+
+  it("keeps one copy when the same file is uploaded twice at once", async () => {
+    const [a, b] = await Promise.all([intakeFile(auth, { file: file("twin a.txt", "same bytes") }), intakeFile(auth, { file: file("twin b.txt", "same bytes") })]);
+    expect([a.duplicate, b.duplicate].sort()).toEqual([false, true]);
+    expect(a.source.id).toBe(b.source.id);
+  });
+
+  it("clears extra waiting copies already saved", async () => {
+    const r = await intakeFile(auth, { file: file("solo.txt", "solo bytes") });
+    const { id: _id, ...rest } = (await db.query.sources.findFirst({ where: eq(schema.sources.id, r.source.id) }))!;
+    await db.insert(schema.sources).values({ ...rest, objectKey: `db:${crypto.randomUUID()}` });
+    expect(await removeWaitingDuplicates(auth.db, auth.engagement.id)).toBe(1);
+    const left = await db.select().from(schema.sources).where(eq(schema.sources.contentHash, rest.contentHash!));
+    expect(left.map((x) => x.id)).toEqual([r.source.id]);
   });
 
   it("stacks a newer copy as the next version", async () => {
