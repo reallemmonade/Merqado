@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { ActionSheetIOS, Alert, Pressable, RefreshControl, ScrollView, SectionList, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import * as Haptics from "expo-haptics";
-import { api, type Task, type TaskStatus, type Todo } from "@/lib/api";
+import { api, type Task, type TaskStatus, type CaseTodo as Todo } from "@/lib/api";
 import { useCase } from "@/lib/auth";
 import { useApi } from "@/lib/useApi";
 import { C, F } from "@/lib/theme";

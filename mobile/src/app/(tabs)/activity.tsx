@@ -12,7 +12,9 @@ import { LargeTitle, ListState, Pill } from "@/components/ui";
 const FILTERS = [
   { key: "all", label: "All" },
   { key: "mention", label: "Mentions" },
+  { key: "reply", label: "Replies" },
   { key: "task", label: "Tasks" },
+  { key: "todo", label: "To-dos" },
   { key: "review", label: "Reviews" },
 ] as const;
 
@@ -43,10 +45,11 @@ export default function Activity() {
 }
 
 function Row({ item }: { item: InboxItem }) {
-  const isTask = item.kind !== "mention";
+  const isTask = item.kind === "task" || item.kind === "review" || item.kind === "todo";
   const color = item.kind === "review" ? C.slate : isTask ? C.rose : colorFor(item.title);
+  const label = { mention: "Mention", reply: "Reply", task: "Task", review: "Review", todo: "To-do" }[item.kind] ?? "";
   const open = () => {
-    if (item.roomId) router.push(`/case/${item.caseId}/room/${item.roomId}`);
+    if (item.roomId) router.push(`/case/${item.caseId}/room/${item.roomId}${item.threadId ? `?thread=${item.threadId}` : ""}`);
     else router.push("/tasks");
   };
   return (
@@ -61,7 +64,7 @@ function Row({ item }: { item: InboxItem }) {
           </Text>
           <Text style={{ fontFamily: F.regular, fontSize: 12, color: C.muted }}>{shortTime(item.at)}</Text>
         </View>
-        <Text style={{ fontFamily: F.medium, fontSize: 12, color }}>{`${item.kind === "review" ? "Review" : isTask ? "Task" : "Mention"} · ${item.caseName}`}</Text>
+        <Text style={{ fontFamily: F.medium, fontSize: 12, color }}>{`${label} · ${item.caseName}`}</Text>
         <Text style={{ fontFamily: F.regular, fontSize: 14, color: C.text }} numberOfLines={2}>
           {item.body}
         </Text>

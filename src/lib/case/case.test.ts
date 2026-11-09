@@ -99,6 +99,14 @@ describe("team chats", () => {
     expect(findMentions("@Anabel please", people)).toEqual(["u3"]);
     expect(findMentions("email ana@firm.com", people)).toEqual([]);
   });
+  it("tags only the full-name match when two people share a first name", () => {
+    const people = [
+      { id: "u1", name: "Ana Reyes" },
+      { id: "u4", name: "Ana Silva" },
+    ];
+    expect(findMentions("@Ana Reyes can you check?", people)).toEqual(["u1"]);
+    expect(findMentions("@Ana Reyes and @Ana Silva", people).sort()).toEqual(["u1", "u4"]);
+  });
   it("derives presence from activity and the chosen status", () => {
     const now = new Date("2026-11-09T12:00:00Z");
     expect(presenceOf("auto", new Date("2026-11-09T11:58:00Z"), now)).toBe("available");

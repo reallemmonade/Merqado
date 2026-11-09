@@ -108,7 +108,7 @@ export type Task = {
 };
 export type InboxItem = {
   id: string;
-  kind: "mention" | "task" | "review";
+  kind: "mention" | "reply" | "task" | "review" | "todo";
   caseId: string;
   caseName: string;
   title: string;
@@ -116,11 +116,26 @@ export type InboxItem = {
   at: string;
   roomId?: string;
   messageId?: string;
+  threadId?: string;
   taskId?: string;
+  todoId?: string;
+};
+export type Todo = {
+  id: string;
+  caseId: string;
+  caseName: string;
+  title: string;
+  status: "open" | "suggested";
+  assigneeId: string | null;
+  assignee: string;
+  due: string | null;
+  mine: boolean;
+  sourceLabel: string;
+  canDelete: boolean;
 };
 
 export const QUICK_REACTIONS = ["👍", "❤️", "😂", "😮", "✅", "👀"] as const;
 
-export type Todo = { id: string; title: string; assigneeId: string | null; assignee: string; due: string | null; source: string; mine: boolean };
+export type CaseTodo = { id: string; title: string; assigneeId: string | null; assignee: string; due: string | null; source: string; mine: boolean };
 export type RoomTemplate = { name: string; who: string };
 export type ChatList = { chats: Chat[]; people: Person[]; canSetup: boolean; templates: RoomTemplate[] };

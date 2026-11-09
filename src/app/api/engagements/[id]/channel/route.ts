@@ -77,22 +77,31 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     const members = await loadMembers(id, user.firmId);
     return members.filter((m) => canSeeChat(chat, m));
   }
-  /** iPhone notifications: @mentions anywhere, and every message in a 1:1 or group chat. */
-  function notifyMessage(chat: NonNullable<Awaited<ReturnType<typeof room>>>, mentions: string[], body: string) {
+  /**
+   * iPhone notifications: @mentions anywhere, every message in a 1:1 or group chat, and replies
+   * in a thread to the people who started it or replied to it, like Teams.
+   */
+  async function notifyMessage(chat: NonNullable<Awaited<ReturnType<typeof room>>>, mentions: string[], body: string, parentId?: string) {
     const direct = chat.kind === "room" ? [] : parseIds(chat.memberIds);
-    const wanted = [...new Set([...mentions, ...direct])].filter((u) => u !== user.id);
-    if (!wanted.length) return;
-    // Only people still on the case and able to see this chat, worked out after the response.
+    // Worked out after the response: only people who can still see this chat.
     const to = async () => {
-      const allowed = new Set((await audience(chat)).map((m) => m.id));
-      return wanted.filter((u) => allowed.has(u));
+      const seeIt = new Set((await audience(chat)).map((m) => m.id));
+      let thread: string[] = [];
+      if (parentId) {
+        const rows = await db
+          .select({ userId: chatMessages.userId })
+          .from(chatMessages)
+          .where(and(eq(chatMessages.roomId, chat.id), or(eq(chatMessages.id, parentId), eq(chatMessages.parentId, parentId))));
+        thread = rows.map((r) => r.userId).filter((u): u is string => !!u);
+      }
+      return [...new Set([...mentions, ...direct, ...thread])].filter((u) => u !== user.id && seeIt.has(u));
     };
     notifyLater(db, to, {
       title: chat.kind === "room" ? `${user.name} · ${chat.name}` : user.name,
       body: (body || "Sent a file").slice(0, 300),
       threadId: `room-${chat.id}`,
       category: "MESSAGE",
-      data: { url: `/case/${id}/room/${chat.id}`, caseId: id, roomId: chat.id },
+      data: { url: `/case/${id}/room/${chat.id}${parentId ? `?thread=${parentId}` : ""}`, caseId: id, roomId: chat.id, ...(parentId && { parentId }) },
     });
   }
   const now = () => new Date();
@@ -183,7 +192,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
           .where(and(eq(sources.engagementId, id), eq(sources.roomId, chat.id), eq(sources.uploadedBy, user.id), isNull(sources.messageId), inArray(sources.id, ids)));
       }
       await markRead(chat.id);
-      notifyMessage(chat, mentions, op.body);
+      await notifyMessage(chat, mentions, op.body, op.parentId);
       return ok({ id: row!.id });
     }
     case "message.edit": {
@@ -192,6 +201,18 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       if (found.row.userId !== user.id || found.row.kind !== "text") return NextResponse.json({ error: "You can only edit your own messages." }, { status: 403 });
       const mentions = findMentions(op.body, await audience(found.room));
       await db.update(chatMessages).set({ body: op.body, mentions: JSON.stringify(mentions), editedAt: now() }).where(eq(chatMessages.id, op.id));
+      // Only people newly @mentioned by the edit hear about it.
+      const before = new Set(parseIds(found.row.mentions));
+      const added = mentions.filter((u) => !before.has(u) && u !== user.id);
+      if (added.length) {
+        notifyLater(db, added, {
+          title: found.room.kind === "room" ? `${user.name} · ${found.room.name}` : user.name,
+          body: op.body.slice(0, 300),
+          threadId: `room-${found.room.id}`,
+          category: "MESSAGE",
+          data: { url: `/case/${id}/room/${found.room.id}${found.row.parentId ? `?thread=${found.row.parentId}` : ""}`, caseId: id, roomId: found.room.id },
+        });
+      }
       return ok();
     }
     case "file.place": {
@@ -227,7 +248,15 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       const found = await message(op.id);
       if (!found) return notFoundJson();
       if (found.row.userId !== user.id) return NextResponse.json({ error: "You can only delete your own messages." }, { status: 403 });
-      await db.delete(chatMessages).where(or(eq(chatMessages.id, op.id), eq(chatMessages.parentId, op.id)));
+      const gone = await db
+        .delete(chatMessages)
+        .where(or(eq(chatMessages.id, op.id), eq(chatMessages.parentId, op.id)))
+        .returning({ id: chatMessages.id });
+      // Files stay in the case's Files; they just leave the chat's Files tab with the message.
+      await db
+        .update(sources)
+        .set({ messageId: null })
+        .where(and(eq(sources.engagementId, id), inArray(sources.messageId, gone.map((g) => g.id))));
       return ok();
     }
     case "reaction.toggle": {

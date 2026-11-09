@@ -28,9 +28,10 @@ export async function GET() {
     .leftJoin(workplanMilestones, eq(workplanMilestones.id, workplanTasks.milestoneId))
     .leftJoin(users, eq(users.id, workplanTasks.assigneeId))
     .where(and(inArray(workplanTasks.engagementId, cases.map((c) => c.id)), or(eq(workplanTasks.assigneeId, user.id), eq(workplanTasks.reviewerId, user.id), eq(workplanTasks.createdBy, user.id), eq(workplanModules.leadId, user.id))));
-  // Reviewer falls back to whoever made the task, then the module lead.
-  const mineOrReview = rows.filter((r) => r.task.assigneeId === user.id || reviewerOf(r.task, r.moduleLead) === user.id);
-  const tasks = mineOrReview.map((r) => {
+  // With no reviewer named, the person who made the task (or the module lead) reviews it, as on the web.
+  const tasks = rows
+    .filter((r) => r.task.assigneeId === user.id || reviewerOf(r.task, r.moduleLead) === user.id)
+    .map((r) => {
     const t = r.task;
     return {
       id: t.id,

@@ -226,7 +226,7 @@ export default async function OverviewPage({
               ))}
               {openTasks.length + todo.open.length + openItems.length + proposed.length + openContradictions.length === 0 && <p className="muted">Nothing open</p>}
               <TodoAdd key={team ? "team" : "mine"} engagementId={id} me={user.id} members={ctx.members} team={team} />
-              <TodoSuggestions engagementId={id} items={todo.suggested} showAssignee={team} />
+              <TodoSuggestions engagementId={id} items={todo.suggested} showAssignee={team} canScan={ctx.canEdit} />
             </div>
           </section>
         </div>
