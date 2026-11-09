@@ -61,8 +61,22 @@
     {
       "idx": 8,
       "version": "6",
-      "when": 1794196282265,
-      "tag": "0008_todos",
+      "when": 1794196369933,
+      "tag": "0008_team_chat",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "6",
+      "when": 1794197964396,
+      "tag": "0009_tasks_and_case_roles",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "6",
+      "when": 1794201104964,
+      "tag": "0010_todos",
       "breakpoints": true
     }
   ]

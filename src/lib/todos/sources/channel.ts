@@ -3,7 +3,10 @@ import { chatMessages, chatRooms, users } from "@/db/schema";
 import { canSeeRoom, parseArchetypes } from "@/lib/case/rooms";
 import type { SourceMessage, TodoSource } from "./types";
 
-/** The case's own Team channel chats, limited to rooms the scanner's role can see. */
+/**
+ * The case's role-based Team channel rooms the scanner can see. 1:1 and group chats are left out:
+ * a to-do's visibility goes by role, which can't keep a private chat private.
+ */
 export const channelSource: TodoSource = {
   kind: "channel",
   label: "Team channel",
@@ -22,7 +25,7 @@ export const channelSource: TodoSource = {
       .from(chatMessages)
       .innerJoin(chatRooms, eq(chatRooms.id, chatMessages.roomId))
       .leftJoin(users, eq(users.id, chatMessages.userId))
-      .where(and(eq(chatMessages.engagementId, engagementId), gte(chatMessages.createdAt, since)))
+      .where(and(eq(chatMessages.engagementId, engagementId), eq(chatRooms.kind, "room"), eq(chatMessages.kind, "text"), gte(chatMessages.createdAt, since)))
       .orderBy(desc(chatMessages.createdAt))
       .limit(limit);
     return rows

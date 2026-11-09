@@ -4,8 +4,7 @@ import { z } from "zod";
 import { engagementMembers, todos } from "@/db/schema";
 import { aiError, notFoundJson, ok, parseOp, runAi } from "@/lib/case/api";
 import { loadMembers } from "@/lib/case/page";
-import { can } from "@/lib/roles";
-import { getEngagementAccess } from "@/lib/session";
+import { allows } from "@/lib/roles";
 import { canSeeTodo } from "@/lib/todos/data";
 import { scanForTodos } from "@/lib/todos/scan";
 
@@ -85,8 +84,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       return ok();
     case "delete": {
       if (todo.createdBy !== user.id || todo.source !== "manual") {
-        const access = await getEngagementAccess(db, user, id);
-        if (!can(access?.access, "edit_findings")) return NextResponse.json({ error: "You can only remove your own to-dos." }, { status: 403 });
+        if (!allows(auth.membership, "edit_findings")) return NextResponse.json({ error: "You can only remove your own to-dos." }, { status: 403 });
       }
       await db.delete(todos).where(eq(todos.id, op.id));
       return ok();
