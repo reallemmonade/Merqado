@@ -38,7 +38,7 @@ export function Dictionary({ engagementId, terms, categories, canEdit }: { engag
           ))}
         </nav>
         <span className="grow" />
-        <input type="search" aria-label="Filter" placeholder="Filter" value={q} onChange={(e) => setQ(e.target.value)} style={{ width: 180 }} />
+        <input type="text" enterKeyHint="search" aria-label="Filter" placeholder="Filter" value={q} onChange={(e) => setQ(e.target.value)} style={{ width: 180, minWidth: 0 }} />
         {canEdit && (
           <button type="button" className="secondary small" disabled={busy !== null} onClick={() => call("suggest", url, { json: { op: "suggest" } })}>
             {busy === "suggest" ? "Suggesting…" : "Suggest terms"}
@@ -90,15 +90,9 @@ export function Dictionary({ engagementId, terms, categories, canEdit }: { engag
             <tbody>
               {shown.map((t) => (
                 <tr key={t.id}>
-                  <td style={{ fontWeight: 600 }}>
-                    <EditableCell value={t.term} label={`Term ${t.term}`} canEdit={canEdit} onSave={save(t.id, "term")} />
-                  </td>
-                  <td>
-                    <EditableCell value={t.category} label={`Category of ${t.term}`} canEdit={canEdit} onSave={save(t.id, "category")} />
-                  </td>
-                  <td>
-                    <EditableCell value={t.definition} label={`Definition of ${t.term}`} canEdit={canEdit} onSave={save(t.id, "definition")} />
-                  </td>
+                  <EditableCell value={t.term} label={`Term ${t.term}`} canEdit={canEdit} style={{ fontWeight: 600 }} onSave={save(t.id, "term")} />
+                  <EditableCell value={t.category} label={`Category of ${t.term}`} canEdit={canEdit} onSave={save(t.id, "category")} />
+                  <EditableCell value={t.definition} label={`Definition of ${t.term}`} canEdit={canEdit} onSave={save(t.id, "definition")} />
                   {canEdit && (
                     <td>
                       <button type="button" className="x" aria-label={`Delete ${t.term}`} disabled={busy !== null} onClick={() => call(t.id, url, { json: { op: "delete", id: t.id } })}>
@@ -149,7 +143,7 @@ export function Dictionary({ engagementId, terms, categories, canEdit }: { engag
             </tbody>
           </table>
         </div>
-        {shown.length === 0 && !canEdit && <p className="muted" style={{ padding: 16 }}>No terms</p>}
+        {shown.length === 0 && (!canEdit || active.length > 0) && <p className="muted" style={{ padding: 16 }}>{active.length ? "No matches" : "No terms"}</p>}
       </section>
     </div>
   );

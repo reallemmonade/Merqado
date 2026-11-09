@@ -73,8 +73,8 @@ h1, h2 { font-family: var(--font-display); font-weight: 600; letter-spacing: -0.
 button, .button { min-height: 40px; padding: 0 16px; border-radius: 6px; border: 0; background: var(--btn-bg, var(--accent)); color: var(--btn-ink, #fff); font: inherit; font-weight: 500; cursor: pointer; }
 button:disabled { opacity: 0.6; cursor: wait; }
 button.secondary { background: var(--surface); color: var(--ink); border: 1px solid var(--line); }
-input[type="text"], textarea { width: 100%; font: inherit; color: var(--ink); background: var(--surface); border: 1.5px solid var(--line); border-radius: 8px; padding: 10px 12px; }
-input[type="text"]:focus, textarea:focus, button:focus-visible, a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+input[type="text"], input[type="search"], textarea { width: 100%; font: inherit; color: var(--ink); background: var(--surface); border: 1.5px solid var(--line); border-radius: 8px; padding: 10px 12px; }
+input[type="text"]:focus, input[type="search"]:focus, textarea:focus, button:focus-visible, a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .answer { white-space: pre-wrap; line-height: 1.6; }
 .error { color: var(--bad); }
 
@@ -242,7 +242,8 @@ kbd { font-family: var(--font-data); font-size: 11px; color: inherit; opacity: 0
 .gpt-bar input[type="text"]:focus { outline: none; }
 .gpt-bar:focus-within { border-color: var(--accent); }
 .gpt-send { width: 44px; padding: 0; background: var(--ink); color: var(--surface); font-size: 18px; border-radius: 10px; }
-@media (max-width: 640px) { .gpt-bar kbd { display: none; } .rail-user { margin-top: 0 !important; } .rail { flex-basis: 100%; flex-direction: row; overflow-x: auto; } .rail-foot { flex-direction: row; margin: 0 0 0 auto; } }
+.rail-phone { display: none; }
+@media (max-width: 640px) { .shell > .nav:has(+ .rail-phone) { display: none; } .rail.rail-phone { display: flex; } .rail { position: sticky; top: 0; z-index: 25; padding: 8px 10px; scrollbar-width: none; } .gpt-bar kbd { display: none; } .rail-user { margin-top: 0 !important; } .rail { flex-basis: 100%; flex-direction: row; overflow-x: auto; } .rail-foot { flex-direction: row; margin: 0 0 0 auto; } }
 
 /* ---------- Pinned side menu footer and glass bars ---------- */
 /* The side menu stays put while the page scrolls; its footer (search, you, settings) is pinned to the bottom of the screen. */
@@ -258,6 +259,19 @@ kbd { font-family: var(--font-data); font-size: 11px; color: inherit; opacity: 0
 @media (min-width: 840px) {
   .nav { position: sticky; top: 0; align-self: flex-start; height: 100vh; height: 100dvh; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; scrollbar-color: var(--nav-line) transparent; }
   .nav-foot { position: sticky; bottom: 0; margin: auto -16px -20px; padding: 12px 16px 20px; }
+}
+@media (max-width: 640px) {
+  .shell { align-content: flex-start; }
+  .shell > .nav { gap: 12px; padding-bottom: 8px; }
+  .nav-cases { display: none; }
+  .shell > .nav[aria-label="Main"] { flex-direction: row; align-items: center; justify-content: space-between; padding: 10px 16px; }
+  .shell > .nav[aria-label="Main"] .nav-foot { margin: 0; background: none; box-shadow: none; -webkit-backdrop-filter: none; backdrop-filter: none; }
+  .rail { gap: 2px; }
+  .rail a { flex: 0 0 40px; width: 40px; height: 40px; }
+  .rail .rail-brand { margin: 0 4px 0 0; }
+  .rail a[aria-current="page"] { box-shadow: inset 0 -3px 0 var(--accent); }
+  .rail-foot { flex-direction: row; margin: 0 0 0 auto; gap: 2px; background: none; box-shadow: none; -webkit-backdrop-filter: none; backdrop-filter: none; }
+  .rail { background: color-mix(in srgb, var(--nav-bg) 70%, transparent); -webkit-backdrop-filter: var(--glass); backdrop-filter: var(--glass); }
 }
 @media (min-width: 641px) {
   .rail { position: sticky; top: 0; align-self: flex-start; height: 100vh; height: 100dvh; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: none; }
@@ -294,6 +308,8 @@ html:root:root .settings-head {
 .ts-btn.ts-almost_done, .pill.ts-almost_done { background: var(--ts-almost_done); color: var(--ts-almost_done-ink); }
 .ts-btn.ts-done, .pill.ts-done { background: var(--ts-done); color: var(--ts-done-ink); }
 table.workplan td { vertical-align: top; }
+table.workplan .wp-mod-col { width: 200px; }
+@media (max-width: 640px) { table.workplan .wp-mod-col { width: 130px; } }
 table.workplan .wp-next { background: var(--next-col); }
 .wp-task { display: flex; gap: 8px; align-items: center; padding: 7px 8px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); font-size: 13px; }
 .seg-count { margin-left: 6px; min-width: 18px; padding: 0 5px; border-radius: 99px; background: var(--warn); color: var(--surface); font-size: 11px; font-weight: 700; line-height: 18px; text-align: center; }
@@ -473,6 +489,8 @@ button.scope-btn:hover, button.scope-btn[aria-expanded="true"] { background: var
 .subtabs .count { display: inline-flex; align-items: center; justify-content: center; min-width: 18px; height: 18px; padding: 0 5px; margin-left: 6px; border-radius: 99px; background: color-mix(in srgb, var(--bad) 14%, var(--panel)); color: var(--bad); font-size: 11px; font-weight: 700; }
 .deck { display: flex; flex-wrap: wrap; gap: 14px; align-items: flex-start; }
 .storyline { flex: 0 1 300px; max-width: 100%; max-height: calc(100vh - 220px); overflow-y: auto; }
+/* Side by side, the storyline takes the slide column's height and scrolls inside it, so both end flush. */
+@media (min-width: 721px) { .deck { align-items: stretch; } .storyline { max-height: none; contain: size; min-height: 320px; } }
 .storyline ol { list-style: none; margin: 0; padding: 0 8px 8px; }
 .story-item { all: unset; box-sizing: border-box; cursor: pointer; display: flex; gap: 10px; align-items: flex-start; width: 100%; padding: 8px 10px; border-radius: 8px; font-size: 13px; line-height: 1.35; }
 .story-item:hover { background: var(--soft); }
@@ -930,3 +948,6 @@ html:root:root[data-style="normal"] .settings-head { background: var(--ground); 
 .gv-style .sw-normal { background: linear-gradient(90deg, #FAF9F5 50%, #1F1E1D 50%); }
 .look small { font-size: 11px; color: var(--muted); }
 .kta { font-family: var(--font-serif); font-size: 1.07em; }
+
+/* The storage card in use keeps its accent edge under every look. */
+html:root:root .storage-card.on { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }

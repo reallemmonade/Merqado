@@ -68,8 +68,9 @@ export interface NoteRow {
 }
 
 export function NoteItem({ engagementId, n }: { engagementId: string; n: NoteRow }) {
-  const { call, busy } = useApi();
+  const { call, busy, error } = useApi();
   const url = `/api/engagements/${engagementId}/notes`;
+  const [draft, setDraft] = useState<string | null>(null);
   return (
     <div id={`note-${n.id}`} className={`item${n.resolved ? " off" : ""}`}>
       <div className="meta">
@@ -85,13 +86,61 @@ export function NoteItem({ engagementId, n }: { engagementId: string; n: NoteRow
             {n.resolved ? "Reopen" : "Resolve"}
           </button>
         )}
+        {n.canChange && draft === null && (
+          <button type="button" className="linkbtn" onClick={() => setDraft(n.body)}>
+            Edit
+          </button>
+        )}
         {n.canChange && (
           <button type="button" className="x" aria-label="Delete note" disabled={busy !== null} onClick={() => call(n.id, url, { json: { op: "delete", id: n.id } })}>
             ×
           </button>
         )}
       </div>
-      <div className="chat-body">{n.body}</div>
+      {draft === null ? (
+        <div className="chat-body">{n.body}</div>
+      ) : (
+        <form
+          style={{ display: "flex", flexDirection: "column", gap: 6 }}
+          onSubmit={async (e) => {
+            e.preventDefault();
+            if (draft.trim() === n.body || (await call(n.id, url, { json: { op: "update", id: n.id, body: draft } }))) setDraft(null);
+          }}
+        >
+          <textarea rows={2} aria-label="Note" value={draft} autoFocus onChange={(e) => setDraft(e.target.value)} onKeyDown={(e) => e.key === "Escape" && setDraft(null)} />
+          <div className="toolbar">
+            <span className="grow" />
+            <button type="button" className="small secondary" onClick={() => setDraft(null)}>
+              Cancel
+            </button>
+            <button type="submit" className="small" disabled={busy !== null || !draft.trim()}>
+              Save
+            </button>
+          </div>
+        </form>
+      )}
+      {error && <span className="error">{error}</span>}
     </div>
+  );
+}
+
+/** Quick add for a decision, as on the Overview's Decisions card. */
+export function DecisionAdd({ engagementId }: { engagementId: string }) {
+  const { call, busy, error } = useApi();
+  const [body, setBody] = useState("");
+  return (
+    <form
+      className="toolbar todo-add"
+      onSubmit={async (e) => {
+        e.preventDefault();
+        if (await call("add", `/api/engagements/${engagementId}/notes`, { json: { op: "add", kind: "decision", body } })) setBody("");
+      }}
+    >
+      <input type="text" value={body} placeholder="Add decision" aria-label="Decision" onChange={(e) => setBody(e.target.value)} />
+      <button type="submit" className="small" disabled={busy !== null || !body.trim()}>
+        Add
+      </button>
+      {error && <span className="error">{error}</span>}
+    </form>
   );
 }

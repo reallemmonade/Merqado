@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { eq } from "drizzle-orm";
+import { desc, eq } from "drizzle-orm";
 import { getDb } from "@/db/client";
 import { engagementMembers, engagements } from "@/db/schema";
 import { AppNav } from "@/components/AppNav";
@@ -8,6 +8,8 @@ import { NewEngagement } from "@/components/NewEngagement";
 import { getSessionUser } from "@/lib/session";
 
 export const dynamic = "force-dynamic";
+
+const STATUS = { active: "Active", paused: "Paused", closed: "Closed" } as const;
 
 export default async function Home() {
   const db = getDb();
@@ -18,7 +20,8 @@ export default async function Home() {
     .select({ id: engagements.id, clientName: engagements.clientName, title: engagements.title, status: engagements.status })
     .from(engagements)
     .innerJoin(engagementMembers, eq(engagementMembers.engagementId, engagements.id))
-    .where(eq(engagementMembers.userId, user.id));
+    .where(eq(engagementMembers.userId, user.id))
+    .orderBy(desc(engagements.createdAt));
 
 
   return (
@@ -32,16 +35,16 @@ export default async function Home() {
           <h1 style={{ fontSize: 30 }}>Good to see you, {user.name.split(" ")[0]}</h1>
         </header>
         <section className="card">
-          <h2 style={{ fontSize: 18 }}>Your engagements</h2>
+          <h2 style={{ fontSize: 18 }}>Cases</h2>
           {rows.map((e) => (
             <div className="row" key={e.id}>
               <Link href={`/e/${e.id}`}>
                 {e.clientName} · {e.title}
               </Link>
-              <span className="muted">{e.status}</span>
+              <span className="muted">{STATUS[e.status]}</span>
             </div>
           ))}
-          {rows.length === 0 && <p className="muted">No engagements</p>}
+          {rows.length === 0 && <p className="muted">No cases</p>}
           <NewEngagement />
         </section>
       </main>

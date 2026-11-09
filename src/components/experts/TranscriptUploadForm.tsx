@@ -50,7 +50,7 @@ export function TranscriptUploadForm({ engagementId, experts }: { engagementId: 
           </select>
         </label>
         <label className="field">
-          This is the
+          Kind
           <select value={kind} onChange={(e) => setKind(e.target.value)}>
             <option value="call">Main call</option>
             <option value="followup">Follow-up</option>
@@ -58,12 +58,12 @@ export function TranscriptUploadForm({ engagementId, experts }: { engagementId: 
         </label>
       </div>
       <label className="field">
-        File (Word, text, .vtt or .srt)
+        File
         <input key={fileKey} type="file" accept={TRANSCRIPT_ACCEPT} onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
       </label>
       {!file && (
         <label className="field">
-          Or paste the transcript
+          Or paste
           <textarea rows={6} value={text} onChange={(e) => setText(e.target.value)} />
         </label>
       )}

@@ -43,7 +43,7 @@ export const COLUMNS: Column[] = [
   {
     key: "company",
     label: "Company",
-    cell: (e, c) => <EditableCell label="Company" value={e.company} canEdit={c.canEdit} onSave={(v) => c.save({ company: v.trim() })} />,
+    cell: (e, c) => <EditableCell label="Company" value={e.company} canEdit={c.canEdit} style={{ minWidth: 150 }} onSave={(v) => c.save({ company: v.trim() })} />,
   },
   {
     key: "title",

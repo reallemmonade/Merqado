@@ -16,7 +16,7 @@ export function NewEngagement() {
     return (
       <div>
         <button type="button" className="secondary" onClick={() => setOpen(true)}>
-          + Start an engagement
+          + New case
         </button>
       </div>
     );
@@ -30,7 +30,11 @@ export function NewEngagement() {
           method: "POST",
           headers: { "content-type": "application/json" },
           body: JSON.stringify({ clientName, title, sample }),
-        });
+        }).catch(() => null);
+        if (!res) {
+          setBusy(false);
+          return setError("Couldn't reach Merqado. Try again.");
+        }
         const data = await res.json().catch(() => ({}));
         setBusy(false);
         if (!res.ok) return setError(data.error ?? "Something went wrong.");
@@ -44,7 +48,7 @@ export function NewEngagement() {
           <input type="text" required value={clientName} onChange={(e) => setClientName(e.target.value)} placeholder="Project Resin" />
         </label>
         <label className="field">
-          Engagement title
+          Case title
           <input type="text" required value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Title" />
         </label>
       </div>

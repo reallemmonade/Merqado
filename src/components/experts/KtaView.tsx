@@ -63,6 +63,7 @@ export function KtaView({
           {interviews.length === 0 && (
             <div className="empty">
               <strong>{focused ? "None" : "No takeaways yet"}</strong>
+              {!focused && <Link href={`/e/${engagementId}/experts`}>Open Calls</Link>}
             </div>
           )}
           {interviews.map((e) => {
@@ -139,6 +140,20 @@ export function KtaView({
                             />
                           )}
                           {k.source === "ai" && <span>AI draft</span>}
+                          {canEdit && (
+                            <button
+                              type="button"
+                              className="secondary small"
+                              style={{ marginLeft: "auto" }}
+                              disabled={!!api.busy}
+                              onClick={() =>
+                                window.confirm("Delete this takeaway?") &&
+                                api.call(`del-${k.id}`, `/api/engagements/${engagementId}/takeaways/${k.id}`, { method: "DELETE" })
+                              }
+                            >
+                              Delete
+                            </button>
+                          )}
                         </div>
                       </div>
                     </div>
@@ -171,10 +186,10 @@ export function KtaView({
               </div>
               <div className="meta">
                 <Link href={hypHref(h.id, "supports")} className="tag v-supports">
-                  {sup} support
+                  {sup} supporting
                 </Link>
                 <Link href={hypHref(h.id, "challenges")} className="tag v-challenges">
-                  {ch} challenge
+                  {ch} challenging
                 </Link>
                 <span style={{ fontWeight: 600, color: "var(--ink)" }}>{read}</span>
               </div>

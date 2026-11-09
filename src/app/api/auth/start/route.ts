@@ -23,7 +23,10 @@ export async function POST(req: Request) {
   const provider = form?.get("provider");
   const returnTo = safeReturnTo(form?.get("returnTo"));
   const back = (error: string) =>
-    NextResponse.redirect(`${base}/login?error=${error}&email=${encodeURIComponent(email)}`, 303);
+    NextResponse.redirect(
+      `${base}/login?error=${error}&email=${encodeURIComponent(email)}${returnTo === "/" ? "" : `&returnTo=${encodeURIComponent(returnTo)}`}`,
+      303,
+    );
 
   let target: SignInTarget;
   if (isPlatformProvider(provider)) {

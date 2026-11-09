@@ -11,7 +11,13 @@ export function SettingsClose({ from }: { from?: string }) {
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape" && !(e.target instanceof HTMLSelectElement)) close();
+      if (e.key !== "Escape" || e.defaultPrevented) return;
+      // Esc in a field or an open pop-up belongs to that, not to Settings.
+      const t = e.target;
+      if (t instanceof HTMLSelectElement || t instanceof HTMLTextAreaElement) return;
+      if (t instanceof HTMLInputElement && !["range", "checkbox", "radio", "button", "submit"].includes(t.type)) return;
+      if (document.querySelector('[aria-modal="true"]')) return;
+      close();
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);

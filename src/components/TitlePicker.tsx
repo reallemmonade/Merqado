@@ -27,11 +27,11 @@ export function TitlePicker({ current, titles }: { current: string; titles: { id
             method: "POST",
             headers: { "content-type": "application/json" },
             body: JSON.stringify({ firmRoleId: next }),
-          });
+          }).catch(() => null);
           setBusy(false);
-          if (!res.ok) {
+          if (!res?.ok) {
             setValue(previous);
-            setError(((await res.json().catch(() => null)) as { error?: string } | null)?.error ?? "Couldn't switch.");
+            setError(((await res?.json().catch(() => null)) as { error?: string } | null)?.error ?? "Couldn't switch.");
             return;
           }
           router.refresh();

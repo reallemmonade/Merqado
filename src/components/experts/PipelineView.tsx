@@ -2,7 +2,7 @@
 
 import { CopyButton } from "@/components/CopyButton";
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { coverage, money, shortDate, STATUS_LABEL, STATUS_ORDER, type Status } from "@/lib/experts/calc";
 import type { ExpertRow, ExpertsData } from "@/lib/experts/data";
 import { TRANSCRIPT_ACCEPT } from "@/lib/experts/transcript-text";
@@ -59,6 +59,15 @@ export function PipelineView({
   );
   const api = useApi();
   const base = `/api/engagements/${engagementId}`;
+  const sideRef = useRef<HTMLElement>(null);
+  // On a phone the details sit below the list; bring them into view when a row is tapped.
+  const revealDetails = () =>
+    requestAnimationFrame(() => {
+      const el = sideRef.current;
+      if (!el) return;
+      const top = el.getBoundingClientRect().top;
+      if (top < 0 || top > window.innerHeight - 120) el.scrollIntoView({ block: "start", behavior: "smooth" });
+    });
 
   const visible = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -105,13 +114,18 @@ export function PipelineView({
   const expert = data.experts.find((e) => e.id === sel) ?? null;
   const topicName = (id: string) => data.topics.find((t) => t.id === id)?.name;
 
+  // A new expert shows up once the refreshed page data includes it; until then keep the form busy.
+  const [pending, setPending] = useState<string | null>(null);
+  useEffect(() => {
+    if (!pending || !data.experts.some((e) => e.id === pending)) return;
+    setSel(pending);
+    setMode("view");
+    setTab("overview");
+    setPending(null);
+  }, [pending, data.experts]);
   async function create(v: ExpertFormValues) {
     const res = await api.call("create", `${base}/experts`, { json: v });
-    if (res?.id) {
-      setSel(res.id);
-      setMode("view");
-      setTab("overview");
-    }
+    if (res?.id) setPending(res.id);
   }
   async function save(v: ExpertFormValues) {
     if (!expert) return;
@@ -131,6 +145,16 @@ export function PipelineView({
     setSel(id);
     setMode("view");
     setDrawer(true);
+    if (!full) revealDetails();
+  }
+  async function remove() {
+    if (!expert || !window.confirm(`Delete ${expert.name}?`)) return;
+    const res = await api.call("delete", `${base}/experts/${expert.id}`, { method: "DELETE" });
+    if (res) {
+      setSel(data.experts.find((e) => e.id !== expert.id)?.id ?? null);
+      setMode(data.experts.length > 1 ? "view" : "new");
+      setDrawer(false);
+    }
   }
 
   useEffect(() => {
@@ -157,7 +181,7 @@ export function PipelineView({
             people={members}
             defaultRequester={suggestedRequester}
             submitLabel="Propose"
-            busy={api.busy === "create"}
+            busy={api.busy === "create" || !!pending}
             onSubmit={create}
             onCancel={() => {
               setMode("view");
@@ -184,6 +208,11 @@ export function PipelineView({
           onSubmit={save}
           onCancel={() => setMode("view")}
         />
+        <div>
+          <button type="button" className="secondary small" disabled={!!api.busy} onClick={remove}>
+            Delete expert
+          </button>
+        </div>
         {api.error && <p className="error">{api.error}</p>}
       </div>
     ) : (
@@ -255,6 +284,7 @@ export function PipelineView({
                 setMode("new");
                 setSel(null);
                 setDrawer(true);
+                if (!full) revealDetails();
               }}
             >
               + Propose expert
@@ -321,7 +351,7 @@ export function PipelineView({
               </div>
             ) : (
               <div className="scroll-x">
-                <table className="grid" style={{ minWidth: 640, tableLayout: "fixed" }}>
+                <table className="grid" style={{ minWidth: 760, tableLayout: "fixed" }}>
                   <colgroup>
                     <col />
                     <col style={{ width: 120 }} />
@@ -395,14 +425,14 @@ export function PipelineView({
       </section>
 
       {!full ? (
-        <aside className="side panel" aria-label="Expert details">
+        <aside ref={sideRef} className="side panel" aria-label="Expert details" style={{ scrollMarginTop: 72 }}>
           {details}
         </aside>
       ) : (
         drawer && (
           <>
             <div className="drawer-backdrop" onClick={() => setDrawer(false)} />
-            <aside className="drawer panel" role="dialog" aria-modal="true" aria-label="Expert details">
+            <aside className="drawer panel" role="dialog" aria-modal="true" aria-label="Expert details" style={{ width: "min(520px, 100vw)", maxWidth: "100vw", height: "auto" }}>
               <div className="drawer-close">
                 <button type="button" className="secondary small" onClick={() => setDrawer(false)}>
                   Close

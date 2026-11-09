@@ -14,6 +14,83 @@ function initials(name: string) {
   return ((p[0]?.[0] ?? "") + (p.length > 1 ? p[p.length - 1]![0] : "")).toUpperCase();
 }
 
+/** Text you click to rename. Enter or clicking away saves, Escape cancels. */
+function Inline({ value, label, onSave, strong }: { value: string; label: string; onSave: (v: string) => void; strong?: boolean }) {
+  const [draft, setDraft] = useState<string | null>(null);
+  if (draft === null)
+    return (
+      <button type="button" className="cell-edit" style={{ padding: "2px 4px", margin: "-2px -4px", minHeight: 0, width: "auto", fontWeight: strong ? 600 : undefined }} aria-label={`Rename ${label}`} onClick={() => setDraft(value)}>
+        {value}
+      </button>
+    );
+  const done = () => {
+    const v = draft.trim();
+    setDraft(null);
+    if (v && v !== value) onSave(v);
+  };
+  return (
+    <input
+      type="text"
+      className="cell-input"
+      aria-label={label}
+      value={draft}
+      autoFocus
+      onChange={(e) => setDraft(e.target.value)}
+      onBlur={done}
+      onKeyDown={(e) => {
+        if (e.key === "Enter") e.currentTarget.blur();
+        if (e.key === "Escape") setDraft(null);
+      }}
+    />
+  );
+}
+
+type TaskDraft = { title: string; assigneeId: string; reviewerId: string; dueDate: string };
+
+function TaskForm({ id, init, members, me, busy, submit, cancel, saveLabel }: { id: string; init: TaskDraft; members: CaseMember[]; me: string; busy: boolean; submit: (d: TaskDraft) => Promise<boolean>; cancel: () => void; saveLabel: string }) {
+  const [draft, setDraft] = useState(init);
+  return (
+    <form
+      onSubmit={async (e) => {
+        e.preventDefault();
+        if (await submit(draft)) setDraft({ ...draft, title: "", dueDate: "" });
+      }}
+      style={{ display: "flex", flexDirection: "column", gap: 6 }}
+    >
+      <label className="sr-only" htmlFor={`t-${id}`}>
+        Task
+      </label>
+      <input id={`t-${id}`} type="text" autoFocus value={draft.title} onChange={(e) => setDraft({ ...draft, title: e.target.value })} onKeyDown={(e) => e.key === "Escape" && cancel()} placeholder="Task" />
+      <div style={{ display: "flex", gap: 6 }}>
+        <select aria-label="Assign to" value={draft.assigneeId} onChange={(e) => setDraft({ ...draft, assigneeId: e.target.value })} style={{ flex: 1, minWidth: 0 }}>
+          <option value="">Unassigned</option>
+          {members.map((p) => (
+            <option key={p.id} value={p.id}>
+              {p.name}
+            </option>
+          ))}
+        </select>
+        <input type="date" aria-label="Due" value={draft.dueDate} onChange={(e) => setDraft({ ...draft, dueDate: e.target.value })} style={{ flex: 1, minWidth: 0 }} />
+      </div>
+      <div style={{ display: "flex", gap: 6 }}>
+        <select aria-label="Reviewer" value={draft.reviewerId} onChange={(e) => setDraft({ ...draft, reviewerId: e.target.value })} style={{ flex: 1, minWidth: 0 }}>
+          {members.map((p) => (
+            <option key={p.id} value={p.id}>
+              {p.id === me ? "Review: me" : `Review: ${p.name}`}
+            </option>
+          ))}
+        </select>
+        <button type="submit" className="small" disabled={!draft.title.trim() || busy}>
+          {saveLabel}
+        </button>
+        <button type="button" className="small secondary" onClick={cancel}>
+          Cancel
+        </button>
+      </div>
+    </form>
+  );
+}
+
 export function WorkplanGrid({ engagementId, wp, members, canEdit, canAssign, canPlan, me }: { engagementId: string; wp: Workplan; members: CaseMember[]; canEdit: boolean; canAssign: boolean; canPlan: boolean; me: string }) {
   const { call, busy, error } = useApi();
   const url = `/api/engagements/${engagementId}/workplan`;
@@ -21,7 +98,7 @@ export function WorkplanGrid({ engagementId, wp, members, canEdit, canAssign, ca
   const [newModule, setNewModule] = useState("");
   const [newDate, setNewDate] = useState({ label: "", date: "" });
   const [adding, setAdding] = useState<string | null>(null);
-  const [draft, setDraft] = useState({ title: "", assigneeId: "", reviewerId: me, dueDate: "" });
+  const [editing, setEditing] = useState<string | null>(null);
 
   const columns = wp.milestones.filter((m) => m.isColumn);
   const hasUndated = wp.tasks.some((t) => !t.milestoneId || !columns.some((c) => c.id === t.milestoneId));
@@ -69,10 +146,17 @@ export function WorkplanGrid({ engagementId, wp, members, canEdit, canAssign, ca
           <table className="grid workplan" style={{ minWidth: 300 + cols.length * 260 }}>
             <thead>
               <tr>
-                <th style={{ width: 200 }}>Module</th>
+                <th className="wp-mod-col">Module</th>
                 {cols.map((c) => (
-                  <th key={c.id ?? "none"} id={c.id ? `ms-${c.id}` : undefined} className={c.id && c.id === nextCol ? "wp-next" : undefined}>
-                    <div style={{ fontWeight: 600, color: "var(--ink)", fontSize: 13 }}>{c.label}</div>
+                  <th key={c.id ?? "none"} id={c.id ? `ms-${c.id}` : undefined} className={c.id && c.id === nextCol ? "wp-next" : undefined} style={{ minWidth: 240 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 6, fontWeight: 600, color: "var(--ink)", fontSize: 13 }}>
+                      {canPlan && c.id ? <Inline value={c.label} label={c.label} onSave={(label) => call("ms", url, { json: { op: "milestone.update", id: c.id, label } })} /> : c.label}
+                      {canPlan && c.id && (
+                        <button type="button" className="x" aria-label={`Delete ${c.label}`} disabled={busy !== null} onClick={() => confirm(`Delete ${c.label}?`) && call("ms", url, { json: { op: "milestone.delete", id: c.id } })}>
+                          ×
+                        </button>
+                      )}
+                    </div>
                     <div className="mono">{c.date ? shortDate(c.date) : ""}</div>
                   </th>
                 ))}
@@ -83,7 +167,7 @@ export function WorkplanGrid({ engagementId, wp, members, canEdit, canAssign, ca
                 <tr key={m.id} id={`mod-${m.id}`}>
                   <td>
                     <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                      <strong>{m.name}</strong>
+                      {canPlan ? <Inline value={m.name} label={m.name} strong onSave={(name) => call("mod", url, { json: { op: "module.update", id: m.id, name } })} /> : <strong>{m.name}</strong>}
                       {canPlan ? (
                         <select
                           aria-label={`Lead for ${m.name}`}
@@ -126,12 +210,36 @@ export function WorkplanGrid({ engagementId, wp, members, canEdit, canAssign, ca
                             const next = primaryMove(t, me, canEdit, m.leadId);
                             const reviewer = reviewerOf(t, m.leadId);
                             const manages = canAssign && (reviewer === null || reviewer === me || t.createdBy === me);
+                            if (editing === t.id)
+                              return (
+                                <TaskForm
+                                  key={t.id}
+                                  id={t.id}
+                                  init={{ title: t.title, assigneeId: t.assigneeId ?? "", reviewerId: t.reviewerId ?? reviewer ?? me, dueDate: t.dueDate ?? "" }}
+                                  members={members}
+                                  me={me}
+                                  busy={busy !== null}
+                                  saveLabel="Save"
+                                  cancel={() => setEditing(null)}
+                                  submit={async (d) => {
+                                    const res = await call("edit", url, { json: { op: "task.update", id: t.id, title: d.title, assigneeId: d.assigneeId || null, reviewerId: d.reviewerId || null, dueDate: d.dueDate || null } });
+                                    if (res) setEditing(null);
+                                    return false;
+                                  }}
+                                />
+                              );
                             return (
                             <div key={t.id} id={`task-${t.id}`} className="wp-task" style={{ opacity: who === "all" || t.assigneeId === who ? 1 : 0.35 }}>
                               <span className="avatar" title={t.assigneeId ? memberName.get(t.assigneeId) : "Unassigned"}>
                                 {t.assigneeId ? initials(memberName.get(t.assigneeId) ?? "?") : "–"}
                               </span>
-                              <span style={{ flex: 1, lineHeight: 1.35 }}>{t.title}</span>
+                              {manages ? (
+                                <button type="button" className="cell-edit" style={{ flex: 1, minHeight: 0, padding: 0, lineHeight: 1.35 }} aria-label={`Edit ${t.title}`} onClick={() => setEditing(t.id)}>
+                                  {t.title}
+                                </button>
+                              ) : (
+                                <span style={{ flex: 1, lineHeight: 1.35 }}>{t.title}</span>
+                              )}
                               <button
                                 type="button"
                                 className={`ts-btn ts-${t.status}`}
@@ -143,7 +251,7 @@ export function WorkplanGrid({ engagementId, wp, members, canEdit, canAssign, ca
                                 {TASK_STATUS_LABEL[t.status]}
                               </button>
                               {manages && (
-                                <button type="button" className="x" aria-label={`Delete ${t.title}`} onClick={() => call("del", url, { json: { op: "task.delete", id: t.id } })}>
+                                <button type="button" className="x" aria-label={`Delete ${t.title}`} onClick={() => confirm(`Delete ${t.title}?`) && call("del", url, { json: { op: "task.delete", id: t.id } })}>
                                   ×
                                 </button>
                               )}
@@ -152,58 +260,22 @@ export function WorkplanGrid({ engagementId, wp, members, canEdit, canAssign, ca
                           })}
                           {canAssign &&
                             (adding === key ? (
-                              <form
-                                onSubmit={async (e) => {
-                                  e.preventDefault();
+                              <TaskForm
+                                id={key}
+                                init={{ title: "", assigneeId: "", reviewerId: me, dueDate: "" }}
+                                members={members}
+                                me={me}
+                                busy={busy !== null}
+                                saveLabel="Add"
+                                cancel={() => setAdding(null)}
+                                submit={async (d) => {
                                   const res = await call("add", url, {
-                                    json: {
-                                      op: "task.add",
-                                      moduleId: m.id,
-                                      milestoneId: c.id,
-                                      title: draft.title,
-                                      assigneeId: draft.assigneeId || null,
-                                      reviewerId: draft.reviewerId || null,
-                                      dueDate: draft.dueDate || null,
-                                    },
+                                    json: { op: "task.add", moduleId: m.id, milestoneId: c.id, title: d.title, assigneeId: d.assigneeId || null, reviewerId: d.reviewerId || null, dueDate: d.dueDate || null },
                                   });
-                                  if (res) {
-                                    setDraft({ ...draft, title: "", dueDate: "" });
-                                    setAdding(null);
-                                  }
+                                  if (res) setAdding(null);
+                                  return !!res;
                                 }}
-                                style={{ display: "flex", flexDirection: "column", gap: 6 }}
-                              >
-                                <label className="sr-only" htmlFor={`t-${key}`}>
-                                  Task
-                                </label>
-                                <input id={`t-${key}`} type="text" autoFocus value={draft.title} onChange={(e) => setDraft({ ...draft, title: e.target.value })} placeholder="Task" />
-                                <div style={{ display: "flex", gap: 6 }}>
-                                  <select aria-label="Assign to" value={draft.assigneeId} onChange={(e) => setDraft({ ...draft, assigneeId: e.target.value })} style={{ flex: 1 }}>
-                                    <option value="">Unassigned</option>
-                                    {members.map((p) => (
-                                      <option key={p.id} value={p.id}>
-                                        {p.name}
-                                      </option>
-                                    ))}
-                                  </select>
-                                  <input type="date" aria-label="Due" value={draft.dueDate} onChange={(e) => setDraft({ ...draft, dueDate: e.target.value })} style={{ flex: 1 }} />
-                                </div>
-                                <div style={{ display: "flex", gap: 6 }}>
-                                  <select aria-label="Reviewer" value={draft.reviewerId} onChange={(e) => setDraft({ ...draft, reviewerId: e.target.value })} style={{ flex: 1 }}>
-                                    {members.map((p) => (
-                                      <option key={p.id} value={p.id}>
-                                        {p.id === me ? "Review: me" : `Review: ${p.name}`}
-                                      </option>
-                                    ))}
-                                  </select>
-                                  <button type="submit" className="small" disabled={!draft.title.trim() || busy !== null}>
-                                    Add
-                                  </button>
-                                  <button type="button" className="small secondary" onClick={() => setAdding(null)}>
-                                    Cancel
-                                  </button>
-                                </div>
-                              </form>
+                              />
                             ) : (
                               <button type="button" className="linkbtn" onClick={() => setAdding(key)}>
                                 + Add task

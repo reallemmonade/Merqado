@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { useApi } from "@/components/experts/useApi";
+import styles from "./Deck.module.css";
 import { SampleButton } from "./SampleButton";
 
 export interface SlideRow {
@@ -16,6 +17,7 @@ export interface SlideRow {
   moduleId: string | null;
   status: "draft" | "final";
   openIssues: number;
+  openContradictions: number;
 }
 
 export interface IssueRow {
@@ -99,7 +101,7 @@ function Generate({ engagementId, hasSlides }: { engagementId: string; hasSlides
   );
 }
 
-function SlideEditor({ engagementId, s, modules, onDone }: { engagementId: string; s: SlideRow | null; modules: { id: string; name: string }[]; onDone: () => void }) {
+function SlideEditor({ engagementId, s, modules, onDone }: { engagementId: string; s: SlideRow | null; modules: { id: string; name: string }[]; onDone: (id?: string) => void }) {
   const { call, busy, error } = useApi();
   const [f, setF] = useState({ section: s?.section ?? "", headline: s?.headline ?? "", body: s?.body ?? "", sourceNote: s?.sourceNote ?? "", moduleId: s?.moduleId ?? "" });
   return (
@@ -109,7 +111,8 @@ function SlideEditor({ engagementId, s, modules, onDone }: { engagementId: strin
       onSubmit={async (e) => {
         e.preventDefault();
         const json = s ? { op: "slide.update", id: s.id, ...f, moduleId: f.moduleId || null } : { op: "slide.add", ...f, moduleId: f.moduleId || null };
-        if (await call("save", `/api/engagements/${engagementId}/deck`, { json })) onDone();
+        const res = await call("save", `/api/engagements/${engagementId}/deck`, { json });
+        if (res) onDone(typeof res.id === "string" ? res.id : undefined);
       }}
     >
       <div className="form-grid">
@@ -145,7 +148,7 @@ function SlideEditor({ engagementId, s, modules, onDone }: { engagementId: strin
         <button type="submit" className="small" disabled={busy !== null || !f.headline.trim()}>
           Save
         </button>
-        <button type="button" className="secondary small" onClick={onDone}>
+        <button type="button" className="secondary small" onClick={() => onDone()}>
           Cancel
         </button>
         {error && <span className="error">{error}</span>}
@@ -175,6 +178,10 @@ export function DeckSlides({
   const current = slides.find((s) => s.id === selected) ?? slides[0];
   const moduleName = new Map(modules.map((m) => [m.id, m.name]));
   const go = (id: string) => router.replace(`/e/${engagementId}/deck?slide=${id}`, { scroll: false });
+  const added = (id?: string) => {
+    setEditing(null);
+    if (id) go(id);
+  };
 
   if (slides.length === 0)
     return (
@@ -188,7 +195,7 @@ export function DeckSlides({
               </button>
               <SampleButton engagementId={engagementId} />
             </div>
-            {editing === "new" && <SlideEditor engagementId={engagementId} s={null} modules={modules} onDone={() => setEditing(null)} />}
+            {editing === "new" && <SlideEditor engagementId={engagementId} s={null} modules={modules} onDone={added} />}
           </>
         ) : (
           <p className="muted">No slides</p>
@@ -199,7 +206,7 @@ export function DeckSlides({
   let lastSection = "";
   return (
     <div className="deck">
-      <nav className="panel storyline" aria-label="Storyline">
+      <nav className={`panel storyline ${styles.storyline}`} aria-label="Storyline">
         {canEdit && (
           <div className="toolbar" style={{ padding: 8 }}>
             <Generate engagementId={engagementId} hasSlides />
@@ -218,7 +225,7 @@ export function DeckSlides({
                 <button type="button" className="story-item" aria-current={s.id === current?.id ? "true" : undefined} onClick={() => go(s.id)}>
                   <span className="mono">{s.n}</span>
                   <span style={{ flex: 1 }}>{s.headline}</span>
-                  {s.openIssues > 0 && <span className="dot" aria-label={`${s.openIssues} open issues`} />}
+                  {s.openIssues > 0 && <span className="dot" aria-label={`${s.openIssues} open ${s.openIssues === 1 ? "issue" : "issues"}`} />}
                   {s.status === "final" && <span className="tag">Final</span>}
                 </button>
               </li>
@@ -228,7 +235,7 @@ export function DeckSlides({
       </nav>
 
       <div className="deck-main">
-        {editing === "new" && <SlideEditor engagementId={engagementId} s={null} modules={modules} onDone={() => setEditing(null)} />}
+        {editing === "new" && <SlideEditor engagementId={engagementId} s={null} modules={modules} onDone={added} />}
         {current && editing === "edit" ? (
           <SlideEditor key={current.id} engagementId={engagementId} s={current} modules={modules} onDone={() => setEditing(null)} />
         ) : (
@@ -239,7 +246,7 @@ export function DeckSlides({
                 <span className="meta">
                   {current.moduleId && moduleName.get(current.moduleId) && <span className="tag">{moduleName.get(current.moduleId)}</span>}
                   {current.openIssues > 0 && (
-                    <Link href={`/e/${engagementId}/deck/contradictions`} className="tag sev-high">
+                    <Link href={`/e/${engagementId}/deck${current.openContradictions > 0 ? "/contradictions" : "/qc"}`} className="tag sev-high">
                       {current.openIssues} {current.openIssues === 1 ? "issue" : "issues"}
                     </Link>
                   )}
@@ -262,9 +269,21 @@ export function DeckSlides({
                       disabled={busy !== null}
                       onClick={() => call("st", url, { json: { op: "slide.update", id: current.id, status: current.status === "final" ? "draft" : "final" } })}
                     >
-                      {current.status === "final" ? "Final" : "Mark final"}
+                      {current.status === "final" ? "Mark draft" : "Mark final"}
                     </button>
-                    <button type="button" className="secondary small" disabled={busy !== null} onClick={() => call("del", url, { json: { op: "slide.delete", id: current.id } })}>
+                    <button
+                      type="button"
+                      className="secondary small"
+                      disabled={busy !== null}
+                      onClick={async () => {
+                        if (!window.confirm(`Delete slide ${current.n}?`)) return;
+                        const next = slides[current.n] ?? slides[current.n - 2];
+                        if (await call("del", url, { json: { op: "slide.delete", id: current.id } })) {
+                          if (next) go(next.id);
+                          else router.replace(`/e/${engagementId}/deck`, { scroll: false });
+                        }
+                      }}
+                    >
                       Delete
                     </button>
                   </>
@@ -357,6 +376,19 @@ function counts(issues: IssueRow[]) {
 
 const SEV_ORDER = { high: 0, medium: 1, low: 2 };
 
+function NoSlides({ engagementId, canEdit }: { engagementId: string; canEdit: boolean }) {
+  return (
+    <div className="toolbar">
+      <span className="muted">No slides</span>
+      {canEdit && (
+        <Link href={`/e/${engagementId}/deck`} className="secondary-link">
+          Add slides
+        </Link>
+      )}
+    </div>
+  );
+}
+
 /** The contradictions tracker: pairs of claims in the deck (or against the case) that can't both be true. */
 export function Contradictions({ engagementId, issues, hasSlides, canEdit, lastScan }: { engagementId: string; issues: IssueRow[]; hasSlides: boolean; canEdit: boolean; lastScan: string }) {
   const { call, busy, error } = useApi();
@@ -376,7 +408,7 @@ export function Contradictions({ engagementId, issues, hasSlides, canEdit, lastS
         )}
       </div>
       {error && <span className="error">{error}</span>}
-      {!hasSlides && <p className="muted">No slides</p>}
+      {!hasSlides && <NoSlides engagementId={engagementId} canEdit={canEdit} />}
       {shown.map((i) => (
         <article key={i.id} className={`panel contra sev-border-${i.severity}`}>
           <div className="group-head">
@@ -386,10 +418,10 @@ export function Contradictions({ engagementId, issues, hasSlides, canEdit, lastS
           <div className="contra-pair">
             <div className="contra-side">
               <div className="meta">
-                <span className="tag">Slide {i.slideN}</span>
+                {i.slideN !== null && <span className="tag">Slide {i.slideN}</span>}
                 <span className="clamp" style={{ WebkitLineClamp: 1 }}>{i.slideHeadline}</span>
               </div>
-              <blockquote>{i.claim}</blockquote>
+              <blockquote style={{ flex: 1 }}>{i.claim}</blockquote>
             </div>
             <div className="contra-vs" aria-hidden="true">
               ≠
@@ -398,7 +430,7 @@ export function Contradictions({ engagementId, issues, hasSlides, canEdit, lastS
               <div className="meta">
                 <span className="tag">{i.otherRef}</span>
               </div>
-              <blockquote>{i.otherClaim}</blockquote>
+              <blockquote style={{ flex: 1 }}>{i.otherClaim}</blockquote>
             </div>
           </div>
           {canEdit && (
@@ -445,12 +477,12 @@ export function QualityCheck({
           )}
         </div>
         {error && <span className="error">{error}</span>}
-        {!hasSlides && <p className="muted">No slides</p>}
+        {!hasSlides && <NoSlides engagementId={engagementId} canEdit={canEdit} />}
         {shown.map((i) => (
           <div key={i.id} className="item">
             <div className="meta">
               <span className={`pill sev-${i.severity}`}>{SEV_LABEL[i.severity]}</span>
-              <span className="tag">Slide {i.slideN}</span>
+              {i.slideN !== null && <span className="tag">Slide {i.slideN}</span>}
               <span className="clamp" style={{ WebkitLineClamp: 1 }}>{i.slideHeadline}</span>
             </div>
             <div>{i.detail}</div>
