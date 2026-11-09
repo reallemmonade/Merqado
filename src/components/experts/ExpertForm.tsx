@@ -20,6 +20,7 @@ export interface ExpertFormValues {
   hourlyRate: number;
   topicIds: string[];
   notes: string;
+  requestedBy?: string | null;
 }
 
 const NETWORKS = ["GLG", "AlphaSights", "Guidepoint", "Third Bridge", "Tegus", "Direct"];
@@ -28,6 +29,8 @@ export function ExpertForm({
   types,
   topics,
   initial,
+  people,
+  defaultRequester,
   submitLabel,
   busy,
   onSubmit,
@@ -36,6 +39,9 @@ export function ExpertForm({
   types: ExpertsData["types"];
   topics: ExpertsData["topics"];
   initial?: ExpertRow;
+  /** People who can be picked as "Asked by"; leave out to hide the field. */
+  people?: { id: string; name: string }[];
+  defaultRequester?: string | null;
   submitLabel: string;
   busy: boolean;
   onSubmit: (v: ExpertFormValues) => void;
@@ -57,6 +63,7 @@ export function ExpertForm({
     hourlyRate: initial?.hourlyRate ?? 0,
     topicIds: initial?.topicIds ?? [],
     notes: initial?.notes ?? "",
+    ...(people ? { requestedBy: initial ? initial.requestedBy : (defaultRequester ?? null) } : {}),
   });
   const set = <K extends keyof ExpertFormValues>(k: K, val: ExpertFormValues[K]) => setV((o) => ({ ...o, [k]: val }));
   const auto = anonymizeTitle(v.company, v.title, v.isFormer);
@@ -92,7 +99,7 @@ export function ExpertForm({
         <input type="checkbox" checked={v.isFormer} onChange={(e) => set("isFormer", e.target.checked)} /> Former employee
       </label>
       <label className="field">
-        Anonymized title (leave blank to use the automatic one)
+        Anonymized title
         <input type="text" value={v.anonTitle ?? ""} placeholder={auto || "Company, seniority"} onChange={(e) => set("anonTitle", e.target.value)} />
       </label>
       <div className="form-grid">
@@ -107,6 +114,19 @@ export function ExpertForm({
             ))}
           </select>
         </label>
+        {people && (
+          <label className="field">
+            Asked by
+            <select value={v.requestedBy ?? ""} onChange={(e) => set("requestedBy", e.target.value || null)}>
+              <option value="">—</option>
+              {people.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.name}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
         <label className="field">
           Interview date
           <input type="date" value={v.interviewDate ?? ""} onChange={(e) => set("interviewDate", e.target.value || null)} />

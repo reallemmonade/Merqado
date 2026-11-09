@@ -8,7 +8,7 @@ import { loadDeck, loadNotes, loadWorkplan } from "@/lib/case/data";
 import { loadCase } from "@/lib/case/page";
 import { progressPct, shortDate, TASK_STATUS_LABEL, timelinePct, todayIso } from "@/lib/case/progress";
 import { checkMove, dueOf, reviewerOf } from "@/lib/case/tasks";
-import { allows } from "@/lib/roles";
+import { parseApprovals, waitingOn } from "@/lib/experts/approval";
 
 export const dynamic = "force-dynamic";
 
@@ -24,7 +24,6 @@ export default async function OverviewPage({
   const ctx = await loadCase(id);
   const { db, user } = ctx;
   const team = sp.todo === "team";
-  const canApprove = allows(ctx.membership, "approve_experts");
 
   const [wp, notes, deck, hyps, takeaways, expertRows, types, budget, rooms, files] = await Promise.all([
     loadWorkplan(db, id),
@@ -53,7 +52,9 @@ export default async function OverviewPage({
       t.status !== "done" &&
       (team || t.assigneeId === user.id || (t.status === "almost_done" && reviewerOf(t, leadOf.get(t.moduleId)) === user.id)),
   );
-  const proposed = expertRows.filter((e) => e.status === "proposed");
+  const proposed = expertRows.filter(
+    (e) => e.status === "proposed" && (team || waitingOn({ requestedBy: e.requestedBy, approvals: parseApprovals(e.approvals) }, ctx.members).includes(user.id)),
+  );
   const openItems = notes.filter((n) => n.kind === "open" && !n.resolved);
   const decisions = notes.filter((n) => n.kind === "decision");
   const openContradictions = deck.issues.filter((i) => i.kind === "contradiction" && i.status === "open");
@@ -167,8 +168,7 @@ export default async function OverviewPage({
                   </span>
                 </div>
               ))}
-              {(canApprove || team) &&
-                proposed.map((e) => (
+              {proposed.map((e) => (
                   <div className="row todo" key={e.id}>
                     <Link href={`${base}/experts?expert=${e.id}`} style={{ flex: 1 }}>
                       Approve {[e.firstName, e.lastName].filter(Boolean).join(" ")}
