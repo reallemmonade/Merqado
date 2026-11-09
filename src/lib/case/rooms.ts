@@ -69,25 +69,32 @@ export function sameMembers(a: string[], b: string[]): boolean {
 
 export const QUICK_REACTIONS = ["👍", "❤️", "😂", "😮", "✅", "👀"] as const;
 
-/** Ids of people @mentioned by full name or first name, longest names first so "Ana Reyes" wins over "Ana". */
+/**
+ * Ids of people @mentioned by full name or first name. Longest names are matched first and the
+ * text they cover is used up, so "@Ana Reyes" tags Ana Reyes only, not every other Ana.
+ */
 export function findMentions(body: string, people: { id: string; name: string }[]): string[] {
   const text = body.toLowerCase();
   const found = new Set<string>();
+  const taken: [number, number][] = [];
   const names = people
     .flatMap((p) => {
       const full = p.name.trim();
       const first = full.split(/\s+/)[0] ?? "";
       return [{ id: p.id, name: full }, ...(first && first !== full ? [{ id: p.id, name: first }] : [])];
     })
+    .filter((n) => n.name)
     .sort((a, b) => b.name.length - a.name.length);
   for (const n of names) {
     const needle = "@" + n.name.toLowerCase();
     let at = text.indexOf(needle);
     while (at !== -1) {
-      const after = text[at + needle.length];
-      if (after === undefined || !/[\p{L}\p{N}]/u.test(after)) {
+      const end = at + needle.length;
+      const after = text[end];
+      const free = !taken.some(([s, e]) => at < e && end > s);
+      if (free && (after === undefined || !/[\p{L}\p{N}]/u.test(after))) {
         found.add(n.id);
-        break;
+        taken.push([at, end]);
       }
       at = text.indexOf(needle, at + 1);
     }

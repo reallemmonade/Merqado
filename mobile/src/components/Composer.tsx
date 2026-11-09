@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Pressable, Text, TextInput, View } from "react-native";
+import { Alert, Pressable, Text, TextInput, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as Haptics from "expo-haptics";
 import { C, F } from "@/lib/theme";
@@ -23,6 +23,9 @@ export function Composer({ placeholder, onSend, members = [], big = false }: { p
     try {
       await onSend(body);
       setText("");
+    } catch (e) {
+      // Keep the text so it can be sent again.
+      Alert.alert(e instanceof Error ? e.message : "Not sent");
     } finally {
       setSending(false);
     }

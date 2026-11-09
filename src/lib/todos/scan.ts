@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { asc, eq } from "drizzle-orm";
 import type { DB } from "@/db/client";
 import { todos, type Archetype } from "@/db/schema";
 import { extractJson } from "@/lib/experts/api";
@@ -26,7 +26,8 @@ export async function scanForTodos(
   const prior = await db
     .select({ title: todos.title, status: todos.status, sourceKey: todos.sourceKey })
     .from(todos)
-    .where(eq(todos.engagementId, opts.engagementId));
+    .where(eq(todos.engagementId, opts.engagementId))
+    .orderBy(asc(todos.createdAt));
   const used = new Set(prior.map((p) => p.sourceKey).filter(Boolean));
 
   const messages: SourceMessage[] = [];

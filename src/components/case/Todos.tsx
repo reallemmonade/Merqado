@@ -29,7 +29,7 @@ function Source({ t }: { t: TodoView }) {
 
 /** Hand-added and accepted to-dos, ticked off in place. */
 export function TodoItem({ engagementId, t, showAssignee }: { engagementId: string; t: TodoView; showAssignee: boolean }) {
-  const { call, busy } = useApi();
+  const { call, busy, error } = useApi();
   return (
     <div className="row todo">
       <label className="check" style={{ flex: 1 }}>
@@ -51,6 +51,7 @@ export function TodoItem({ engagementId, t, showAssignee }: { engagementId: stri
             ×
           </button>
         )}
+        {error && <span className="error">{error}</span>}
       </span>
     </div>
   );
@@ -92,7 +93,7 @@ export function TodoAdd({ engagementId, me, members, team }: { engagementId: str
 }
 
 /** To-dos the model found in the chats, waiting to be added or dismissed. */
-export function TodoSuggestions({ engagementId, items, showAssignee }: { engagementId: string; items: TodoView[]; showAssignee: boolean }) {
+export function TodoSuggestions({ engagementId, items, showAssignee, canScan }: { engagementId: string; items: TodoView[]; showAssignee: boolean; canScan: boolean }) {
   const { call, busy, error } = useApi();
   return (
     <div className="todo-suggest">
@@ -100,9 +101,11 @@ export function TodoSuggestions({ engagementId, items, showAssignee }: { engagem
         <h3 style={{ fontSize: 14 }}>Suggested</h3>
         {items.length > 0 && <span className="mono">{items.length}</span>}
         <span className="grow" />
-        <button type="button" className="small secondary" disabled={busy !== null} onClick={() => call("scan", url(engagementId), { json: { op: "scan" } })}>
-          {busy === "scan" ? "Scanning…" : "Scan chats"}
-        </button>
+        {canScan && (
+          <button type="button" className="small secondary" disabled={busy !== null} onClick={() => call("scan", url(engagementId), { json: { op: "scan" } })}>
+            {busy === "scan" ? "Scanning…" : "Scan chats"}
+          </button>
+        )}
       </div>
       {error && <span className="error">{error}</span>}
       {items.map((t) => (

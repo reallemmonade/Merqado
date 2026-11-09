@@ -127,14 +127,15 @@ function Pop({ button, children, align = "left", open, setOpen }: { button: Reac
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (!open) return;
-    const close = (e: MouseEvent) => {
+    const close = (e: PointerEvent) => {
       if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
     };
     const esc = (e: KeyboardEvent) => e.key === "Escape" && setOpen(false);
-    document.addEventListener("mousedown", close);
+    // pointerdown, not mousedown: iOS Safari sends no mousedown for taps on plain areas.
+    document.addEventListener("pointerdown", close);
     document.addEventListener("keydown", esc);
     return () => {
-      document.removeEventListener("mousedown", close);
+      document.removeEventListener("pointerdown", close);
       document.removeEventListener("keydown", esc);
     };
   }, [open, setOpen]);
@@ -215,7 +216,8 @@ function useLive(engagementId: string, roomId: string | null, newest: string) {
 export function TeamChat(p: Props) {
   const { engagementId, active, people, me } = p;
   const peopleMap = useMemo(() => new Map(p.people.map((x) => [x.id, x])), [p.people]);
-  const newest = p.messages[p.messages.length - 1]?.at ?? "";
+  // Thread replies count as unread too, so a new reply in view also marks the chat read.
+  const newest = p.messages.reduce((acc, m) => [acc, m.at, m.replies.lastAt ?? ""].reduce((a, b) => (b > a ? b : a)), "");
   useLive(engagementId, active?.id ?? null, `${newest}|${p.thread?.replies.length ?? 0}`);
 
   const base = `/e/${engagementId}/channel`;
@@ -244,7 +246,7 @@ export function TeamChat(p: Props) {
       <ChatList {...p} peopleMap={peopleMap} href={href} />
       <section className="tc-convo" aria-label="Conversation">
         {active ? (
-          <Conversation {...p} active={active} audience={audience} ctx={ctx} href={href} />
+          <Conversation key={active.id} {...p} active={active} audience={audience} ctx={ctx} href={href} />
         ) : (
           <div className="tc-empty">{p.setup ?? <span className="muted">No chats</span>}</div>
         )}
@@ -536,7 +538,7 @@ function Conversation(p: Props & { active: ChatListItem; audience: ChatPerson[];
           {active.kind !== "room" && <AddPeople engagementId={p.engagementId} chat={active} people={p.people} meId={p.me.id} href={p.href} />}
           <CallButton engagementId={p.engagementId} roomId={active.id} video={false} />
           <CallButton engagementId={p.engagementId} roomId={active.id} video />
-          {active.kind === "group" && <GroupMenu engagementId={p.engagementId} chat={active} />}
+          {active.kind === "group" && <GroupMenu key={active.id} engagementId={p.engagementId} chat={active} />}
         </div>
         <nav className="tc-tabs" aria-label="Chat views">
           {tabs.map((t) => (
@@ -633,7 +635,8 @@ function Message({ m, ctx, cont, showReplies, selected }: { m: ChatMsg; ctx: Msg
   const react = (emoji: string) => call(`r-${emoji}`, url, { json: { op: "reaction.toggle", id: m.id, emoji } });
   const author = m.authorId ? ctx.peopleMap.get(m.authorId) : undefined;
   return (
-    <div id={`m-${m.id}`} className={`tc-msg${cont ? " cont" : ""}${m.mentionsMe ? " hl" : ""}${selected ? " sel" : ""}`}>
+    // tabIndex lets a tap focus the message on touch screens, which shows its actions.
+    <div id={`m-${m.id}`} tabIndex={-1} className={`tc-msg${cont ? " cont" : ""}${m.mentionsMe ? " hl" : ""}${selected ? " sel" : ""}`}>
       {cont ? <span className="tc-gutter" /> : <Avatar id={m.authorId ?? m.id} initials={m.initials} presence={author?.presence} />}
       <div className="tc-mb">
         {!cont && (
@@ -746,7 +749,16 @@ function Message({ m, ctx, cont, showReplies, selected }: { m: ChatMsg; ctx: Msg
             }}
           />
         )}
-        {m.mine && <IconButton icon="trash" label="Delete" onClick={() => call("del", url, { json: { op: "message.delete", id: m.id } })} />}
+        {m.mine && (
+          <IconButton
+            icon="trash"
+            label="Delete"
+            onClick={() => {
+              if (m.replies.count > 0 && !confirm(`Delete this message and its ${m.replies.count} replies?`)) return;
+              call("del", url, { json: { op: "message.delete", id: m.id } });
+            }}
+          />
+        )}
       </div>
     </div>
   );
@@ -1002,7 +1014,17 @@ function GroupMenu({ engagementId, chat }: { engagementId: string; chat: ChatLis
   const [name, setName] = useState(chat.name);
   const url = `/api/engagements/${engagementId}/channel`;
   return (
-    <Pop open={open} setOpen={setOpen} align="right" button={<IconButton icon="more" label="Chat options" onClick={() => setOpen(!open)} />}>
+    <Pop open={open} setOpen={setOpen} align="right" button={
+        <IconButton
+          icon="more"
+          label="Chat options"
+          onClick={() => {
+            if (!open) setName(chat.name);
+            setOpen(!open);
+          }}
+        />
+      }
+    >
       <form
         className="tc-form"
         onSubmit={async (e) => {
@@ -1264,7 +1286,8 @@ function Composer({
               return;
             }
           }
-          if (e.key === "Enter" && !e.shiftKey) {
+          // Not while an IME is composing a word, and on touch keyboards Enter is a new line; Send sends.
+          if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing && !matchMedia("(hover: none)").matches) {
             e.preventDefault();
             send();
           }
@@ -1314,7 +1337,13 @@ function ScheduleIcon({ engagementId, roomId }: { engagementId: string; roomId: 
   const [open, setOpen] = useState(false);
   return (
     <Pop open={open} setOpen={setOpen} button={<IconButton icon="calendar" label="Schedule meeting" onClick={() => setOpen(!open)} />}>
-      <div className="tc-up">
+      {/* Inside the composer's form: Enter here must not send the chat draft. */}
+      <div
+        className="tc-up"
+        onKeyDown={(e) => {
+          if (e.key === "Enter" && e.target instanceof HTMLInputElement) e.preventDefault();
+        }}
+      >
         <ScheduleMeeting engagementId={engagementId} roomId={roomId} inline onDone={() => setOpen(false)} />
       </div>
     </Pop>

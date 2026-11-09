@@ -847,7 +847,13 @@ button.settings-close:hover { background: var(--soft); }
 .tc-replies .tc-av { box-shadow: 0 0 0 2px var(--surface); }
 .tc-hover { position: absolute; right: 10px; top: -16px; display: flex; gap: 1px; padding: 3px; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; box-shadow: 0 4px 14px rgba(17, 28, 38, 0.12); opacity: 0; pointer-events: none; transition: opacity 0.12s; z-index: 5; }
 .tc-msg:hover .tc-hover, .tc-msg:focus-within .tc-hover, .tc-hover.open { opacity: 1; pointer-events: auto; }
-@media (hover: none) { .tc-hover { position: static; opacity: 1; pointer-events: auto; box-shadow: none; border: 0; padding: 0; align-self: flex-start; } }
+/* Touch screens: tap a message to show its actions on their own line under it, so the text keeps its width. */
+.tc-msg:focus { outline: none; }
+@media (hover: none) {
+  .tc-msg { flex-wrap: wrap; }
+  .tc-hover { position: static; display: none; box-shadow: none; border: 0; padding: 0 0 0 42px; flex: 1 0 100%; flex-wrap: wrap; }
+  .tc-msg:focus-within .tc-hover, .tc-hover.open { display: flex; opacity: 1; pointer-events: auto; }
+}
 .tc-edit { display: flex; flex-direction: column; gap: 6px; }
 .tc-card { display: flex; align-items: center; gap: 12px; max-width: 480px; padding: 10px 12px; border: 1px solid var(--line); border-left: 3px solid var(--accent); border-radius: 10px; background: var(--surface); color: var(--accent); }
 .tc-card.live { border-left-color: var(--bad); color: var(--bad); }
@@ -884,12 +890,13 @@ button.settings-close:hover { background: var(--soft); }
 .tc-empty { flex: 1; display: flex; flex-direction: column; padding: 20px; gap: 12px; }
 
 @media (max-width: 1100px) { .tc.has-thread .tc-list { display: none; } }
+/* Phones: one fixed-height column that scrolls inside, so a chat opens at its newest message. */
 @media (max-width: 840px) {
-  .tc { flex-direction: column; height: auto; min-height: 0; overflow: visible; }
-  .tc-list { flex-basis: auto; max-height: 320px; border-right: 0; border-bottom: 1px solid var(--line); }
-  .tc.has-thread .tc-list { display: flex; }
-  .tc-convo { min-height: 70vh; }
-  .tc-thread { flex-basis: auto; border-left: 0; border-top: 1px solid var(--line); min-height: 50vh; }
+  .tc { flex-direction: column; height: calc(100dvh - 250px); min-height: 420px; }
+  .tc-list { flex: 0 0 auto; max-height: 28dvh; border-right: 0; border-bottom: 1px solid var(--line); }
+  .tc-convo { flex: 1; min-height: 0; }
+  .tc.has-thread .tc-list, .tc.has-thread .tc-convo { display: none; }
+  .tc-thread { flex: 1; min-height: 0; border-left: 0; }
   .tc-title h2 { max-width: 60%; }
 }
 

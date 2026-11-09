@@ -39,9 +39,10 @@ export async function registerForPush(): Promise<void> {
 
 /** Opens the right screen when a notification is tapped, or sends a lock-screen reply. */
 export async function handleResponse(res: Notifications.NotificationResponse) {
-  const data = res.notification.request.content.data as { url?: string; caseId?: string; roomId?: string };
+  const data = res.notification.request.content.data as { url?: string; caseId?: string; roomId?: string; parentId?: string };
   if (res.actionIdentifier === "reply" && res.userText && data.caseId && data.roomId) {
-    await api(`/api/engagements/${data.caseId}/channel`, { body: { op: "message.post", roomId: data.roomId, body: res.userText } }).catch(() => {});
+    const reply = { op: "message.post", roomId: data.roomId, body: res.userText, ...(data.parentId && { parentId: data.parentId }) };
+    await api(`/api/engagements/${data.caseId}/channel`, { body: reply }).catch(() => {});
   }
   if (res.actionIdentifier === "read" && data.caseId && data.roomId) {
     await api(`/api/engagements/${data.caseId}/channel`, { body: { op: "read", roomId: data.roomId } }).catch(() => {});
