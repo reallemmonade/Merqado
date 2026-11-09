@@ -488,7 +488,7 @@ function ExpertTile({
           <ol className="steps" aria-label="Progress">
             {STATUS_ORDER.map((s, i) => (
               <li key={s} className={`${i <= at ? "done" : ""} ${i === at ? "current" : ""}`}>
-                <span />
+                <span className={i <= at ? `seg-${s}` : undefined} />
                 {STATUS_LABEL[s]}
               </li>
             ))}
