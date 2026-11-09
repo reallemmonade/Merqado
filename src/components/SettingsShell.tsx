@@ -5,11 +5,12 @@ import { initials } from "@/lib/prefs";
 import { safeReturnPath } from "@/lib/return-path";
 import { SettingsClose } from "./SettingsClose";
 
-export type SettingsSection = "profile" | "appearance";
+export type SettingsSection = "profile" | "appearance" | "storage";
 
 const SECTIONS: { key: SettingsSection; label: string; href: string }[] = [
   { key: "profile", label: "Profile", href: "/settings" },
   { key: "appearance", label: "Appearance", href: "/settings/appearance" },
+  { key: "storage", label: "Storage", href: "/settings/storage" },
 ];
 
 /** Where "back" goes: the case you came from (by name), else all cases. */

@@ -1,18 +1,13 @@
 import type { TaskStatus } from "@/db/schema";
 
 export const TASK_STATUS_LABEL: Record<TaskStatus, string> = {
-  not_yet: "Not yet",
-  in_progress: "In progress",
-  almost_done: "Almost done",
+  not_yet: "Not started",
+  in_progress: "Started",
+  almost_done: "Ready for review",
   done: "Done",
 };
 
 const WEIGHT: Record<TaskStatus, number> = { not_yet: 0, in_progress: 1 / 3, almost_done: 2 / 3, done: 1 };
-
-export function nextStatus(s: TaskStatus): TaskStatus {
-  const order: TaskStatus[] = ["not_yet", "in_progress", "almost_done", "done"];
-  return order[(order.indexOf(s) + 1) % order.length]!;
-}
 
 /** Share of a module's work done, 0 to 100, counting partly done tasks. */
 export function progressPct(tasks: { status: TaskStatus }[]): number {

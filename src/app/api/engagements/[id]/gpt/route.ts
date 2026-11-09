@@ -93,7 +93,7 @@ async function answer(auth: Authorized, chatId: string, only: SourceKind[] = [])
 
   const all = await loadCorpus(db, engagement.id, user);
   const corpus = only.length ? all.filter((s) => only.includes(s.kind)) : all;
-  const pieces: Snippet[] = corpus.flatMap((s) => (s.kind === "transcript" ? chunk(s.text).map((text) => ({ ...s, text })) : [s]));
+  const pieces: Snippet[] = corpus.flatMap((s) => (s.kind === "transcript" || s.kind === "file" ? chunk(s.text).map((text) => ({ ...s, text })) : [s]));
   const priorQuestion = [...msgs].reverse().find((m) => m.role === "user" && m.id !== last.id)?.body ?? "";
   const picked = topSnippets(pieces, `${last.body} ${priorQuestion}`, 30, 40000);
   const numbered = picked.map((s, i) => ({ n: i + 1, label: s.label, href: s.href, text: s.text }));

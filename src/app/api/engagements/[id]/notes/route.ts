@@ -3,7 +3,7 @@ import { and, eq } from "drizzle-orm";
 import { z } from "zod";
 import { caseNotes, NOTE_KINDS, workplanModules } from "@/db/schema";
 import { notFoundJson, ok, parseOp } from "@/lib/case/api";
-import { can } from "@/lib/roles";
+import { allows } from "@/lib/roles";
 import { getEngagementAccess } from "@/lib/session";
 
 const ref = z.string().min(1).max(64);
@@ -40,7 +40,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   if (!note || (note.isPrivate && note.createdBy !== user.id)) return notFoundJson();
   if (note.createdBy !== user.id) {
     const access = await getEngagementAccess(db, user, id);
-    if (!can(access?.access, "edit_findings")) return NextResponse.json({ error: "You can only change your own notes." }, { status: 403 });
+    if (!allows(access, "edit_findings")) return NextResponse.json({ error: "You can only change your own notes." }, { status: 403 });
   }
 
   if (op.op === "delete") {
