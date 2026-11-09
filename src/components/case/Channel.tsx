@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { ARCHETYPES, type Archetype } from "@/db/schema";
 import { useApi } from "@/components/experts/useApi";
 import { ARCHETYPE_LABEL, ROOM_TEMPLATES } from "@/lib/case/rooms";
@@ -86,20 +86,88 @@ export function NewRoom({ engagementId }: { engagementId: string }) {
   );
 }
 
+export interface ChatFile {
+  id: string;
+  filename: string;
+  folder: string;
+  pending: boolean;
+  mine: boolean;
+  suggestions: string[];
+  links: string[];
+}
+
+/** A file in a message: its folder, or (for the sender) a suggested folder to confirm. */
+function ChatFileCard({ engagementId, file, folders }: { engagementId: string; file: ChatFile; folders: string[] }) {
+  const { call, busy, error } = useApi();
+  const [folder, setFolder] = useState(file.suggestions[0] ?? "");
+  return (
+    <div className="chat-file">
+      <div className="name">
+        <a href={`/api/engagements/${engagementId}/sources/${file.id}`} target="_blank" rel="noreferrer">
+          {file.filename}
+        </a>
+        <div className="chips">
+          {!file.pending && file.folder && <span className="tag tag-good">{file.folder}</span>}
+          {file.links.map((l) => (
+            <span key={l} className="tag tag-accent">
+              {l}
+            </span>
+          ))}
+        </div>
+      </div>
+      {file.pending && file.mine && (
+        <form
+          className="toolbar"
+          onSubmit={(e) => {
+            e.preventDefault();
+            call("place", `/api/engagements/${engagementId}/channel`, { json: { op: "file.place", sourceId: file.id, folder } });
+          }}
+        >
+          <input type="text" list={`folders-${engagementId}`} aria-label="Folder" placeholder="Folder" value={folder} onChange={(e) => setFolder(e.target.value)} />
+          <button type="submit" className="small" disabled={busy !== null || !folder.trim()}>
+            File
+          </button>
+          {error && <span className="error">{error}</span>}
+        </form>
+      )}
+    </div>
+  );
+}
+
 export interface ChatLine {
   id: string;
   body: string;
   pinned: boolean;
   mine: boolean;
+  files: ChatFile[];
   author: string;
   initials: string;
   time: string;
 }
 
-export function RoomView({ engagementId, roomId, lines }: { engagementId: string; roomId: string; lines: ChatLine[] }) {
-  const { call, busy, error } = useApi();
+export function RoomView({ engagementId, roomId, lines, folders }: { engagementId: string; roomId: string; lines: ChatLine[]; folders: string[] }) {
+  const { call, busy, error, setError } = useApi();
   const [body, setBody] = useState("");
+  const [attached, setAttached] = useState<{ id: string; filename: string }[]>([]);
+  const [uploading, setUploading] = useState(0);
+  const [over, setOver] = useState(false);
+  const picker = useRef<HTMLInputElement>(null);
   const url = `/api/engagements/${engagementId}/channel`;
+
+  async function attach(files: File[]) {
+    setUploading((n) => n + files.length);
+    for (const file of files) {
+      const form = new FormData();
+      form.set("file", file);
+      form.set("roomId", roomId);
+      const res = await fetch(`/api/engagements/${engagementId}/sources`, { method: "POST", body: form }).catch(() => null);
+      const data = res ? await res.json().catch(() => ({})) : {};
+      if (res?.ok && data.duplicate) setError(`${file.name} is already in Files.`);
+      else if (res?.ok && data.source?.id) setAttached((a) => (a.some((x) => x.id === data.source.id) ? a : [...a, { id: data.source.id, filename: data.source.filename }]));
+      else setError(data.error ?? `Couldn't attach ${file.name}.`);
+      setUploading((n) => n - 1);
+    }
+  }
   return (
     <div className="chat">
       <div className="chat-log">
@@ -112,7 +180,14 @@ export function RoomView({ engagementId, roomId, lines }: { engagementId: string
                 <span>{m.time}</span>
                 {m.pinned && <span className="tag">Pinned</span>}
               </div>
-              <div className="chat-body">{m.body}</div>
+              {m.body && <div className="chat-body">{m.body}</div>}
+              {m.files.length > 0 && (
+                <div className="chat-files">
+                  {m.files.map((f) => (
+                    <ChatFileCard key={f.id} engagementId={engagementId} file={f} folders={folders} />
+                  ))}
+                </div>
+              )}
             </div>
             <div className="chat-actions">
               <button type="button" className="linkbtn" disabled={busy !== null} onClick={() => call(m.id, url, { json: { op: "message.pin", id: m.id, pinned: !m.pinned } })}>
@@ -128,15 +203,64 @@ export function RoomView({ engagementId, roomId, lines }: { engagementId: string
         ))}
         {lines.length === 0 && <p className="muted">No messages</p>}
       </div>
+      <datalist id={`folders-${engagementId}`}>
+        {folders.map((f) => (
+          <option key={f} value={f} />
+        ))}
+      </datalist>
       <form
-        className="composer"
+        className={`composer${over ? " is-over" : ""}`}
+        onDragOver={(e) => {
+          if (e.dataTransfer.types.includes("Files")) {
+            e.preventDefault();
+            setOver(true);
+          }
+        }}
+        onDragLeave={() => setOver(false)}
+        onDrop={(e) => {
+          if (!e.dataTransfer.files.length) return;
+          e.preventDefault();
+          setOver(false);
+          attach([...e.dataTransfer.files]);
+        }}
         onSubmit={async (e) => {
           e.preventDefault();
-          if (!body.trim()) return;
-          const res = await call("post", url, { json: { op: "message.post", roomId, body } });
-          if (res) setBody("");
+          if ((!body.trim() && !attached.length) || uploading) return;
+          const res = await call("post", url, { json: { op: "message.post", roomId, body, sourceIds: attached.map((a) => a.id) } });
+          if (res) {
+            setBody("");
+            setAttached([]);
+          }
         }}
       >
+        {(attached.length > 0 || uploading > 0) && (
+          <div className="composer-files">
+            {attached.map((a) => (
+              <span key={a.id} className="tag">
+                {a.filename}{" "}
+                <button type="button" className="x" aria-label={`Remove ${a.filename}`} onClick={() => setAttached(attached.filter((x) => x.id !== a.id))}>
+                  ×
+                </button>
+              </span>
+            ))}
+            {uploading > 0 && <span className="muted">…</span>}
+          </div>
+        )}
+        <button type="button" className="secondary small" aria-label="Attach" onClick={() => picker.current?.click()}>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} aria-hidden="true">
+            <path d="M20 11.5 12 19.5a5 5 0 0 1-7-7l8.5-8.5a3.3 3.3 0 0 1 4.7 4.7L9.7 17.2a1.7 1.7 0 0 1-2.4-2.4L15 7" />
+          </svg>
+        </button>
+        <input
+          ref={picker}
+          type="file"
+          hidden
+          multiple
+          onChange={(e) => {
+            attach([...(e.target.files ?? [])]);
+            e.target.value = "";
+          }}
+        />
         <textarea
           rows={2}
           value={body}
@@ -150,7 +274,7 @@ export function RoomView({ engagementId, roomId, lines }: { engagementId: string
             }
           }}
         />
-        <button type="submit" disabled={busy !== null || !body.trim()}>
+        <button type="submit" disabled={busy !== null || uploading > 0 || (!body.trim() && !attached.length)}>
           Send
         </button>
       </form>

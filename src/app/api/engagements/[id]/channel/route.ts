@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
-import { and, eq, max } from "drizzle-orm";
+import { and, eq, inArray, isNull, max } from "drizzle-orm";
 import { z } from "zod";
-import { ARCHETYPES, caseNotes, chatMessages, chatRooms } from "@/db/schema";
+import { ARCHETYPES, caseNotes, chatMessages, chatRooms, sources } from "@/db/schema";
+import { fileSources } from "@/lib/files/intake";
 import { notFoundJson, ok, parseOp } from "@/lib/case/api";
 import { canSeeRoom, ROOM_TEMPLATES } from "@/lib/case/rooms";
 import { allows } from "@/lib/roles";
@@ -13,7 +14,8 @@ const Op = z.discriminatedUnion("op", [
   z.object({ op: z.literal("rooms.setup"), names: z.array(z.string().max(100)).min(1, "Pick at least one chat.") }),
   z.object({ op: z.literal("room.add"), name: z.string().trim().min(1, "Add a name.").max(100), archetypes: z.array(z.enum(ARCHETYPES)).min(1, "Pick who's in it.") }),
   z.object({ op: z.literal("room.delete"), id: ref }),
-  z.object({ op: z.literal("message.post"), roomId: ref, body: z.string().trim().min(1, "Write a message.").max(8000) }),
+  z.object({ op: z.literal("message.post"), roomId: ref, body: z.string().trim().max(8000), sourceIds: z.array(ref).max(20).optional() }),
+  z.object({ op: z.literal("file.place"), sourceId: ref, folder: z.string().trim().min(1, "Pick a folder.").max(250) }),
   z.object({ op: z.literal("message.pin"), id: ref, pinned: z.boolean() }),
   z.object({ op: z.literal("message.delete"), id: ref }),
 ]);
@@ -64,8 +66,29 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       return ok();
     case "message.post": {
       if (!(await room(op.roomId))) return notFoundJson();
+      const ids = op.sourceIds ?? [];
+      if (!op.body && !ids.length) return NextResponse.json({ error: "Write a message." }, { status: 400 });
       const [row] = await db.insert(chatMessages).values({ roomId: op.roomId, engagementId: id, userId: user.id, body: op.body }).returning();
+      if (ids.length) {
+        // Files this person just attached in this room join the message.
+        await db
+          .update(sources)
+          .set({ messageId: row!.id })
+          .where(and(eq(sources.engagementId, id), eq(sources.roomId, op.roomId), eq(sources.uploadedBy, user.id), isNull(sources.messageId), inArray(sources.id, ids)));
+      }
       return ok({ id: row!.id });
+    }
+    case "file.place": {
+      const src = await db.query.sources.findFirst({ where: and(eq(sources.id, op.sourceId), eq(sources.engagementId, id)) });
+      if (!src || !src.roomId || src.uploadedBy !== user.id || !(await room(src.roomId))) return notFoundJson();
+      const access = await getEngagementAccess(db, user, id);
+      if (!access) return notFoundJson();
+      try {
+        await fileSources({ db, user, engagement: access.engagement, membership: access }, [{ sourceId: src.id, folder: op.folder, asVersion: !!src.versionCandidate }]);
+      } catch (err) {
+        return NextResponse.json({ error: err instanceof Error ? err.message : "Filing failed." }, { status: 502 });
+      }
+      return ok();
     }
     case "message.pin": {
       const found = await message(op.id);

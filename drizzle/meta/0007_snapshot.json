@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "28aa609a-1f16-4c70-b918-64feb8c07b95",
+  "id": "ceed5142-c619-4a1b-90a0-1a7608f2104d",
   "prevId": "3aaf3513-4946-4009-84d4-67d3f79799f0",
   "tables": {
     "ai_providers": {
@@ -223,6 +223,76 @@
             "id"
           ],
           "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "case_folders": {
+      "name": "case_folders",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "engagement_id": {
+          "name": "engagement_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "path": {
+          "name": "path",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "sort": {
+          "name": "sort",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 0
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "(unixepoch())"
+        }
+      },
+      "indexes": {
+        "case_folders_path": {
+          "name": "case_folders_path",
+          "columns": [
+            "engagement_id",
+            "path"
+          ],
+          "isUnique": true
+        }
+      },
+      "foreignKeys": {
+        "case_folders_engagement_id_engagements_id_fk": {
+          "name": "case_folders_engagement_id_engagements_id_fk",
+          "tableFrom": "case_folders",
+          "tableTo": "engagements",
+          "columnsFrom": [
+            "engagement_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
           "onUpdate": "no action"
         }
       },
@@ -2842,6 +2912,94 @@
           "autoincrement": false,
           "default": "''"
         },
+        "filing": {
+          "name": "filing",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'filed'"
+        },
+        "suggestions": {
+          "name": "suggestions",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'[]'"
+        },
+        "links": {
+          "name": "links",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'[]'"
+        },
+        "content_hash": {
+          "name": "content_hash",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "version_of": {
+          "name": "version_of",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "version": {
+          "name": "version",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 1
+        },
+        "version_candidate": {
+          "name": "version_candidate",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "rel_path": {
+          "name": "rel_path",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "text_body": {
+          "name": "text_body",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "room_id": {
+          "name": "room_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "message_id": {
+          "name": "message_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "batch_id": {
+          "name": "batch_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
         "created_at": {
           "name": "created_at",
           "type": "integer",
@@ -2856,6 +3014,14 @@
           "name": "sources_engagement",
           "columns": [
             "engagement_id"
+          ],
+          "isUnique": false
+        },
+        "sources_hash": {
+          "name": "sources_hash",
+          "columns": [
+            "engagement_id",
+            "content_hash"
           ],
           "isUnique": false
         }
@@ -3467,35 +3633,6 @@
           "autoincrement": false,
           "default": "'not_yet'"
         },
-        "due_date": {
-          "name": "due_date",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "reviewer_id": {
-          "name": "reviewer_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "created_by": {
-          "name": "created_by",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "review_note": {
-          "name": "review_note",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": "''"
-        },
         "sort": {
           "name": "sort",
           "type": "integer",
@@ -3568,32 +3705,6 @@
           "tableTo": "users",
           "columnsFrom": [
             "assignee_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "set null",
-          "onUpdate": "no action"
-        },
-        "workplan_tasks_reviewer_id_users_id_fk": {
-          "name": "workplan_tasks_reviewer_id_users_id_fk",
-          "tableFrom": "workplan_tasks",
-          "tableTo": "users",
-          "columnsFrom": [
-            "reviewer_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "set null",
-          "onUpdate": "no action"
-        },
-        "workplan_tasks_created_by_users_id_fk": {
-          "name": "workplan_tasks_created_by_users_id_fk",
-          "tableFrom": "workplan_tasks",
-          "tableTo": "users",
-          "columnsFrom": [
-            "created_by"
           ],
           "columnsTo": [
             "id"

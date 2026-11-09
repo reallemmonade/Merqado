@@ -155,9 +155,47 @@ export const sources = sqliteTable(
     uploadedBy: text("uploaded_by").references(() => users.id),
     /** Folder in the case's Files view, e.g. "Models". Empty means unfiled. */
     folder: text("folder").notNull().default(""),
+    /** "pending" waits for someone to confirm its folder; "filed" is in place. */
+    filing: text("filing", { enum: ["pending", "filed"] }).notNull().default("filed"),
+    /** JSON array of suggested folder paths, best first. */
+    suggestions: text("suggestions").notNull().default("[]"),
+    /** JSON array of case items the file is about: { kind, id, label }. */
+    links: text("links").notNull().default("[]"),
+    /** SHA-256 of the bytes, to skip exact duplicates. */
+    contentHash: text("content_hash"),
+    /** The first file of a version stack; null for the first version itself. */
+    versionOf: text("version_of"),
+    version: integer("version").notNull().default(1),
+    /** Pending only: the earlier file this looks like a newer copy of. */
+    versionCandidate: text("version_candidate"),
+    /** Where the file sat inside a dropped folder, e.g. "OEM deep dive/OEM 01.xlsx". */
+    relPath: text("rel_path"),
+    /** Plain text of the file, for search and the case GPT. */
+    textBody: text("text_body"),
+    /** Files posted in a chat stay visible only to that chat's members. */
+    roomId: text("room_id"),
+    messageId: text("message_id"),
+    /** Files dropped together share a batch, so they're confirmed together. */
+    batchId: text("batch_id"),
     createdAt: createdAt(),
   },
-  (t) => [index("sources_engagement").on(t.engagementId)],
+  (t) => [index("sources_engagement").on(t.engagementId), index("sources_hash").on(t.engagementId, t.contentHash)],
+);
+
+/** A case's folder list, seeded from the firm default and editable per case. */
+export const caseFolders = sqliteTable(
+  "case_folders",
+  {
+    id: id(),
+    engagementId: text("engagement_id")
+      .notNull()
+      .references(() => engagements.id, { onDelete: "cascade" }),
+    /** Full path, e.g. "Interviews/Transcripts". */
+    path: text("path").notNull(),
+    sort: integer("sort").notNull().default(0),
+    createdAt: createdAt(),
+  },
+  (t) => [uniqueIndex("case_folders_path").on(t.engagementId, t.path)],
 );
 
 /**
