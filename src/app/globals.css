@@ -262,6 +262,7 @@ kbd { font-family: var(--font-data); font-size: 11px; color: inherit; opacity: 0
 }
 @media (max-width: 640px) {
   .shell { align-content: flex-start; }
+  .shell > .main { min-height: calc(100dvh - 56px); }
   .shell > .nav { gap: 12px; padding-bottom: 8px; }
   .nav-cases { display: none; }
   .shell > .nav[aria-label="Main"] { flex-direction: row; align-items: center; justify-content: space-between; padding: 10px 16px; }
