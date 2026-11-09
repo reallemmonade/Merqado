@@ -13,8 +13,8 @@
 - Build only the chosen option.
 
 ## Brand
-- Inter for UI and logo. Newsreader (`--font-serif`) for quotes, KTAs, slide titles and headlines.
-- Main logo look is Orchid (#6a6fa3 → #9a4a96 → #d0267e); logo files live in `public/brand/`. Don't stretch or recolor them.
+- Inter for UI and logo. Newsreader for quotes, KTAs, slide titles and headlines.
+- Main logo look is Orchid (#6a6fa3 → #9a4a96 → #d0267e). Don't stretch or recolor them.
 - App looks come from the Guava theme (`src/lib/guava/`).
 
 ## Case data privacy
