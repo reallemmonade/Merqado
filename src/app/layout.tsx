@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { htmlAttrs, THEME_SCRIPT } from "@/lib/prefs";
 import { getPrefs } from "@/lib/prefs.server";
+import { GuavaSky } from "@/components/GuavaSky";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -20,7 +21,10 @@ export default async function RootLayout({ children }: { children: React.ReactNo
           href="https://fonts.googleapis.com/css2?family=Familjen+Grotesk:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap"
         />
       </head>
-      <body>{children}</body>
+      <body>
+        <GuavaSky initial={prefs} />
+        {children}
+      </body>
     </html>
   );
 }

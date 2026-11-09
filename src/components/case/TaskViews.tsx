@@ -19,6 +19,8 @@ export interface ReviewExpert {
   title: string;
   cost: number;
   proposedBy: string | null;
+  /** Names with a tick when signed: e.g. [["Pat", true], ["Sam", false]]. */
+  signoffs: [string, boolean][];
 }
 
 function initials(name: string | undefined) {
@@ -177,14 +179,13 @@ export function ReviewList({
                         value={notes[t.id] ?? ""}
                         onChange={(e) => setNotes({ ...notes, [t.id]: e.target.value })}
                       />
-                      <div style={{ display: "flex", gap: 6 }}>
-                        <button type="button" style={{ flex: 1 }} disabled={!canEdit || busy !== null} onClick={() => call(t.id, url, { json: { op: "task.update", id: t.id, status: "done" } })}>
+                      <div className="act-row">
+                        <button type="button" className="act" disabled={!canEdit || busy !== null} onClick={() => call(t.id, url, { json: { op: "task.update", id: t.id, status: "done" } })}>
                           Done
                         </button>
                         <button
                           type="button"
-                          className="secondary"
-                          style={{ flex: 1 }}
+                          className="secondary act"
                           disabled={!canEdit || busy !== null}
                           onClick={() => call(t.id, url, { json: { op: "task.update", id: t.id, status: "in_progress", note: notes[t.id] ?? "" } })}
                         >
@@ -212,13 +213,23 @@ export function ReviewList({
                   <td>{e.proposedBy ?? ""}</td>
                   <td />
                   <td>
-                    <div style={{ display: "flex", gap: 6 }}>
-                      <button type="button" style={{ flex: 1 }} disabled={busy !== null} onClick={() => setExpert(e.id, "approved")}>
-                        Approve
-                      </button>
-                      <button type="button" className="secondary" style={{ flex: 1 }} disabled={busy !== null} onClick={() => setExpert(e.id, "declined")}>
-                        Pass
-                      </button>
+                    <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                      <ul className="signoffs" aria-label="Approvals">
+                        {e.signoffs.map(([who, done], i) => (
+                          <li key={i} className={done ? "done" : ""}>
+                            <span aria-hidden>{done ? "✓" : "○"}</span>
+                            {who}
+                          </li>
+                        ))}
+                      </ul>
+                      <div className="act-row">
+                        <button type="button" className="act" disabled={busy !== null} onClick={() => setExpert(e.id, "approved")}>
+                          Approve
+                        </button>
+                        <button type="button" className="secondary act" disabled={busy !== null} onClick={() => setExpert(e.id, "declined")}>
+                          Pass
+                        </button>
+                      </div>
                     </div>
                   </td>
                 </tr>
