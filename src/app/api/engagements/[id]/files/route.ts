@@ -1,9 +1,10 @@
 import { NextResponse } from "next/server";
-import { and, eq, inArray, like, or } from "drizzle-orm";
+import { and, eq, inArray, or, sql } from "drizzle-orm";
 import { z } from "zod";
 import { caseFolders, sources } from "@/db/schema";
 import { notFoundJson, ok, parseOp } from "@/lib/case/api";
-import { addCaseFolders, cleanPath } from "@/lib/files/folders";
+import { sourceVisibility } from "@/lib/files/access";
+import { addCaseFolders, cleanPath, insideFolder } from "@/lib/files/folders";
 import { caseFolderName, fileSources } from "@/lib/files/intake";
 import { deleteSourceBytes, placeSourceFile, sourceMeta } from "@/lib/storage/files";
 
@@ -24,18 +25,23 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   if (r instanceof NextResponse) return r;
   const { auth, op } = r;
   const { db, user, engagement } = auth;
+  // Files shared in a chat stay private to that chat's members, here too.
+  const canSee = await sourceVisibility(db, id, user);
 
   switch (op.op) {
     case "file": {
+      const ids = op.items.map((i) => i.sourceId);
+      const seen = await db.select({ id: sources.id, roomId: sources.roomId }).from(sources).where(and(eq(sources.engagementId, id), inArray(sources.id, ids)));
+      const allowed = new Set(seen.filter(canSee).map((s) => s.id));
       try {
-        return ok({ filed: await fileSources(auth, op.items) });
+        return ok({ filed: await fileSources(auth, op.items.filter((i) => allowed.has(i.sourceId))) });
       } catch (err) {
         return NextResponse.json({ error: err instanceof Error ? err.message : "Filing failed." }, { status: 502 });
       }
     }
     case "move": {
       const src = await db.query.sources.findFirst({ where: and(eq(sources.id, op.sourceId), eq(sources.engagementId, id)) });
-      if (!src) return notFoundJson();
+      if (!src || !canSee(src)) return notFoundJson();
       const path = cleanPath(op.folder);
       await addCaseFolders(db, id, [path]);
       let objectKey = src.objectKey;
@@ -55,11 +61,11 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
         .select(sourceMeta)
         .from(sources)
         .where(and(eq(sources.engagementId, id), eq(sources.filing, "pending"), inArray(sources.id, op.sourceIds)));
-      for (const s of rows) {
+      for (const s of rows.filter(canSee)) {
         await deleteSourceBytes(db, user.firmId, s).catch((err) => console.warn("discard: storage delete failed", s.id, err));
         await db.delete(sources).where(eq(sources.id, s.id));
       }
-      return ok({ discarded: rows.length });
+      return ok({ discarded: rows.filter(canSee).length });
     }
     case "folder.add": {
       const path = cleanPath(op.path);
@@ -70,10 +76,10 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     case "folder.delete": {
       const path = cleanPath(op.path);
       const inUse = await db.query.sources.findFirst({
-        where: and(eq(sources.engagementId, id), or(eq(sources.folder, path), like(sources.folder, `${path}/%`))),
+        where: and(eq(sources.engagementId, id), or(eq(sources.folder, path), sql`${sources.folder} like ${insideFolder(path)} escape '\\'`)),
       });
       if (inUse) return NextResponse.json({ error: "Move its files out first." }, { status: 400 });
-      await db.delete(caseFolders).where(and(eq(caseFolders.engagementId, id), or(eq(caseFolders.path, path), like(caseFolders.path, `${path}/%`))));
+      await db.delete(caseFolders).where(and(eq(caseFolders.engagementId, id), or(eq(caseFolders.path, path), sql`${caseFolders.path} like ${insideFolder(path)} escape '\\'`)));
       return ok();
     }
   }

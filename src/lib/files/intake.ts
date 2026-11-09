@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { and, desc, eq, inArray, max, or } from "drizzle-orm";
+import { and, desc, eq, inArray, like, max, or } from "drizzle-orm";
 import type { Authorized } from "@/lib/experts/api";
 import { runAi } from "@/lib/case/api";
 import { experts, sources } from "@/db/schema";
@@ -92,7 +92,7 @@ async function findVersionCandidate(auth: Authorized, filename: string): Promise
   const rows = await auth.db
     .select(sourceMeta)
     .from(sources)
-    .where(and(eq(sources.engagementId, auth.engagement.id), eq(sources.filing, "filed")))
+    .where(and(eq(sources.engagementId, auth.engagement.id), eq(sources.filing, "filed"), filename.includes(".") ? like(sources.filename, `%.${ext}`) : undefined))
     .orderBy(desc(sources.createdAt));
   return rows.find((r) => r.filename.toLowerCase().split(".").pop() === ext && versionStem(r.filename) === stem) ?? null;
 }

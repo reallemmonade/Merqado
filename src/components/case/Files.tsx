@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useApi } from "@/components/experts/useApi";
+import { isJunk } from "@/lib/files/junk";
 
 export interface PendingFile {
   id: string;
@@ -20,20 +21,24 @@ interface Dropped {
   relPath: string;
 }
 
+/** Matches the server's limit, so a too-big file fails at once instead of after uploading. */
+const MAX_BYTES = 100 * 1024 * 1024;
+
 /** Reads every file inside dropped folders, keeping each file's path inside the folder. */
 async function readDrop(dt: DataTransfer): Promise<Dropped[]> {
   const entries = [...dt.items].map((i) => (i.kind === "file" ? i.webkitGetAsEntry?.() : null)).filter((e): e is FileSystemEntry => !!e);
-  if (!entries.length) return [...dt.files].map((file) => ({ file, relPath: file.name }));
+  if (!entries.length) return [...dt.files].filter((f) => !isJunk(f.name)).map((file) => ({ file, relPath: file.name }));
   const out: Dropped[] = [];
   const walk = async (entry: FileSystemEntry): Promise<void> => {
     if (entry.isFile) {
-      const file = await new Promise<File>((res, rej) => (entry as FileSystemFileEntry).file(res, rej));
-      if (!file.name.startsWith(".")) out.push({ file, relPath: entry.fullPath.replace(/^\/+/, "") });
+      const file = await new Promise<File>((res, rej) => (entry as FileSystemFileEntry).file(res, rej)).catch(() => null);
+      if (file && !isJunk(file.name)) out.push({ file, relPath: entry.fullPath.replace(/^\/+/, "") });
       return;
     }
     const reader = (entry as FileSystemDirectoryEntry).createReader();
     for (;;) {
-      const batch = await new Promise<FileSystemEntry[]>((res, rej) => reader.readEntries(res, rej));
+      // An unreadable folder is skipped rather than failing the whole drop.
+      const batch = await new Promise<FileSystemEntry[]>((res, rej) => reader.readEntries(res, rej)).catch(() => []);
       if (!batch.length) break;
       for (const e of batch) await walk(e);
     }
@@ -43,6 +48,12 @@ async function readDrop(dt: DataTransfer): Promise<Dropped[]> {
 }
 
 const NEW = "\u0000new";
+
+/** A file skipped because the same bytes are already in the case, and where that copy is. */
+interface Duplicate {
+  name: string;
+  folder: string;
+}
 const plural = (n: number, w: string) => `${n} ${w}${n === 1 ? "" : "s"}`;
 
 /**
@@ -65,13 +76,14 @@ export function FilesWorkspace({
   const router = useRouter();
   const [over, setOver] = useState(false);
   const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
-  const [batch, setBatch] = useState<{ id: string; target: string; skipped: string[]; failed: string[] } | null>(null);
+  const [batch, setBatch] = useState<{ id: string; targets: Record<string, string>; skipped: Duplicate[]; failed: string[] } | null>(null);
   const depth = useRef(0);
   // Files still to send; a second drop while sending joins the same batch.
-  const queue = useRef<{ files: Dropped[]; id: string; done: number } | null>(null);
+  const queue = useRef<{ files: (Dropped & { target: string })[]; id: string; done: number } | null>(null);
 
   const upload = useCallback(
-    async (files: Dropped[], target = "") => {
+    async (dropped: Dropped[], target = "") => {
+      const files = dropped.map((d) => ({ ...d, target }));
       if (!files.length) return;
       if (queue.current) {
         queue.current.files.push(...files);
@@ -81,26 +93,35 @@ export function FilesWorkspace({
       const id = crypto.randomUUID();
       const q = { files: [...files], id, done: 0 };
       queue.current = q;
-      const skipped: string[] = [];
+      const skipped: Duplicate[] = [];
       const failed: string[] = [];
+      // Each file goes to the folder it was dropped on, even when a later drop joins the batch.
+      const targets: Record<string, string> = {};
       // Open the confirm drawer now and fill it as each file lands.
-      setBatch({ id, target, skipped: [], failed: [] });
+      setBatch({ id, targets: {}, skipped: [], failed: [] });
       setProgress({ done: 0, total: q.files.length });
       let next = 0;
       let lastRefresh = 0;
       const worker = async () => {
         while (next < q.files.length) {
-          const { file, relPath } = q.files[next++]!;
-          const form = new FormData();
-          form.set("file", file);
-          form.set("relPath", relPath);
-          form.set("batchId", id);
-          const res = await fetch(`/api/engagements/${engagementId}/sources`, { method: "POST", body: form, signal: AbortSignal.timeout(180_000) }).catch(() => null);
-          const data = res ? await res.json().catch(() => ({})) : {};
+          const { file, relPath, target: to } = q.files[next++]!;
+          let res: Response | null = null;
+          let data: { error?: string; duplicate?: boolean; source?: { id: string; folder: string; filing: string } } = {};
+          if (file.size > MAX_BYTES) data = { error: "Files are limited to 100 MB." };
+          else {
+            const form = new FormData();
+            form.set("file", file);
+            form.set("relPath", relPath);
+            form.set("batchId", id);
+            // Big files on a slow connection need longer than a few minutes.
+            res = await fetch(`/api/engagements/${engagementId}/sources`, { method: "POST", body: form, signal: AbortSignal.timeout(15 * 60_000) }).catch(() => null);
+            data = res ? await res.json().catch(() => ({})) : {};
+          }
           if (!res?.ok) failed.push(`${file.name}${data.error ? `: ${data.error}` : ""}`);
-          else if (data.duplicate) skipped.push(file.name);
+          else if (data.duplicate) skipped.push({ name: file.name, folder: data.source?.filing === "filed" ? data.source.folder || "Unfiled" : "To review" });
+          else if (data.source && to) targets[data.source.id] = to;
           setProgress({ done: ++q.done, total: q.files.length });
-          setBatch((b) => (b?.id === id ? { ...b, skipped: [...skipped], failed: [...failed] } : b));
+          setBatch((b) => (b?.id === id ? { ...b, targets: { ...targets }, skipped: [...skipped], failed: [...failed] } : b));
           if (Date.now() - lastRefresh > 1500) {
             lastRefresh = Date.now();
             router.refresh();
@@ -116,7 +137,16 @@ export function FilesWorkspace({
   );
 
   useEffect(() => {
-    if (!canUpload) return;
+    // Without upload rights, still stop the browser from leaving the page to open a dropped file.
+    if (!canUpload) {
+      const block = (e: DragEvent) => e.dataTransfer?.types.includes("Files") && e.preventDefault();
+      window.addEventListener("dragover", block);
+      window.addEventListener("drop", block);
+      return () => {
+        window.removeEventListener("dragover", block);
+        window.removeEventListener("drop", block);
+      };
+    }
     const onEnter = (e: DragEvent) => {
       if (!e.dataTransfer?.types.includes("Files")) return;
       e.preventDefault();
@@ -136,7 +166,7 @@ export function FilesWorkspace({
       depth.current = 0;
       setOver(false);
       const target = (e.target as HTMLElement | null)?.closest<HTMLElement>("[data-drop-folder]")?.dataset.dropFolder ?? "";
-      upload(await readDrop(e.dataTransfer), target);
+      upload(await readDrop(e.dataTransfer).catch(() => []), target);
     };
     window.addEventListener("dragenter", onEnter);
     window.addEventListener("dragleave", onLeave);
@@ -161,8 +191,8 @@ export function FilesWorkspace({
               {progress.done} / {progress.total}
             </span>
           )}
-          <PickButton label="Upload folder" folder onPick={(f) => upload(f)} disabled={!!progress} />
-          <PickButton label="Upload" onPick={(f) => upload(f)} disabled={!!progress} primary />
+          <PickButton label="Upload folder" folder onPick={(f) => upload(f)} />
+          <PickButton label="Upload" onPick={(f) => upload(f)} primary />
         </div>
       )}
       {children}
@@ -181,7 +211,7 @@ export function FilesWorkspace({
               engagementId={engagementId}
               folders={folders}
               rows={batchRows}
-              target={batch.target}
+              targets={batch.targets}
               skipped={batch.skipped}
               failed={batch.failed}
               progress={progress}
@@ -194,11 +224,11 @@ export function FilesWorkspace({
   );
 }
 
-function PickButton({ label, folder, primary, disabled, onPick }: { label: string; folder?: boolean; primary?: boolean; disabled?: boolean; onPick: (f: Dropped[]) => void }) {
+function PickButton({ label, folder, primary, onPick }: { label: string; folder?: boolean; primary?: boolean; onPick: (f: Dropped[]) => void }) {
   const ref = useRef<HTMLInputElement>(null);
   return (
     <>
-      <button type="button" className={primary ? "small" : "secondary small"} disabled={disabled} onClick={() => ref.current?.click()}>
+      <button type="button" className={primary ? "small" : "secondary small"} onClick={() => ref.current?.click()}>
         {label}
       </button>
       <input
@@ -208,7 +238,7 @@ function PickButton({ label, folder, primary, disabled, onPick }: { label: strin
         multiple
         {...(folder ? { webkitdirectory: "" } : {})}
         onChange={(e) => {
-          const files = [...(e.target.files ?? [])].filter((f) => !f.name.startsWith("."));
+          const files = [...(e.target.files ?? [])].filter((f) => !isJunk(f.name));
           onPick(files.map((file) => ({ file, relPath: file.webkitRelativePath || file.name })));
           e.target.value = "";
         }}
@@ -222,7 +252,7 @@ export function ReviewTable({
   engagementId,
   folders,
   rows,
-  target = "",
+  targets = {},
   skipped = [],
   failed = [],
   progress = null,
@@ -231,8 +261,8 @@ export function ReviewTable({
   engagementId: string;
   folders: string[];
   rows: PendingFile[];
-  target?: string;
-  skipped?: string[];
+  targets?: Record<string, string>;
+  skipped?: Duplicate[];
   failed?: string[];
   progress?: { done: number; total: number } | null;
   onClose?: () => void;
@@ -242,8 +272,10 @@ export function ReviewTable({
   const [asVersion, setAsVersion] = useState<Record<string, boolean>>({});
   const [typing, setTyping] = useState<Record<string, boolean>>({});
   // Dropped on a folder: that folder, unless a suggestion is one of its subfolders.
-  const folderOf = (r: PendingFile) =>
-    choice[r.id] ?? (target ? (r.suggestions.find((s) => s.startsWith(target + "/")) ?? target) : r.suggestions[0] || "");
+  const folderOf = (r: PendingFile) => {
+    const target = targets[r.id];
+    return choice[r.id] ?? (target ? (r.suggestions.find((s) => s.startsWith(target + "/")) ?? target) : r.suggestions[0] || "");
+  };
   const ready = rows.filter((r) => folderOf(r).trim());
   const url = `/api/engagements/${engagementId}/files`;
   const listId = `folders-${engagementId}`;
@@ -338,14 +370,15 @@ export function ReviewTable({
                 </tr>
               );
             })}
-            {skipped.map((name) => (
-              <tr key={`dup-${name}`} className="muted-row">
-                <td>{name}</td>
-                <td colSpan={3}>Duplicate</td>
+            {skipped.map((d, i) => (
+              <tr key={`dup-${i}`} className="muted-row">
+                <td>{d.name}</td>
+                <td>{d.folder}</td>
+                <td colSpan={2}>Duplicate</td>
               </tr>
             ))}
-            {failed.map((msg) => (
-              <tr key={`fail-${msg}`} className="muted-row">
+            {failed.map((msg, i) => (
+              <tr key={`fail-${i}`} className="muted-row">
                 <td colSpan={4} className="error">
                   {msg}
                 </td>

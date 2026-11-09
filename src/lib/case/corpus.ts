@@ -1,4 +1,4 @@
-import { and, asc, eq, inArray } from "drizzle-orm";
+import { and, asc, eq, inArray, sql } from "drizzle-orm";
 import type { DB } from "@/db/client";
 import type { Archetype } from "@/db/schema";
 import { deckSlides, experts, expertTranscripts, glossaryTerms, hypotheses, keyTakeaways, sources, workplanTasks, chatMessages } from "@/db/schema";
@@ -10,7 +10,15 @@ import type { Snippet } from "./search";
  * Everything in a case that this person may read, as plain-text documents: transcripts,
  * takeaways, notes, chats in rooms they can see, slides, dictionary, hypotheses, tasks, file names.
  */
-export async function loadCorpus(db: DB, engagementId: string, viewer: { id: string; archetype: Archetype }): Promise<Snippet[]> {
+export async function loadCorpus(
+  db: DB,
+  engagementId: string,
+  viewer: { id: string; archetype: Archetype },
+  /** Keyword search: only load files whose name or text contains this phrase, not every file's full text. */
+  filePhrase?: string,
+): Promise<Snippet[]> {
+  // SQLite's lower() only folds A-Z, so phrases with other letters are matched in JS instead.
+  const phrase = filePhrase && /^[\x20-\x7e]+$/.test(filePhrase.trim()) ? filePhrase.trim().toLowerCase() : undefined;
   const base = `/e/${engagementId}`;
   const rooms = await visibleRooms(db, engagementId, viewer);
   const roomIds = rooms.map((r) => r.id);
@@ -27,7 +35,13 @@ export async function loadCorpus(db: DB, engagementId: string, viewer: { id: str
     db.select().from(glossaryTerms).where(and(eq(glossaryTerms.engagementId, engagementId), eq(glossaryTerms.status, "active"))),
     db.select().from(hypotheses).where(eq(hypotheses.engagementId, engagementId)),
     db.select().from(workplanTasks).where(eq(workplanTasks.engagementId, engagementId)),
-    db.select({ id: sources.id, filename: sources.filename, folder: sources.folder, textBody: sources.textBody, roomId: sources.roomId }).from(sources).where(eq(sources.engagementId, engagementId)),
+    db.select({ id: sources.id, filename: sources.filename, folder: sources.folder, textBody: sources.textBody, roomId: sources.roomId }).from(sources)
+      .where(
+        and(
+          eq(sources.engagementId, engagementId),
+          phrase ? sql`instr(lower(${sources.filename} || char(10) || coalesce(${sources.textBody}, '')), ${phrase}) > 0` : undefined,
+        ),
+      ),
   ]);
   const who = new Map(people.map((p) => [p.id, p.anonTitle || anonymizeTitle(p.company, p.title, p.isFormer)]));
   const roomName = new Map(rooms.map((r) => [r.id, r.name]));

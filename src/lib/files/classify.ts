@@ -112,7 +112,9 @@ export function suggestFolders(facts: FileFacts, folders: string[]): { folders: 
   if (mapped) {
     const sub = extra.length ? `${mapped}/${extra[0]}` : mapped;
     // A file whose own name points to a more specific child of the mapped folder goes there.
-    const child = scored.find((s) => s.folder.startsWith(mapped + "/"));
+    // Only its own name and text count: the dropped folder's name alone would send every file
+    // in an "Interviews" folder to Interviews/Transcripts.
+    const child = scoreFolders({ ...facts, relPath: null }, folders).find((s) => s.folder.startsWith(mapped + "/"));
     const best = !extra.length && child ? child.folder : sub;
     return { folders: unique([best, ...scored.map((s) => s.folder)]).slice(0, 2), sure: true };
   }
