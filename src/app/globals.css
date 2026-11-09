@@ -72,7 +72,7 @@ h1, h2 { font-family: var(--font-display); font-weight: 600; letter-spacing: -0.
 .status-contradicted { color: var(--bad); font-weight: 600; font-size: 12px; }
 .row { display: flex; justify-content: space-between; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--line); }
 .row:last-child { border-bottom: 0; }
-button, .button { min-height: 40px; padding: 0 16px; border-radius: 6px; border: 0; background: var(--accent); color: #fff; font: inherit; font-weight: 500; cursor: pointer; }
+button, .button { min-height: 40px; padding: 0 16px; border-radius: 6px; border: 0; background: var(--btn-bg, var(--accent)); color: var(--btn-ink, #fff); font: inherit; font-weight: 500; cursor: pointer; }
 button:disabled { opacity: 0.6; cursor: wait; }
 button.secondary { background: var(--surface); color: var(--ink); border: 1px solid var(--line); }
 input[type="text"], textarea { width: 100%; font: inherit; color: var(--ink); background: var(--surface); border: 1.5px solid var(--line); border-radius: 8px; padding: 10px 12px; }
@@ -539,6 +539,81 @@ button.settings-close:hover { background: var(--soft); }
 .swatch-orange { background: #c2410c; }
 .swatch-rose { background: #c0265e; }
 
+/* ---------- Guava theme: a living sky behind glass (values come from lib/guava/sky.ts) ---------- */
+@property --ground { syntax: "<color>"; inherits: true; initial-value: #fff4f2; }
+@property --art1 { syntax: "<color>"; inherits: true; initial-value: transparent; }
+@property --art2 { syntax: "<color>"; inherits: true; initial-value: transparent; }
+@property --art3 { syntax: "<color>"; inherits: true; initial-value: transparent; }
+@property --art4 { syntax: "<color>"; inherits: true; initial-value: transparent; }
+@property --sun-halo { syntax: "<color>"; inherits: true; initial-value: transparent; }
+:root[data-theme-pref="guava"] {
+  --bg: var(--ground);
+  --surface: var(--panel-glass);
+  --muted: var(--ink-soft);
+  --line: var(--rule);
+  --warn: var(--signal);
+  --soft: color-mix(in srgb, var(--panel) 45%, transparent);
+  --selected: var(--accent-soft);
+  --track: color-mix(in srgb, var(--rule) 85%, transparent);
+  --font-body: var(--f-body);
+  --font-display: var(--f-display);
+  --nav-bg: color-mix(in srgb, var(--panel) 52%, transparent);
+  --nav-ink: var(--ink-soft);
+  --nav-active: var(--accent-soft);
+  --nav-strong: var(--ink);
+  --nav-line: var(--rule);
+  --nav-faint: var(--ink-faint);
+  --glass-edge: rgba(255, 255, 255, 0.7);
+  --btn-bg: var(--accent-fill);
+  --btn-ink: var(--on-accent);
+  transition: --ground 0.6s ease, --art1 0.6s ease, --art2 0.6s ease, --art3 0.6s ease, --art4 0.6s ease, --sun-halo 0.6s ease;
+}
+:root[data-theme-pref="guava"][data-theme="dark"] { --glass-edge: rgba(255, 255, 255, 0.09); }
+:root.guava-playing { transition: none; }
+:root[data-theme-pref="guava"] body { background: var(--ground); transition: color 0.6s ease; }
+:root[data-theme-pref="guava"] body > :not(#backdrop):not(script) { position: relative; z-index: 1; }
+#backdrop { position: fixed; inset: -6vh -8vw; z-index: 0; pointer-events: none; overflow: hidden;
+  background:
+    radial-gradient(62% 42% at var(--sun-x, 30%) 14%, var(--art1) 0%, transparent 70%),
+    radial-gradient(58% 40% at 88% 8%, var(--art2) 0%, transparent 72%),
+    radial-gradient(75% 40% at 40% 42%, var(--art3) 0%, transparent 72%),
+    radial-gradient(80% 45% at 12% 78%, var(--art2) 0%, transparent 72%),
+    radial-gradient(85% 40% at 92% 100%, var(--art4) 0%, transparent 70%),
+    var(--ground);
+  animation: skydrift 46s ease-in-out infinite alternate; }
+#backdrop::after { content: ""; position: absolute; inset: 0; opacity: 0.06; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .5 0 0 0 0 .5 0 0 0 0 .5 0 0 0 .55 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"); }
+#backdrop .sun { position: absolute; left: var(--sun-gx, 50%); top: var(--sun-gy, 40%); translate: -50% -50%; width: min(150vmin, 1400px); aspect-ratio: 1; border-radius: 50%; opacity: var(--sun-o, 0); pointer-events: none; mix-blend-mode: soft-light;
+  background: radial-gradient(circle, var(--sun-halo) 0%, color-mix(in srgb, var(--sun-halo) 70%, transparent) 20%, color-mix(in srgb, var(--sun-halo) 30%, transparent) 42%, transparent 70%); }
+@keyframes skydrift { from { transform: translate3d(-2.5%, -1%, 0) scale(1.02); } to { transform: translate3d(2.5%, 1.5%, 0) scale(1.07); } }
+:root[data-theme-pref="guava"] :is(.card, .panel, .group, .gpt-bar, .drawer, .nav, .rail) {
+  -webkit-backdrop-filter: blur(16px) saturate(1.3); backdrop-filter: blur(16px) saturate(1.3); }
+:root[data-theme-pref="guava"] :is(.card, .panel, .group, .gpt-bar) { border-color: var(--glass-edge); box-shadow: 0 10px 26px -18px rgba(40, 24, 110, 0.4); }
+:root[data-theme-pref="guava"] :is(.nav, .rail) { border-right: 1px solid var(--glass-edge); }
+:root[data-theme-pref="guava"] .brand { color: var(--ink); }
+:root[data-theme-pref="guava"] .eyebrow { color: var(--ink-faint); }
+:root[data-theme-pref="guava"] :is(.seg button[aria-pressed="true"], .seg-link[aria-current="page"], .chips a[aria-current="page"], .button-link, .gpt-send, .tip) { color: var(--panel); }
+@media (prefers-reduced-motion: reduce) {
+  #backdrop { animation: none; }
+  :root[data-theme-pref="guava"], :root[data-theme-pref="guava"] body { transition: none; }
+}
+
+/* Guava settings */
+.looks { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); grid-auto-rows: min-content; align-items: start; gap: 10px; }
+.setting-stack { display: flex; flex-direction: column; gap: 8px; padding: 4px 0; }
+.look { display: flex; flex-direction: column; align-items: stretch; gap: 8px; min-height: 0; padding: 8px; border-radius: 12px; border: 1.5px solid var(--line); background: var(--surface); color: var(--ink); text-align: left; font-weight: 400; }
+.look[aria-checked="true"] { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+.look-sky { height: 56px; border-radius: 8px; }
+.look b { font-weight: 600; font-size: 13px; }
+.look span { font-size: 12px; color: var(--muted); }
+.look .look-aa { font-size: 26px; line-height: 1; color: var(--ink); }
+.timeline { display: flex; flex-direction: column; gap: 4px; }
+.timeline input[type="range"] { width: 100%; margin: 0; accent-color: var(--accent); height: 28px; }
+.tl-marks { display: flex; justify-content: space-between; font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.tl-read { font-weight: 600; font-variant-numeric: tabular-nums; }
+.switch { position: relative; width: 44px; min-height: 26px; height: 26px; padding: 0; border-radius: 99px; background: var(--track); border: 1px solid var(--line); }
+.switch::after { content: ""; position: absolute; top: 2px; left: 2px; width: 20px; height: 20px; border-radius: 99px; background: var(--panel, #fff); box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25); transition: transform 0.15s; }
+.switch[aria-checked="true"] { background: var(--accent); }
+.switch[aria-checked="true"]::after { transform: translateX(18px); }
 /* Files: drop anywhere, confirm folders */
 .files-ws { display: flex; flex-direction: column; gap: 12px; }
 .files-actions { justify-content: flex-end; }
