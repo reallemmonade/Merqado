@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { Pressable, StyleSheet, Text, View, type StyleProp, type ViewStyle } from "react-native";
+import { ActivityIndicator, Pressable, StyleSheet, Text, View, type StyleProp, type ViewStyle } from "react-native";
 import { C, colorFor, F, initials } from "@/lib/theme";
 
 export function Avatar({ name, size = 40, square = false, idKey }: { name: string; size?: number; square?: boolean; idKey?: string }) {
@@ -40,7 +40,40 @@ export function LargeTitle({ title, right }: { title: string; right?: ReactNode 
   );
 }
 
+/** What a list shows when it has no rows: loading, an error with Retry, or a short empty line and action. */
+export function ListState({ loading, error, empty, onRetry, action }: { loading?: boolean; error?: string | null; empty: string; onRetry?: () => void; action?: { label: string; onPress: () => void } }) {
+  if (loading) return <View style={s.state}><ActivityIndicator color={C.orchid} /></View>;
+  if (error) {
+    return (
+      <View style={s.state}>
+        <Text style={s.stateText}>{error}</Text>
+        {onRetry && <Button label="Retry" onPress={onRetry} quiet />}
+      </View>
+    );
+  }
+  return (
+    <View style={s.state}>
+      <Text style={s.stateText}>{empty}</Text>
+      {action && <Button label={action.label} onPress={action.onPress} />}
+    </View>
+  );
+}
+
+export function Button({ label, onPress, quiet = false, disabled = false }: { label: string; onPress: () => void; quiet?: boolean; disabled?: boolean }) {
+  return (
+    <Pressable onPress={onPress} disabled={disabled} accessibilityRole="button" style={[s.button, quiet ? s.buttonQuiet : s.buttonMain, disabled && { opacity: 0.4 }]}>
+      <Text style={[s.buttonText, { color: quiet ? C.orchid : "#fff" }]}>{label}</Text>
+    </Pressable>
+  );
+}
+
 const s = StyleSheet.create({
+  state: { alignItems: "center", justifyContent: "center", gap: 14, paddingVertical: 64, paddingHorizontal: 32 },
+  stateText: { fontFamily: F.regular, fontSize: 16, color: C.muted, textAlign: "center" },
+  button: { height: 44, paddingHorizontal: 22, borderRadius: 22, alignItems: "center", justifyContent: "center" },
+  buttonMain: { backgroundColor: C.orchid },
+  buttonQuiet: { backgroundColor: "transparent" },
+  buttonText: { fontFamily: F.semibold, fontSize: 15 },
   section: { paddingHorizontal: 20, paddingTop: 14, paddingBottom: 6, fontSize: 12, fontFamily: F.semibold, color: C.muted, textTransform: "uppercase", letterSpacing: 0.6 },
   pill: { height: 32, paddingHorizontal: 14, borderRadius: 16, justifyContent: "center" },
   pillOn: { backgroundColor: C.ink },

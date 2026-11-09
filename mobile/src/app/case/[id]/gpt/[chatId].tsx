@@ -21,7 +21,11 @@ export default function GptChat() {
   const started = useRef(false);
   const path = `/api/mobile/cases/${id}/gpt/${chatId}`;
 
-  const load = useCallback(async () => setData(await api<Payload>(path).catch(() => null)), [path]);
+  // A failed reload keeps what is on screen.
+  const load = useCallback(async () => {
+    const d = await api<Payload>(path).catch(() => null);
+    if (d) setData(d);
+  }, [path]);
 
   const run = useCallback(
     async (op: { op: "answer" } | { op: "ask"; question: string }) => {
@@ -87,7 +91,7 @@ export default function GptChat() {
             )
           }
         />
-        <Composer big placeholder={`Ask ${name}`} onSend={ask} />
+        {data?.chat.mine && <Composer big placeholder={`Ask ${name}`} onSend={ask} />}
       </KeyboardAvoidingView>
     </SafeAreaView>
   );

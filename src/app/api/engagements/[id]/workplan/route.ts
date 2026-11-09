@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { and, eq, max } from "drizzle-orm";
+import { and, eq, inArray, max } from "drizzle-orm";
 import { z } from "zod";
 import { ARCHETYPES, engagementMembers, TASK_STATUSES, workplanMilestones, workplanModules, workplanTasks } from "@/db/schema";
 import { allows } from "@/lib/roles";
@@ -46,6 +46,17 @@ const Op = z.discriminatedUnion("op", [
 const PLAN_OPS = new Set(["module.add", "module.update", "module.delete", "milestone.add", "milestone.update", "milestone.delete"]);
 const deny = (error: string) => NextResponse.json({ error }, { status: 403 });
 
+/** Every given person id is a member of this case. */
+async function onCase(db: Authorized["db"], engagementId: string, ids: (string | null | undefined)[]) {
+  const want = [...new Set(ids.filter((x): x is string => !!x))];
+  if (!want.length) return true;
+  const rows = await db
+    .select({ userId: engagementMembers.userId })
+    .from(engagementMembers)
+    .where(and(eq(engagementMembers.engagementId, engagementId), inArray(engagementMembers.userId, want)));
+  return rows.length === want.length;
+}
+
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const r = await parseOp(req, id, "edit_findings", Op);
@@ -55,6 +66,10 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   if (PLAN_OPS.has(op.op) && !allows(membership, "edit_plan")) return deny("Only managers can change modules and dates.");
   if (op.op === "task.add" && !allows(membership, "assign_tasks")) return deny("Only consultants and up can assign tasks.");
   if (op.op === "member.role" && !allows(membership, "set_roles")) return deny("Only managers can change roles.");
+
+  if ((op.op === "task.add" || op.op === "task.update") && !(await onCase(db, id, [op.assigneeId, op.reviewerId]))) {
+    return NextResponse.json({ error: "Pick people on this case." }, { status: 400 });
+  }
 
   switch (op.op) {
     case "module.add": {

@@ -83,17 +83,19 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
    */
   async function notifyMessage(chat: NonNullable<Awaited<ReturnType<typeof room>>>, mentions: string[], body: string, parentId?: string) {
     const direct = chat.kind === "room" ? [] : parseIds(chat.memberIds);
-    let thread: string[] = [];
-    if (parentId) {
-      const rows = await db
-        .select({ userId: chatMessages.userId })
-        .from(chatMessages)
-        .where(and(eq(chatMessages.roomId, chat.id), or(eq(chatMessages.id, parentId), eq(chatMessages.parentId, parentId))));
+    // Worked out after the response: only people who can still see this chat.
+    const to = async () => {
       const seeIt = new Set((await audience(chat)).map((m) => m.id));
-      thread = rows.map((r) => r.userId).filter((u): u is string => !!u && seeIt.has(u));
-    }
-    const to = [...new Set([...mentions, ...direct, ...thread])].filter((u) => u !== user.id);
-    if (!to.length) return;
+      let thread: string[] = [];
+      if (parentId) {
+        const rows = await db
+          .select({ userId: chatMessages.userId })
+          .from(chatMessages)
+          .where(and(eq(chatMessages.roomId, chat.id), or(eq(chatMessages.id, parentId), eq(chatMessages.parentId, parentId))));
+        thread = rows.map((r) => r.userId).filter((u): u is string => !!u);
+      }
+      return [...new Set([...mentions, ...direct, ...thread])].filter((u) => u !== user.id && seeIt.has(u));
+    };
     notifyLater(db, to, {
       title: chat.kind === "room" ? `${user.name} · ${chat.name}` : user.name,
       body: (body || "Sent a file").slice(0, 300),

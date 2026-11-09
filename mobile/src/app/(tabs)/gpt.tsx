@@ -9,11 +9,11 @@ import { C, F, shortTime } from "@/lib/theme";
 import { CaseSwitch } from "@/components/CaseSwitch";
 import { Composer } from "@/components/Composer";
 import { Icon } from "@/components/Icon";
-import { LargeTitle, Pill } from "@/components/ui";
+import { LargeTitle, ListState, Pill } from "@/components/ui";
 
 export default function Gpt() {
   const c = useCase();
-  const { data, refreshing, refresh } = useApi<{ name: string; chats: GptChat[] }>(c ? `/api/mobile/cases/${c.id}/gpt` : null);
+  const { data, error, loading, refreshing, refresh, reload } = useApi<{ name: string; chats: GptChat[] }>(c ? `/api/mobile/cases/${c.id}/gpt` : null);
   const [scope, setScope] = useState<"mine" | "team">("mine");
   const chats = useMemo(() => (data?.chats ?? []).filter((x) => (scope === "mine" ? x.mine : x.shared)), [data, scope]);
   const name = c?.gptName ?? "GPT";
@@ -36,6 +36,8 @@ export default function Gpt() {
           data={chats}
           keyExtractor={(x) => x.id}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={C.orchid} />}
+          keyboardShouldPersistTaps="handled"
+          ListEmptyComponent={<ListState loading={loading} error={error} onRetry={reload} empty="No chats" />}
           renderItem={({ item }) => (
             <Pressable
               onPress={() => router.push(`/case/${c!.id}/gpt/${item.id}`)}
@@ -53,7 +55,7 @@ export default function Gpt() {
             </Pressable>
           )}
         />
-        <Composer big placeholder={`Ask ${name}`} onSend={ask} />
+        <Composer big inTab placeholder={`Ask ${name}`} onSend={ask} />
       </KeyboardAvoidingView>
     </SafeAreaView>
   );

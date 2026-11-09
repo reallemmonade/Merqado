@@ -106,6 +106,8 @@ export async function sendApns(
               resolve({ token, status, reason });
             });
             req.on("error", (e) => resolve({ token, status: 0, reason: e.message }));
+            // A timed-out stream only closes; the first resolve wins.
+            req.on("close", () => resolve({ token, status, reason: status ? undefined : "timeout" }));
             req.end(body);
           }),
       ),

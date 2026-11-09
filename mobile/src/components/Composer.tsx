@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { Alert, Pressable, Text, TextInput, View } from "react-native";
+import { useEffect, useState } from "react";
+import { Alert, Keyboard, Pressable, Text, TextInput, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as Haptics from "expo-haptics";
 import { C, F } from "@/lib/theme";
@@ -8,8 +8,17 @@ import type { Member } from "@/lib/api";
 import { Avatar } from "@/components/ui";
 
 /** Message box with @mention suggestions. */
-export function Composer({ placeholder, onSend, members = [], big = false }: { placeholder: string; onSend: (text: string) => Promise<void> | void; members?: Member[]; big?: boolean }) {
+export function Composer({ placeholder, onSend, members = [], big = false, inTab = false }: { placeholder: string; onSend: (text: string) => Promise<void> | void; members?: Member[]; big?: boolean; inTab?: boolean }) {
   const insets = useSafeAreaInsets();
+  const [keyboard, setKeyboard] = useState(false);
+  useEffect(() => {
+    const show = Keyboard.addListener("keyboardWillShow", () => setKeyboard(true));
+    const hide = Keyboard.addListener("keyboardWillHide", () => setKeyboard(false));
+    return () => {
+      show.remove();
+      hide.remove();
+    };
+  }, []);
   const [text, setText] = useState("");
   const [sending, setSending] = useState(false);
   const query = text.match(/(?:^|\s)@([^\s@]*)$/)?.[1];
@@ -24,8 +33,7 @@ export function Composer({ placeholder, onSend, members = [], big = false }: { p
       await onSend(body);
       setText("");
     } catch (e) {
-      // Keep the text so it can be sent again.
-      Alert.alert(e instanceof Error ? e.message : "Not sent");
+      Alert.alert("Not sent", e instanceof Error ? e.message : "Try again.");
     } finally {
       setSending(false);
     }
@@ -36,7 +44,7 @@ export function Composer({ placeholder, onSend, members = [], big = false }: { p
   }
 
   return (
-    <View style={{ backgroundColor: "#fff", borderTopWidth: big ? 0 : 1, borderTopColor: C.line, paddingBottom: Math.max(insets.bottom, 8) }}>
+    <View style={{ backgroundColor: "#fff", borderTopWidth: big ? 0 : 1, borderTopColor: C.line, paddingBottom: keyboard || inTab ? 8 : Math.max(insets.bottom, 8) }}>
       {suggestions.map((m) => (
         <Pressable key={m.id} onPress={() => pick(m)} accessibilityRole="button" style={{ flexDirection: "row", alignItems: "center", gap: 10, paddingHorizontal: 16, paddingVertical: 8 }}>
           <Avatar name={m.name} size={28} idKey={m.id} />

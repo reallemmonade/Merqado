@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { ActivityIndicator, View } from "react-native";
 import { Stack, useRouter, useSegments } from "expo-router";
 import { StatusBar } from "expo-status-bar";
@@ -14,7 +14,7 @@ import { C } from "@/lib/theme";
 void SplashScreen.preventAutoHideAsync();
 
 function Gate() {
-  const { ready, me } = useAuth();
+  const { ready, me, setCaseId } = useAuth();
   const segments = useSegments();
   const router = useRouter();
   const lastResponse = Notifications.useLastNotificationResponse();
@@ -33,9 +33,17 @@ function Gate() {
     void registerForPush().catch(() => {});
   }, [me]);
 
+  const handled = useRef<string | null>(null);
   useEffect(() => {
-    if (me && lastResponse) void handleResponse(lastResponse);
-  }, [me, lastResponse]);
+    if (!me || !lastResponse) return;
+    const key = `${lastResponse.notification.request.identifier}:${lastResponse.actionIdentifier}`;
+    if (handled.current === key) return;
+    handled.current = key;
+    // Lists follow the case pill, so open the case the notification is about.
+    const caseId = (lastResponse.notification.request.content.data as { caseId?: unknown } | undefined)?.caseId;
+    if (typeof caseId === "string" && me.cases.some((c) => c.id === caseId)) setCaseId(caseId);
+    void handleResponse(lastResponse);
+  }, [me, lastResponse, setCaseId]);
 
   if (!ready) {
     return (
@@ -49,6 +57,8 @@ function Gate() {
       <Stack.Screen name="(tabs)" />
       <Stack.Screen name="sign-in" options={{ animation: "fade" }} />
       <Stack.Screen name="cases" options={{ presentation: "formSheet", sheetAllowedDetents: [0.5, 1], sheetGrabberVisible: true }} />
+      <Stack.Screen name="case/[id]/new-chat" options={{ presentation: "modal" }} />
+      <Stack.Screen name="case/[id]/setup-rooms" options={{ presentation: "modal" }} />
     </Stack>
   );
 }

@@ -1,70 +1,93 @@
 import { useMemo, useState } from "react";
-import { FlatList, Pressable, RefreshControl, ScrollView, Text, View } from "react-native";
+import { Pressable, RefreshControl, SectionList, Text, TextInput, View } from "react-native";
 import { router } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
-import type { InboxItem } from "@/lib/api";
+import type { Chat, ChatList } from "@/lib/api";
+import { useCase } from "@/lib/auth";
 import { useApi } from "@/lib/useApi";
 import { C, colorFor, F, initials, shortTime } from "@/lib/theme";
 import { CaseSwitch } from "@/components/CaseSwitch";
-import { LargeTitle, Pill } from "@/components/ui";
+import { Icon } from "@/components/Icon";
+import { Badge, LargeTitle, ListState, SectionLabel } from "@/components/ui";
 
-const FILTERS = [
-  { key: "all", label: "All" },
-  { key: "mention", label: "Mentions" },
-  { key: "reply", label: "Replies" },
-  { key: "task", label: "Tasks" },
-  { key: "todo", label: "To-dos" },
-  { key: "review", label: "Reviews" },
-] as const;
-
-export default function Inbox() {
-  const { data, refreshing, refresh } = useApi<{ items: InboxItem[] }>("/api/mobile/inbox", 30000);
-  const [filter, setFilter] = useState<(typeof FILTERS)[number]["key"]>("all");
-  const items = useMemo(() => (data?.items ?? []).filter((i) => filter === "all" || i.kind === filter), [data, filter]);
+export default function Chats() {
+  const c = useCase();
+  const { data, error, loading, refreshing, refresh, reload } = useApi<ChatList>(c ? `/api/mobile/cases/${c.id}/rooms` : null, 15000);
+  const [q, setQ] = useState("");
+  const sections = useMemo(() => {
+    const all = (data?.chats ?? []).filter((r) => r.name.toLowerCase().includes(q.trim().toLowerCase()));
+    const byRecent = (a: Chat, b: Chat) => (b.lastAt ?? "").localeCompare(a.lastAt ?? "");
+    return [
+      { title: "Rooms", data: all.filter((r) => r.kind === "room") },
+      { title: "Chats", data: all.filter((r) => r.kind !== "room").sort(byRecent) },
+    ].filter((s) => s.data.length);
+  }, [data, q, c]);
 
   return (
     <SafeAreaView edges={["top"]} style={{ flex: 1, backgroundColor: C.bg }}>
-      <LargeTitle title="Inbox" right={<CaseSwitch />} />
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0 }} contentContainerStyle={{ gap: 8, paddingHorizontal: 20, paddingVertical: 8 }}>
-        {FILTERS.map((f) => (
-          <Pill key={f.key} label={f.label} active={filter === f.key} onPress={() => setFilter(f.key)} />
-        ))}
-      </ScrollView>
-      <FlatList
-        data={items}
-        keyExtractor={(i) => i.id}
+      <LargeTitle
+        title="Chats"
+        right={
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+            <CaseSwitch />
+            {c && (
+              <Pressable
+                onPress={() => router.push(`/case/${c.id}/new-chat`)}
+                accessibilityRole="button"
+                accessibilityLabel="New chat"
+                style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: C.orchid, alignItems: "center", justifyContent: "center" }}
+              >
+                <Icon name="compose" size={19} color="#fff" stroke={2.2} />
+              </Pressable>
+            )}
+          </View>
+        }
+      />
+      <View style={{ paddingHorizontal: 20, paddingVertical: 6 }}>
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 8, height: 38, paddingHorizontal: 12, borderRadius: 10, backgroundColor: C.field }}>
+          <Icon name="search" size={16} color={C.muted} stroke={2} />
+          <TextInput value={q} onChangeText={setQ} placeholder="Search" placeholderTextColor={C.muted} style={{ flex: 1, fontFamily: F.regular, fontSize: 15, color: C.ink }} accessibilityLabel="Search" />
+        </View>
+      </View>
+      <SectionList
+        sections={sections}
+        keyExtractor={(r) => r.id}
+        stickySectionHeadersEnabled={false}
+        ListEmptyComponent={
+          <ListState
+            loading={loading}
+            error={error}
+            onRetry={reload}
+            empty={q.trim() ? "No matches" : "No chats"}
+            action={!c || q.trim() ? undefined : data?.canSetup && !data.chats.some((r) => r.kind === "room") ? { label: "Set up rooms", onPress: () => router.push(`/case/${c.id}/setup-rooms`) } : { label: "New chat", onPress: () => router.push(`/case/${c.id}/new-chat`) }}
+          />
+        }
+        renderSectionHeader={({ section }) => <SectionLabel>{section.title}</SectionLabel>}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={C.orchid} />}
-        renderItem={({ item }) => <Row item={item} />}
+        renderItem={({ item }) => (
+          <Pressable
+            onPress={() => router.push(`/case/${c!.id}/room/${item.id}`)}
+            accessibilityRole="button"
+            style={({ pressed }) => ({ flexDirection: "row", alignItems: "center", gap: 12, paddingHorizontal: 20, paddingVertical: 11, backgroundColor: pressed ? C.soft : "transparent" })}
+          >
+            <View style={{ width: 44, height: 44, borderRadius: item.kind === "room" ? 12 : 22, backgroundColor: colorFor(item.otherId ?? item.id), alignItems: "center", justifyContent: "center" }}>
+              <Text style={{ color: "#fff", fontFamily: F.semibold, fontSize: 15 }}>{initials(item.name)}</Text>
+            </View>
+            <View style={{ flex: 1, gap: 3 }}>
+              <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
+                <Text style={{ fontFamily: item.unread ? F.semibold : F.medium, fontSize: 16, color: C.ink }}>{item.name}</Text>
+                <Text style={{ fontFamily: F.regular, fontSize: 12, color: item.mentioned ? C.orchid : C.muted }}>{item.mentioned ? "@ " : ""}{shortTime(item.lastAt)}</Text>
+              </View>
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                <Text style={{ flex: 1, fontFamily: F.regular, fontSize: 14, color: C.muted }} numberOfLines={1}>
+                  {item.last ? `${item.last.author}: ${item.last.text}` : item.sub}
+                </Text>
+                <Badge n={item.unread} />
+              </View>
+            </View>
+          </Pressable>
+        )}
       />
     </SafeAreaView>
-  );
-}
-
-function Row({ item }: { item: InboxItem }) {
-  const isTask = item.kind === "task" || item.kind === "review" || item.kind === "todo";
-  const color = item.kind === "review" ? C.slate : isTask ? C.rose : colorFor(item.title);
-  const label = { mention: "Mention", reply: "Reply", task: "Task", review: "Review", todo: "To-do" }[item.kind] ?? "";
-  const open = () => {
-    if (item.roomId) router.push(`/case/${item.caseId}/room/${item.roomId}${item.threadId ? `?thread=${item.threadId}` : ""}`);
-    else router.push("/tasks");
-  };
-  return (
-    <Pressable onPress={open} accessibilityRole="button" style={({ pressed }) => ({ flexDirection: "row", gap: 12, paddingHorizontal: 20, paddingVertical: 12, backgroundColor: pressed ? C.soft : "transparent" })}>
-      <View style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: color, alignItems: "center", justifyContent: "center" }}>
-        <Text style={{ color: "#fff", fontFamily: F.semibold, fontSize: 14 }}>{isTask ? "✓" : initials(item.title)}</Text>
-      </View>
-      <View style={{ flex: 1, gap: 3 }}>
-        <View style={{ flexDirection: "row", justifyContent: "space-between", gap: 8 }}>
-          <Text style={{ fontFamily: F.semibold, fontSize: 15, color: C.ink, flex: 1 }} numberOfLines={1}>
-            {item.title}
-          </Text>
-          <Text style={{ fontFamily: F.regular, fontSize: 12, color: C.muted }}>{shortTime(item.at)}</Text>
-        </View>
-        <Text style={{ fontFamily: F.medium, fontSize: 12, color }}>{`${label} · ${item.caseName}`}</Text>
-        <Text style={{ fontFamily: F.regular, fontSize: 14, color: C.text }} numberOfLines={2}>
-          {item.body}
-        </Text>
-      </View>
-    </Pressable>
   );
 }
