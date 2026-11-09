@@ -50,10 +50,17 @@ export const firmRoles = sqliteTable(
   (t) => [uniqueIndex("firm_roles_firm_title").on(t.firmId, t.title)],
 );
 
+export const PRESENCE_STATUSES = ["auto", "busy", "dnd", "away"] as const;
+export type PresenceStatus = (typeof PRESENCE_STATUSES)[number];
+
 export const users = sqliteTable("users", {
   id: id(),
   email: text("email").notNull().unique(),
   name: text("name").notNull(),
+  /** Last time the person had Merqado open; drives available / away / offline. */
+  lastSeenAt: integer("last_seen_at", { mode: "timestamp" }),
+  /** "auto" follows activity; the others are set by the person. */
+  presence: text("presence", { enum: PRESENCE_STATUSES }).notNull().default("auto"),
   createdAt: createdAt(),
 });
 
@@ -104,6 +111,8 @@ export const engagementMembers = sqliteTable(
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
     access: text("access", { enum: ACCESS_LEVELS }).notNull().default("editor"),
+    /** Role on this case; null means the person's firm title decides it. Rights like approving follow it. */
+    caseRole: text("case_role", { enum: ARCHETYPES }),
   },
   (t) => [primaryKey({ columns: [t.engagementId, t.userId] })],
 );
@@ -153,9 +162,47 @@ export const sources = sqliteTable(
     uploadedBy: text("uploaded_by").references(() => users.id),
     /** Folder in the case's Files view, e.g. "Models". Empty means unfiled. */
     folder: text("folder").notNull().default(""),
+    /** "pending" waits for someone to confirm its folder; "filed" is in place. */
+    filing: text("filing", { enum: ["pending", "filed"] }).notNull().default("filed"),
+    /** JSON array of suggested folder paths, best first. */
+    suggestions: text("suggestions").notNull().default("[]"),
+    /** JSON array of case items the file is about: { kind, id, label }. */
+    links: text("links").notNull().default("[]"),
+    /** SHA-256 of the bytes, to skip exact duplicates. */
+    contentHash: text("content_hash"),
+    /** The first file of a version stack; null for the first version itself. */
+    versionOf: text("version_of"),
+    version: integer("version").notNull().default(1),
+    /** Pending only: the earlier file this looks like a newer copy of. */
+    versionCandidate: text("version_candidate"),
+    /** Where the file sat inside a dropped folder, e.g. "OEM deep dive/OEM 01.xlsx". */
+    relPath: text("rel_path"),
+    /** Plain text of the file, for search and the case GPT. */
+    textBody: text("text_body"),
+    /** Files posted in a chat stay visible only to that chat's members. */
+    roomId: text("room_id"),
+    messageId: text("message_id"),
+    /** Files dropped together share a batch, so they're confirmed together. */
+    batchId: text("batch_id"),
     createdAt: createdAt(),
   },
-  (t) => [index("sources_engagement").on(t.engagementId)],
+  (t) => [index("sources_engagement").on(t.engagementId), index("sources_hash").on(t.engagementId, t.contentHash)],
+);
+
+/** A case's folder list, seeded from the firm default and editable per case. */
+export const caseFolders = sqliteTable(
+  "case_folders",
+  {
+    id: id(),
+    engagementId: text("engagement_id")
+      .notNull()
+      .references(() => engagements.id, { onDelete: "cascade" }),
+    /** Full path, e.g. "Interviews/Transcripts". */
+    path: text("path").notNull(),
+    sort: integer("sort").notNull().default(0),
+    createdAt: createdAt(),
+  },
+  (t) => [uniqueIndex("case_folders_path").on(t.engagementId, t.path)],
 );
 
 /**
@@ -350,6 +397,10 @@ export const experts = sqliteTable(
     guide: text("guide"),
     guideUpdatedAt: integer("guide_updated_at", { mode: "timestamp" }),
     proposedBy: text("proposed_by").references(() => users.id),
+    /** Who asked for this expert, if not a consultant. They sign off too, on top of a consultant. */
+    requestedBy: text("requested_by").references(() => users.id, { onDelete: "set null" }),
+    /** JSON array of user ids who have signed off so far (see lib/experts/approval). */
+    approvals: text("approvals").notNull().default("[]"),
     approvedBy: text("approved_by").references(() => users.id),
     createdAt: createdAt(),
   },
@@ -510,6 +561,10 @@ export const workplanMilestones = sqliteTable(
   (t) => [index("workplan_milestones_engagement").on(t.engagementId)],
 );
 
+/**
+ * Stored keys predate the current labels: not_yet = Not started, in_progress = Started,
+ * almost_done = Ready for review, done = Done (see TASK_STATUS_LABEL).
+ */
 export const TASK_STATUSES = ["not_yet", "in_progress", "almost_done", "done"] as const;
 export type TaskStatus = (typeof TASK_STATUSES)[number];
 
@@ -527,13 +582,26 @@ export const workplanTasks = sqliteTable(
     title: text("title").notNull(),
     assigneeId: text("assignee_id").references(() => users.id, { onDelete: "set null" }),
     status: text("status", { enum: TASK_STATUSES }).notNull().default("not_yet"),
+    /** ISO date; falls back to the milestone's date when empty. */
+    dueDate: text("due_date"),
+    /** Who marks it done. Falls back to whoever assigned it, then the module lead. */
+    reviewerId: text("reviewer_id").references(() => users.id, { onDelete: "set null" }),
+    createdBy: text("created_by").references(() => users.id, { onDelete: "set null" }),
+    /** The reviewer's note when sending a task back. */
+    reviewNote: text("review_note").notNull().default(""),
     sort: integer("sort").notNull().default(0),
     createdAt: createdAt(),
   },
   (t) => [index("workplan_tasks_engagement").on(t.engagementId)],
 );
 
-/** A team chat; only people whose archetype is listed can see it. */
+export const CHAT_KINDS = ["room", "dm", "group"] as const;
+export type ChatKind = (typeof CHAT_KINDS)[number];
+
+/**
+ * A team chat. Rooms are seen by the roles in `archetypes`; 1:1 and group chats ("dm", "group")
+ * are seen only by the people in `memberIds`.
+ */
 export const chatRooms = sqliteTable(
   "chat_rooms",
   {
@@ -542,8 +610,12 @@ export const chatRooms = sqliteTable(
       .notNull()
       .references(() => engagements.id, { onDelete: "cascade" }),
     name: text("name").notNull(),
+    kind: text("kind", { enum: CHAT_KINDS }).notNull().default("room"),
     /** JSON array of archetypes allowed in the room. */
     archetypes: text("archetypes").notNull().default("[]"),
+    /** JSON array of user ids in a 1:1 or group chat. */
+    memberIds: text("member_ids").notNull().default("[]"),
+    createdBy: text("created_by").references(() => users.id, { onDelete: "set null" }),
     sort: integer("sort").notNull().default(0),
     createdAt: createdAt(),
   },
@@ -563,9 +635,48 @@ export const chatMessages = sqliteTable(
     userId: text("user_id").references(() => users.id, { onDelete: "set null" }),
     body: text("body").notNull(),
     pinned: integer("pinned", { mode: "boolean" }).notNull().default(false),
+    /** Set on thread replies: the message they answer. */
+    parentId: text("parent_id"),
+    /** "text", or a meeting / call card whose details are in `meta`. */
+    kind: text("kind", { enum: ["text", "meeting", "call"] }).notNull().default("text"),
+    /** JSON: meeting { title, startsAt, minutes, link } or call { video, endedAt, link }. */
+    meta: text("meta").notNull().default("{}"),
+    /** JSON array of user ids @mentioned. */
+    mentions: text("mentions").notNull().default("[]"),
+    editedAt: integer("edited_at", { mode: "timestamp" }),
     createdAt: createdAt(),
   },
-  (t) => [index("chat_messages_room").on(t.roomId, t.createdAt)],
+  (t) => [index("chat_messages_room").on(t.roomId, t.createdAt), index("chat_messages_parent").on(t.parentId)],
+);
+
+export const chatReactions = sqliteTable(
+  "chat_reactions",
+  {
+    messageId: text("message_id")
+      .notNull()
+      .references(() => chatMessages.id, { onDelete: "cascade" }),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    emoji: text("emoji").notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => [primaryKey({ columns: [t.messageId, t.userId, t.emoji] })],
+);
+
+/** How far each person has read in each chat, for unread counts. */
+export const chatReads = sqliteTable(
+  "chat_reads",
+  {
+    roomId: text("room_id")
+      .notNull()
+      .references(() => chatRooms.id, { onDelete: "cascade" }),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    lastReadAt: integer("last_read_at", { mode: "timestamp" }).notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.roomId, t.userId] })],
 );
 
 export const NOTE_KINDS = ["note", "decision", "open"] as const;

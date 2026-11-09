@@ -1,8 +1,8 @@
-import Link from "next/link";
 import { getDb } from "@/db/client";
 import { initials } from "@/lib/prefs";
 import { getSessionUser } from "@/lib/session";
 import { Icon } from "./case/icons";
+import { SettingsLink } from "./SettingsLink";
 
 /** Sidebar footer: the signed-in person and the way into Settings. */
 export async function NavUser({ compact = false }: { compact?: boolean }) {
@@ -10,9 +10,9 @@ export async function NavUser({ compact = false }: { compact?: boolean }) {
   if (!user) return null;
   if (compact) {
     return (
-      <Link href="/settings" className="rail-user" aria-label="Settings" title={`${user.name} · Settings`}>
+      <SettingsLink className="rail-user" aria-label="Settings" title={`${user.name} · Settings`}>
         <span className="avatar">{initials(user.name)}</span>
-      </Link>
+      </SettingsLink>
     );
   }
   return (
@@ -21,9 +21,9 @@ export async function NavUser({ compact = false }: { compact?: boolean }) {
         {initials(user.name)}
       </span>
       <span className="nav-user-name">{user.name}</span>
-      <Link href="/settings" className="nav-gear" aria-label="Settings" title="Settings">
+      <SettingsLink className="nav-gear" aria-label="Settings" title="Settings">
         <Icon name="settings" />
-      </Link>
+      </SettingsLink>
     </div>
   );
 }

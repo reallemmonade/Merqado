@@ -1,5 +1,18 @@
 import type { AccessLevel, Archetype } from "@/db/schema";
 
+export const ROLE_ORDER: Archetype[] = ["associate", "consultant", "manager", "partner"];
+export const ROLE_LABEL: Record<Archetype, string> = { associate: "Associate", consultant: "Consultant", manager: "Manager", partner: "Partner" };
+
+export const ROLE_RANK: Record<Archetype, number> = { associate: 0, consultant: 1, manager: 2, partner: 3 };
+
+/** The lowest case role that may take an action, on top of the access level. Others need no role. */
+const ROLE_MIN: Partial<Record<Action, Archetype>> = {
+  approve_experts: "consultant",
+  assign_tasks: "consultant",
+  edit_plan: "manager",
+  set_roles: "manager",
+};
+
 /** What each persona lands on. Everyone shares the same engagement data underneath. */
 export const PERSONA_HOME: Record<Archetype, { view: string; label: string }> = {
   partner: { view: "overview", label: "Engagement health and the deck" },
@@ -26,6 +39,9 @@ export type Action =
   | "edit_experts"
   | "approve_experts"
   | "manage_members"
+  | "assign_tasks"
+  | "edit_plan"
+  | "set_roles"
   | "manage_connections";
 
 const REQUIRED: Record<Action, AccessLevel> = {
@@ -35,9 +51,15 @@ const REQUIRED: Record<Action, AccessLevel> = {
   edit_findings: "editor",
   /** Propose experts, log calls, upload transcripts, edit takeaways. */
   edit_experts: "editor",
-  /** Approve or pass on proposed experts. Raise to "lead" to limit it to engagement leads. */
+  /** Approve or pass on proposed experts; also needs consultant or above on the case (ROLE_MIN). */
   approve_experts: "editor",
   manage_members: "lead",
+  /** Assign, edit and delete workplan tasks. */
+  assign_tasks: "editor",
+  /** Add or change workplan modules, leads and dates. */
+  edit_plan: "editor",
+  /** Change who plays which role on the case. */
+  set_roles: "editor",
   manage_connections: "lead",
 };
 
@@ -48,4 +70,11 @@ const REQUIRED: Record<Action, AccessLevel> = {
 export function can(access: AccessLevel | null | undefined, action: Action): boolean {
   if (!access) return false;
   return ACCESS_RANK[access] >= ACCESS_RANK[REQUIRED[action]];
+}
+
+/** Access level and case role together: e.g. approving experts needs edit access and consultant or above. */
+export function allows(member: { access: AccessLevel; role: Archetype } | null | undefined, action: Action): boolean {
+  if (!member || !can(member.access, action)) return false;
+  const min = ROLE_MIN[action];
+  return !min || ROLE_RANK[member.role] >= ROLE_RANK[min];
 }

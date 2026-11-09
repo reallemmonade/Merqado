@@ -5,6 +5,7 @@ import { decryptJson } from "@/lib/crypto";
 import { storageConfigSchema, type StorageConfig } from "./config";
 import { AzureBlobStorage } from "./providers/azure-blob";
 import { GcsStorage } from "./providers/gcs";
+import { GDriveStorage } from "./providers/gdrive";
 import { LocalStorage } from "./providers/local";
 import { S3Storage } from "./providers/s3";
 import type { StorageProvider } from "./types";
@@ -20,6 +21,8 @@ export function createStorage(config: StorageConfig): StorageProvider {
       return new AzureBlobStorage(config);
     case "gcs":
       return new GcsStorage(config);
+    case "gdrive":
+      return new GDriveStorage(config);
     case "local":
       return new LocalStorage(config.root);
   }

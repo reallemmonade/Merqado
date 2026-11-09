@@ -71,7 +71,7 @@ export async function CaseShell({
               </Link>
             ))}
           </div>
-          <div style={{ marginTop: "auto", display: "flex", flexDirection: "column", gap: 10 }}>
+          <div className="nav-foot">
             <Link href={`${base}/search`} className="nav-search">
               <Icon name="search" size={16} />
               <span style={{ flex: 1 }}>Keyword search</span>
@@ -90,10 +90,12 @@ export async function CaseShell({
               <Icon name={s.icon} size={20} />
             </Link>
           ))}
-          <Link href={`${base}/search`} aria-label="Keyword search" title="Keyword search · Ctrl K" className="rail-search" aria-current={section === "search" ? "page" : undefined}>
-            <Icon name="search" />
-          </Link>
-          <NavUser compact />
+          <div className="rail-foot">
+            <Link href={`${base}/search`} aria-label="Keyword search" title="Keyword search · Ctrl K" className="rail-search" aria-current={section === "search" ? "page" : undefined}>
+              <Icon name="search" />
+            </Link>
+            <NavUser compact />
+          </div>
         </nav>
       )}
       <main className="main case-main">
