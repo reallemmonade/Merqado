@@ -66,19 +66,30 @@ export function FilesWorkspace({
   const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
   const [batch, setBatch] = useState<{ id: string; target: string; skipped: string[]; failed: string[] } | null>(null);
   const depth = useRef(0);
+  // Files still to send; a second drop while sending joins the same batch.
+  const queue = useRef<{ files: Dropped[]; id: string; done: number } | null>(null);
 
   const upload = useCallback(
     async (files: Dropped[], target = "") => {
       if (!files.length) return;
+      if (queue.current) {
+        queue.current.files.push(...files);
+        setProgress({ done: queue.current.done, total: queue.current.files.length });
+        return;
+      }
       const id = crypto.randomUUID();
+      const q = { files: [...files], id, done: 0 };
+      queue.current = q;
       const skipped: string[] = [];
       const failed: string[] = [];
-      setProgress({ done: 0, total: files.length });
+      // Open the confirm drawer now and fill it as each file lands.
+      setBatch({ id, target, skipped: [], failed: [] });
+      setProgress({ done: 0, total: q.files.length });
       let next = 0;
-      let done = 0;
+      let lastRefresh = 0;
       const worker = async () => {
-        while (next < files.length) {
-          const { file, relPath } = files[next++]!;
+        while (next < q.files.length) {
+          const { file, relPath } = q.files[next++]!;
           const form = new FormData();
           form.set("file", file);
           form.set("relPath", relPath);
@@ -87,12 +98,17 @@ export function FilesWorkspace({
           const data = res ? await res.json().catch(() => ({})) : {};
           if (!res?.ok) failed.push(`${file.name}${data.error ? `: ${data.error}` : ""}`);
           else if (data.duplicate) skipped.push(file.name);
-          setProgress({ done: ++done, total: files.length });
+          setProgress({ done: ++q.done, total: q.files.length });
+          setBatch((b) => (b?.id === id ? { ...b, skipped: [...skipped], failed: [...failed] } : b));
+          if (Date.now() - lastRefresh > 1500) {
+            lastRefresh = Date.now();
+            router.refresh();
+          }
         }
       };
       await Promise.all([worker(), worker(), worker()]);
+      queue.current = null;
       setProgress(null);
-      setBatch({ id, target, skipped, failed });
       router.refresh();
     },
     [engagementId, router],
@@ -157,7 +173,7 @@ export function FilesWorkspace({
           <strong>Drop to file</strong>
         </div>
       )}
-      {batch && (batchRows.length > 0 || batch.skipped.length > 0 || batch.failed.length > 0) && (
+      {batch && (progress || batchRows.length > 0 || batch.skipped.length > 0 || batch.failed.length > 0) && (
         <div className="drawer-backdrop" onClick={(e) => e.target === e.currentTarget && setBatch(null)}>
           <aside className="drawer" aria-label="Confirm folders">
             <ReviewTable
@@ -167,6 +183,7 @@ export function FilesWorkspace({
               target={batch.target}
               skipped={batch.skipped}
               failed={batch.failed}
+              progress={progress}
               onClose={() => setBatch(null)}
             />
           </aside>
@@ -207,6 +224,7 @@ export function ReviewTable({
   target = "",
   skipped = [],
   failed = [],
+  progress = null,
   onClose,
 }: {
   engagementId: string;
@@ -215,6 +233,7 @@ export function ReviewTable({
   target?: string;
   skipped?: string[];
   failed?: string[];
+  progress?: { done: number; total: number } | null;
   onClose?: () => void;
 }) {
   const { call, busy, error } = useApi();
@@ -230,8 +249,13 @@ export function ReviewTable({
   return (
     <div className="review">
       <header className="review-head">
-        <h2>{plural(rows.length + skipped.length + failed.length, "item")}</h2>
+        <h2>{plural(progress ? progress.total : rows.length + skipped.length + failed.length, "item")}</h2>
         <div className="chips">
+          {progress && (
+            <span className="tag mono">
+              {progress.done} / {progress.total}
+            </span>
+          )}
           {rows.length > 0 && <span className="tag tag-good">{rows.length} to file</span>}
           {skipped.length > 0 && <span className="tag">{skipped.length} duplicate</span>}
           {failed.length > 0 && <span className="tag tag-bad">{failed.length} failed</span>}
@@ -325,7 +349,7 @@ export function ReviewTable({
           <button
             type="button"
             className="secondary"
-            disabled={busy !== null}
+            disabled={busy !== null || !!progress}
             onClick={async () => {
               if (await call("discard", url, { json: { op: "discard", sourceIds: rows.map((r) => r.id) } })) onClose?.();
             }}
@@ -336,7 +360,7 @@ export function ReviewTable({
         {rows.length > 0 ? (
           <button
             type="button"
-            disabled={busy !== null || ready.length === 0}
+            disabled={busy !== null || !!progress || ready.length === 0}
             onClick={async () => {
               const items = ready.map((r) => ({ sourceId: r.id, folder: folderOf(r), asVersion: !!r.newVersion && (asVersion[r.id] ?? true) }));
               if (await call("file", url, { json: { op: "file", items } })) onClose?.();
