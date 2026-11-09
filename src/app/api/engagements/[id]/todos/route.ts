@@ -1,16 +1,18 @@
 import { NextResponse } from "next/server";
 import { and, eq } from "drizzle-orm";
 import { z } from "zod";
-import { engagementMembers, todos } from "@/db/schema";
+import { todos } from "@/db/schema";
 import { aiError, notFoundJson, ok, parseOp, runAi } from "@/lib/case/api";
 import { loadMembers } from "@/lib/case/page";
+import { notifyLater } from "@/lib/push/notify";
 import { allows } from "@/lib/roles";
 import { canSeeTodo } from "@/lib/todos/data";
+import { isDate } from "@/lib/todos/extract";
 import { scanForTodos } from "@/lib/todos/scan";
 
 const ref = z.string().min(1).max(64);
 const title = z.string().trim().min(1, "Write a to-do.").max(300);
-const due = z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable();
+const due = z.string().refine(isDate, "Pick a date.").nullable();
 
 const Op = z.discriminatedUnion("op", [
   z.object({ op: z.literal("add"), title, assigneeId: ref.nullable().optional(), dueDate: due.optional() }),
@@ -29,12 +31,28 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   const { auth, op } = r;
   const { db, user } = auth;
 
-  async function onCase(userId: string | null | undefined) {
+  /** The assignee must be on the case and, for a to-do from a private chat, in that chat's roles. */
+  async function canAssign(userId: string | null | undefined, audience: string | null = null) {
     if (!userId) return true;
-    return !!(await db.query.engagementMembers.findFirst({ where: and(eq(engagementMembers.engagementId, id), eq(engagementMembers.userId, userId)) }));
+    const member = (await loadMembers(id, user.firmId)).find((m) => m.id === userId);
+    return !!member && canSeeTodo({ audience }, member.archetype);
+  }
+
+  /** iPhone notification for someone else being given a to-do. */
+  function notifyAssigned(assigneeId: string | null | undefined, todoTitle: string) {
+    if (!assigneeId || assigneeId === user.id) return;
+    notifyLater(db, [assigneeId], {
+      title: `${user.name} gave you a to-do`,
+      body: todoTitle.slice(0, 300),
+      threadId: `todos-${id}`,
+      category: "TODO",
+      data: { url: "/tasks", caseId: id },
+    });
   }
 
   if (op.op === "scan") {
+    // Scanning runs a paid model call, so it needs edit access like other AI work on the case.
+    if (!allows(auth.membership, "edit_findings")) return NextResponse.json({ error: "You can't scan chats on this case." }, { status: 403 });
     try {
       const members = await loadMembers(id, user.firmId);
       const res = await scanForTodos(db, { engagementId: id, viewer: { id: user.id, archetype: user.archetype }, members }, (q) => runAi(auth, "todo_scan", q));
@@ -45,11 +63,12 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   }
 
   if (op.op === "add") {
-    if (!(await onCase(op.assigneeId))) return notFoundJson();
+    if (!(await canAssign(op.assigneeId))) return notFoundJson();
     const [row] = await db
       .insert(todos)
       .values({ engagementId: id, title: op.title, assigneeId: op.assigneeId ?? null, dueDate: op.dueDate ?? null, status: "open", source: "manual", createdBy: user.id })
       .returning();
+    notifyAssigned(op.assigneeId, op.title);
     return ok({ id: row!.id });
   }
 
@@ -58,7 +77,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
 
   switch (op.op) {
     case "update":
-      if (!(await onCase(op.assigneeId))) return notFoundJson();
+      if (todo.status !== "open" && todo.status !== "suggested") return notFoundJson();
+      if (!(await canAssign(op.assigneeId, todo.audience))) return notFoundJson();
       await db
         .update(todos)
         .set({
@@ -67,8 +87,10 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
           ...(op.dueDate !== undefined && { dueDate: op.dueDate }),
         })
         .where(eq(todos.id, op.id));
+      if (op.assigneeId && op.assigneeId !== todo.assigneeId && todo.status === "open") notifyAssigned(op.assigneeId, op.title ?? todo.title);
       return ok();
     case "done":
+      if (todo.status === "suggested" || todo.status === "dismissed") return notFoundJson();
       await db
         .update(todos)
         .set({ status: op.done ? "done" : "open", doneAt: op.done ? new Date() : null })
@@ -79,8 +101,10 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       if (todo.status !== "suggested") return notFoundJson();
       await db
         .update(todos)
-        .set({ status: op.op === "accept" ? "open" : "dismissed" })
+        // An unassigned suggestion goes to whoever adds it, not to whoever ran the scan.
+        .set(op.op === "accept" ? { status: "open", assigneeId: todo.assigneeId ?? user.id } : { status: "dismissed" })
         .where(eq(todos.id, op.id));
+      if (op.op === "accept") notifyAssigned(todo.assigneeId, todo.title);
       return ok();
     case "delete": {
       if (todo.createdBy !== user.id || todo.source !== "manual") {

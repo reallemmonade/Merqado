@@ -16,12 +16,17 @@ const STATUS: Record<TaskStatus, { label: string; bg: string; fg: string; ring: 
 };
 const MOVE: Record<TaskStatus, string> = { not_yet: "Not started", in_progress: "Start", almost_done: "Send for review", done: "Mark done" };
 
+/** YYYY-MM-DD on this phone's own calendar, not UTC. */
+function localDay(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
 function bucket(due: string | null): string {
   if (!due) return "Later";
-  const today = new Date().toISOString().slice(0, 10);
+  const today = localDay(new Date());
   if (due < today) return "Overdue";
   if (due === today) return "Today";
-  const week = new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10);
+  const week = localDay(new Date(Date.now() + 7 * 86400000));
   return due <= week ? "This week" : "Later";
 }
 

@@ -1,9 +1,12 @@
+import type { Archetype } from "@/db/schema";
 import { z } from "zod";
 import type { SourceMessage } from "./sources/types";
 
 export interface Member {
   id: string;
   name: string;
+  /** Case role; when set, a to-do from a private chat only goes to someone in that chat's roles. */
+  archetype?: Archetype;
 }
 
 export interface Suggestion {
@@ -65,6 +68,13 @@ export function matchMember(name: string | null | undefined, members: Member[]):
   return first.length === 1 ? first[0]!.id : null;
 }
 
+/** A real calendar date written YYYY-MM-DD (rejects 2026-02-31). */
+export function isDate(v: string): boolean {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(v)) return false;
+  const d = new Date(`${v}T00:00:00Z`);
+  return !Number.isNaN(d.getTime()) && d.toISOString().slice(0, 10) === v;
+}
+
 /** Parses the model's JSON, drops anything that points nowhere or repeats an existing to-do. */
 export function parseSuggestions(json: unknown, messages: SourceMessage[], members: Member[], existing: string[]): Suggestion[] {
   const parsed = Reply.parse(json);
@@ -76,8 +86,10 @@ export function parseSuggestions(json: unknown, messages: SourceMessage[], membe
     const key = normTitle(t.title);
     if (!message || !key || seen.has(key)) continue;
     seen.add(key);
-    const due = t.due && /^\d{4}-\d{2}-\d{2}$/.test(t.due) ? t.due : null;
-    out.push({ title: t.title, assigneeId: matchMember(t.assignee, members), dueDate: due, message });
+    const due = t.due && isDate(t.due) ? t.due : null;
+    const audience = message.audience;
+    const eligible = audience ? members.filter((m) => !m.archetype || audience.includes(m.archetype)) : members;
+    out.push({ title: t.title, assigneeId: matchMember(t.assignee, eligible), dueDate: due, message });
   }
   return out;
 }
