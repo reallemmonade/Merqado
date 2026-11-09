@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import { useApi } from "@/components/experts/useApi";
 import { useDismiss } from "./GptAsk";
 import { Icon } from "./icons";
+import styles from "./GptList.module.css";
 
 export interface GptChatRow {
   id: string;
@@ -150,7 +151,7 @@ export function GptList({ engagementId, name, chats, activeId, folders }: { enga
   }
 
   return (
-    <nav className="panel gpt-list" aria-label="Chats">
+    <nav className={`panel gpt-list ${styles.list}`} aria-label="Chats">
       <div className="gpt-list-head">
         <span className="gpt-name">{name}</span>
         <button
@@ -167,7 +168,7 @@ export function GptList({ engagementId, name, chats, activeId, folders }: { enga
         </button>
       </div>
       {searching && (
-        <input type="search" className="gpt-find" aria-label="Search chats" value={term} autoFocus onChange={(e) => setTerm(e.target.value)} onKeyDown={(e) => e.key === "Escape" && (setSearching(false), setTerm(""))} />
+        <input type="text" enterKeyHint="search" placeholder="Search" className="gpt-find" aria-label="Search chats" value={term} autoFocus onChange={(e) => setTerm(e.target.value)} onKeyDown={(e) => e.key === "Escape" && (setSearching(false), setTerm(""))} />
       )}
       <Link href={base} className="gpt-new" aria-current={!activeId ? "page" : undefined}>
         <Icon name="compose" size={16} />

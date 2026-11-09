@@ -47,7 +47,7 @@ export default async function ExpertsTranscriptsPage({
         )}
         <section className="card" aria-labelledby="list-h" style={{ padding: 0, gap: 0 }}>
           <h2 id="list-h" style={{ fontSize: 14, padding: "12px 16px", borderBottom: "1px solid var(--line)" }}>
-            {data.transcripts.length} transcripts
+            {data.transcripts.length} {data.transcripts.length === 1 ? "transcript" : "transcripts"}
           </h2>
           {[...data.transcripts].reverse().map((tr) => {
             const e = expertOf(tr.expertId);

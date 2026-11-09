@@ -10,7 +10,7 @@ const ERRORS: Record<string, string> = {
   email: "Enter your work email address.",
   no_connection: "That sign-in option isn't available. Try another one.",
   firm_not_found: "Your firm isn't on Merqado yet. Ask your Merqado admin, or contact us to get started.",
-  use_button: "Your firm signs in with Google or Microsoft. Use one of the buttons above.",
+  use_button: "Your firm signs in with Google or Microsoft.",
   personal_account: "Use your work account, not a personal Google or Microsoft account.",
   idp_unreachable: "We couldn't reach your firm's sign-in service. Try again in a minute.",
   idp_denied: "Sign-in was cancelled or denied by your firm's sign-in service.",

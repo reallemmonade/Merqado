@@ -95,11 +95,11 @@ function NamedTargets({
           <label className="sr-only" htmlFor={`new-${kind}`}>
             New {kind}
           </label>
-          <input id={`new-${kind}`} type="text" required placeholder={placeholder} value={name} onChange={(e) => setName(e.target.value)} />
+          <input id={`new-${kind}`} type="text" required placeholder={placeholder} value={name} onChange={(e) => setName(e.target.value)} style={{ flex: "1 1 auto", minWidth: 0 }} />
           <label className="sr-only" htmlFor={`new-${kind}-t`}>
             Target
           </label>
-          <input id={`new-${kind}-t`} type="number" min={0} placeholder="Target" value={target} onChange={(e) => setTarget(e.target.value)} style={{ width: 90 }} />
+          <input id={`new-${kind}-t`} type="number" min={0} placeholder="Target" value={target} onChange={(e) => setTarget(e.target.value)} style={{ flex: "0 0 72px", width: 72 }} />
           <button type="submit" disabled={api.busy === `add-${kind}`}>
             Add
           </button>
@@ -135,11 +135,11 @@ function Row({
       <label className="sr-only" htmlFor={`n-${row.id}`}>
         Name
       </label>
-      <input id={`n-${row.id}`} type="text" value={name} onChange={(e) => setName(e.target.value)} />
+      <input id={`n-${row.id}`} type="text" value={name} onChange={(e) => setName(e.target.value)} style={{ flex: "1 1 auto", minWidth: 0 }} />
       <label className="sr-only" htmlFor={`t-${row.id}`}>
         Target
       </label>
-      <input id={`t-${row.id}`} type="number" min={0} value={target} onChange={(e) => setTarget(e.target.value)} style={{ width: 90 }} />
+      <input id={`t-${row.id}`} type="number" min={0} value={target} onChange={(e) => setTarget(e.target.value)} style={{ flex: "0 0 72px", width: 72 }} />
       {dirty && (
         <button type="button" className="small" onClick={() => send(`s-${row.id}`, { kind, id: row.id, name, target: Number(target) || 0 })}>
           Save

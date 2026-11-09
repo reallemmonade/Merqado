@@ -75,6 +75,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     }
     case "delete":
       await db.delete(gptChats).where(eq(gptChats.id, chat.id));
+      // A note pinned from this chat keeps its text but no longer links to a chat that is gone.
+      await db.update(caseNotes).set({ link: null }).where(and(eq(caseNotes.engagementId, id), eq(caseNotes.link, `/e/${id}/gpt/${chat.id}`)));
       return ok();
   }
 }

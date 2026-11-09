@@ -1,0 +1,6 @@
+@media (max-width: 720px) {
+  nav.storyline {
+    flex-basis: 100%;
+    max-height: 40vh;
+  }
+}

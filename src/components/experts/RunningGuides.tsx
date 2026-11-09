@@ -6,7 +6,7 @@ import { useApi } from "./useApi";
 
 /** The team's running interview guides: one general guide plus one per interviewee type. */
 export function RunningGuides({ engagementId, data, canEdit }: { engagementId: string; data: ExpertsData; canEdit: boolean }) {
-  const slots = [{ id: null as string | null, name: "General (used when a type has no guide)" }, ...data.types.map((t) => ({ id: t.id as string | null, name: t.name }))];
+  const slots = [{ id: null as string | null, name: "General" }, ...data.types.map((t) => ({ id: t.id as string | null, name: t.name }))];
   const [pick, setPick] = useState<string>("");
   const slot = slots.find((s) => (s.id ?? "") === pick) ?? slots[0]!;
   const saved = data.guides.find((g) => (g.typeId ?? null) === slot.id)?.body ?? "";

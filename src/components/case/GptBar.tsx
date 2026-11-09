@@ -18,7 +18,7 @@ export function GptBar({ engagementId, name }: { engagementId: string; name: str
     const res = await fetch(`/api/engagements/${engagementId}/gpt`, {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ op: "new", question: q }),
+      body: JSON.stringify({ op: "new", question: q, shared: true }),
     });
     const data = await res.json().catch(() => ({}));
     setBusy(false);

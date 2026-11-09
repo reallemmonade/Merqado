@@ -1,0 +1,7 @@
+/* The chat menu is placed against the screen; lift the list so the menu paints over the chat panel. */
+.list { position: relative; z-index: 2; }
+
+/* Below the side-by-side breakpoint the chat list wraps above the chat: give it the full row. */
+@media (max-width: 899px) {
+  .list { flex-grow: 1; }
+}

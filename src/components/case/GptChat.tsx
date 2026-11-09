@@ -7,6 +7,7 @@ import { useApi } from "@/components/experts/useApi";
 import type { SourceKind } from "@/lib/case/gptSources";
 import { splitCitations } from "@/lib/case/search";
 import { Greeting, GptAsk, ScopeMenu } from "./GptAsk";
+import styles from "./GptChat.module.css";
 
 export interface GptSource {
   n: number;
@@ -103,15 +104,19 @@ export function GptChat({
 
   return (
     <section className="panel gpt-main">
-      <div className="gpt-head">
+      <div className={`gpt-head ${styles.head}`}>
         {chat.mine ? (
           <input
             type="text"
-            className="title-input"
+            className={`title-input ${styles.title}`}
             aria-label="Title"
             value={title}
             onChange={(e) => setTitle(e.target.value)}
-            onBlur={() => title.trim() && title !== chat.title && call("rename", url, { json: { op: "rename", chatId: chat.id, title } })}
+            onKeyDown={(e) => e.key === "Enter" && e.currentTarget.blur()}
+            onBlur={() => {
+              if (!title.trim()) setTitle(chat.title);
+              else if (title !== chat.title) call("rename", url, { json: { op: "rename", chatId: chat.id, title } });
+            }}
           />
         ) : (
           <h2 className="gpt-head-title">{chat.title}</h2>

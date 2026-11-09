@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useApi } from "@/components/experts/useApi";
+import styles from "./StorageSettings.module.css";
 
 /** Where the firm's case files live: Google Drive now; SharePoint and Box later. */
 export function StorageSettings({
@@ -22,7 +23,7 @@ export function StorageSettings({
   const cards: { name: string; state: string; on: boolean; action?: React.ReactNode }[] = [
     {
       name: "Google Drive",
-      state: drive ? "Connected" : "",
+      state: drive ? "Connected" : isAdmin ? "" : "Off",
       on: !!drive,
       action:
         isAdmin &&
@@ -44,7 +45,7 @@ export function StorageSettings({
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
       {(error || apiError) && <p className="error">{error ?? apiError}</p>}
-      <div className="storage-cards">
+      <div className={`storage-cards ${styles.cards}`}>
         {cards.map((c) => (
           <div key={c.name} className={`card storage-card${c.on ? " on" : ""}`}>
             <strong>{c.name}</strong>
@@ -90,7 +91,9 @@ export function StorageSettings({
           {isAdmin && (
             <div className="storage-row">
               <span />
-              <button type="button" className="secondary small" disabled={busy !== null} onClick={() => call("off", "/api/storage/settings", { json: { op: "disconnect" } })}>
+              <button type="button" className="secondary small" disabled={busy !== null} onClick={() => {
+                  if (confirm("Disconnect Google Drive?")) call("off", "/api/storage/settings", { json: { op: "disconnect" } });
+                }}>
                 Disconnect
               </button>
             </div>

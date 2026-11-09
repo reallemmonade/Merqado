@@ -4,6 +4,7 @@ import { getEngagementAccess, type SessionUser } from "@/lib/session";
 import { initials } from "@/lib/prefs";
 import { safeReturnPath } from "@/lib/return-path";
 import { SettingsClose } from "./SettingsClose";
+import styles from "./SettingsShell.module.css";
 
 export type SettingsSection = "profile" | "appearance" | "storage";
 
@@ -38,7 +39,7 @@ export async function SettingsShell({
   const q = from ? `?from=${encodeURIComponent(back)}` : "";
   return (
     <div className="shell">
-      <nav className="nav settings-nav" aria-label="Settings">
+      <nav className={`nav settings-nav ${styles.nav}`} aria-label="Settings">
         <Link href={back} className="nav-back">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
             <path d="M15 6l-6 6 6 6" />
@@ -46,7 +47,7 @@ export async function SettingsShell({
           {label}
         </Link>
         <div className="case-name">Settings</div>
-        <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+        <div className={styles.sections}>
           {SECTIONS.map((s) => (
             <Link key={s.key} href={s.href + q} className="nav-item" aria-current={s.key === section ? "page" : undefined}>
               {s.label}

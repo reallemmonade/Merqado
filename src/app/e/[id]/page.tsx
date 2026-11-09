@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { and, asc, eq } from "drizzle-orm";
 import { CaseShell } from "@/components/case/CaseShell";
+import { DecisionAdd } from "@/components/case/Notes";
 import { SampleButton } from "@/components/case/SampleButton";
 import { TaskCheck } from "@/components/case/TaskCheck";
 import { TodoAdd, TodoItem, TodoSuggestions } from "@/components/case/Todos";
@@ -295,16 +296,20 @@ export default async function OverviewPage({
                     </Link>
                     <span className="meta">
                       <Link href={kta(h.id, "supports")} className="tag v-supports">
-                        {sup} supports
+                        {sup} {sup === 1 ? "support" : "supports"}
                       </Link>
                       <Link href={kta(h.id, "challenges")} className="tag v-challenges">
-                        {chal} challenges
+                        {chal} {chal === 1 ? "challenge" : "challenges"}
                       </Link>
                     </span>
                   </div>
                 );
               })}
-              {hyps.length === 0 && <p className="muted">No hypotheses</p>}
+              {hyps.length === 0 && (
+                <p className="muted">
+                  No hypotheses · <Link href={`${base}/experts/setup`}>Add</Link>
+                </p>
+              )}
             </div>
           </section>
         </div>
@@ -323,6 +328,7 @@ export default async function OverviewPage({
               </Link>
             ))}
             {decisions.length === 0 && <p className="muted">None</p>}
+            <DecisionAdd engagementId={id} />
           </section>
 
           <section className="card">

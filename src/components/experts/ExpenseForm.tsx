@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useApi } from "./useApi";
 
 const CATEGORIES = [
-  ["meals", "Meals (late dinners)"],
+  ["meals", "Meals"],
   ["travel", "Cabs and travel"],
   ["ai_tools", "AI tools"],
   ["other", "Other"],

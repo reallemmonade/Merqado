@@ -13,6 +13,7 @@ export function slideRows(deck: Deck): SlideRow[] {
     moduleId: s.moduleId,
     status: s.status,
     openIssues: deck.issues.filter((x) => x.slideId === s.id && x.status === "open").length,
+    openContradictions: deck.issues.filter((x) => x.slideId === s.id && x.status === "open" && x.kind === "contradiction").length,
   }));
 }
 

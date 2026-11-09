@@ -22,8 +22,8 @@ export function AppNav({
       <Link href="/" className="brand" style={{ padding: 0 }}>
         Merqado
       </Link>
-      <div>
-        <div className="eyebrow">Engagements</div>
+      <div className="nav-cases">
+        <div className="eyebrow">Cases</div>
         {engagements.map((e) => (
           <div key={e.id}>
             <Link href={`/e/${e.id}`} aria-current={e.id === activeId && !section ? "page" : undefined}>
@@ -40,7 +40,7 @@ export function AppNav({
             )}
           </div>
         ))}
-        {engagements.length === 0 && <p className="muted">No engagements</p>}
+        {engagements.length === 0 && <p className="muted">No cases</p>}
       </div>
       <div className="nav-foot">
         <NavUser />

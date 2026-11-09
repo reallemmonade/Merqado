@@ -374,12 +374,14 @@ function PlayTheDay({ value, from, onClose }: { value: GuavaPrefs; from: number;
     };
     frame = requestAnimationFrame(step);
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
+      if (e.key !== "Escape") return;
+      e.preventDefault();
+      onClose();
     };
-    window.addEventListener("keydown", onKey);
+    window.addEventListener("keydown", onKey, true);
     return () => {
       cancelAnimationFrame(frame);
-      window.removeEventListener("keydown", onKey);
+      window.removeEventListener("keydown", onKey, true);
     };
   }, [from, onClose]);
 
@@ -483,7 +485,18 @@ function CityPicker({
       </div>
       {open && (
         <div className="gv-city-pick">
-          <input type="text" placeholder="Search cities" aria-label="Search cities" value={q} onChange={(e) => setQ(e.target.value)} autoFocus />
+          <input type="text" placeholder="Search cities" aria-label="Search cities" value={q}
+            onChange={(e) => setQ(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Escape") {
+                e.preventDefault();
+                setOpen(false);
+                setQ("");
+              }
+            }}
+            autoFocus
+          />
+          {q.trim() && matches.length === 0 && <p className="muted">No cities</p>}
           {matches.length > 0 && (
             <ul className="gv-city-list">
               {matches.map((c) => (

@@ -40,7 +40,7 @@ export default async function SearchPage({ params, searchParams }: { params: Pro
         <label htmlFor="kw" className="sr-only">
           Keyword
         </label>
-        <input id="kw" name="q" type="search" defaultValue={q} placeholder="Keyword" autoFocus style={{ flex: 1, minHeight: 44 }} />
+        <input id="kw" name="q" type="text" enterKeyHint="search" defaultValue={q} placeholder="Keyword" autoFocus style={{ flex: 1, minHeight: 44 }} />
         <button type="submit">Search</button>
       </form>
       {q && (
@@ -56,7 +56,7 @@ export default async function SearchPage({ params, searchParams }: { params: Pro
             ))}
           </nav>
           <span className="grow" />
-          <span className="muted mono">{total} matches</span>
+          <span className="muted mono">{total} {total === 1 ? "match" : "matches"}</span>
         </div>
       )}
       {q && (

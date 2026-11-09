@@ -19,7 +19,7 @@ export default async function ExpertsGuidesPage({ params }: { params: Promise<{ 
         {upcoming.map((e) => (
           <div className="row" key={e.id}>
             <Link href={`/e/${id}/experts?expert=${e.id}&tab=guide`}>{e.anonTitle || e.name}</Link>
-            <span className="muted" style={{ fontSize: 12 }}>
+            <span className="muted" style={{ fontSize: 12, whiteSpace: "nowrap" }}>
               {e.guide ? "Guide ready" : "No guide"} · {STATUS_LABEL[e.status]}
             </span>
           </div>

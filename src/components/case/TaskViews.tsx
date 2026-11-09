@@ -143,7 +143,7 @@ export function ReviewList({
           </button>
         ))}
       </div>
-      <div className="group">
+      <div className="group scroll-x">
         <table className="grid review-table">
           <thead>
             <tr>
@@ -151,7 +151,7 @@ export function ReviewList({
               <th>Kind</th>
               <th>From</th>
               <th>Due</th>
-              <th style={{ width: 360 }} />
+              <th style={{ width: 260, minWidth: 220 }} aria-label="Actions" />
             </tr>
           </thead>
           <tbody>

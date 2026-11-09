@@ -54,7 +54,7 @@ export async function CaseShell({
       <Suspense>
         <HashFocus />
       </Suspense>
-      {full ? (
+      {full && (
         <nav className="nav" aria-label="Case sections">
           <Link href="/" className="brand" style={{ padding: 0 }}>
             Merqado
@@ -85,24 +85,24 @@ export async function CaseShell({
             <NavUser />
           </div>
         </nav>
-      ) : (
-        <nav className="rail" aria-label="Case sections">
-          <Link href={base} className="rail-brand" aria-label={`${ctx.engagement.clientName} overview`} title={ctx.engagement.clientName}>
-            m
-          </Link>
-          {items.map((s) => (
-            <Link key={s.key} href={base + s.href} aria-label={s.label} title={s.label} aria-current={s.key === section ? "page" : undefined}>
-              <Icon name={s.icon} size={20} />
-            </Link>
-          ))}
-          <div className="rail-foot">
-            <Link href={`${base}/search`} aria-label="Keyword search" title="Keyword search · Ctrl K" className="rail-search" aria-current={section === "search" ? "page" : undefined}>
-              <Icon name="search" />
-            </Link>
-            <NavUser compact />
-          </div>
-        </nav>
       )}
+      {/* On a phone the full menu would fill the first screen, so the icon bar always shows there. */}
+      <nav className={full ? "rail rail-phone" : "rail"} aria-label="Case sections">
+        <Link href={base} className="rail-brand" aria-label={`${ctx.engagement.clientName} overview`} title={ctx.engagement.clientName}>
+          m
+        </Link>
+        {items.map((s) => (
+          <Link key={s.key} href={base + s.href} aria-label={s.label} title={s.label} aria-current={s.key === section ? "page" : undefined}>
+            <Icon name={s.icon} size={20} />
+          </Link>
+        ))}
+        <div className="rail-foot">
+          <Link href={`${base}/search`} aria-label="Keyword search" title="Keyword search · Ctrl K" className="rail-search" aria-current={section === "search" ? "page" : undefined}>
+            <Icon name="search" />
+          </Link>
+          <NavUser compact />
+        </div>
+      </nav>
       <main className="main case-main">
         {title && (
           <header className="case-head">
