@@ -1,5 +1,5 @@
 import { and, eq } from "drizzle-orm";
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import type { DB } from "@/db/client";
 import { findSession, SESSION_COOKIE } from "@/lib/auth/session";
 import { findTestAccount } from "@/lib/auth/test-accounts";
@@ -17,12 +17,14 @@ export interface SessionUser {
 }
 
 /**
- * The signed-in person, from their SSO session cookie.
+ * The signed-in person, from their SSO session cookie, or from the iPhone app's
+ * `Authorization: Bearer <token>` header.
  * Outside production, DEV_USER_EMAIL signs in a seeded user without SSO.
  */
 export async function getSessionUser(db: DB): Promise<SessionUser | null> {
   const jar = await cookies();
-  const session = await findSession(db, jar.get(SESSION_COOKIE)?.value);
+  const bearer = (await headers()).get("authorization")?.match(/^Bearer\s+(\S+)$/i)?.[1];
+  const session = await findSession(db, bearer ?? jar.get(SESSION_COOKIE)?.value);
   if (session) return loadUser(db, eq(users.id, session.userId), session.firmId);
 
   if (process.env.NODE_ENV === "production") return null;

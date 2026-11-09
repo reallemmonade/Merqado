@@ -823,6 +823,44 @@ export const gptMessages = sqliteTable(
   (t) => [index("gpt_messages_chat").on(t.chatId, t.createdAt)],
 );
 
+// ---------------------------------------------------------------------------
+// iPhone app: sign-in hand-off and push devices.
+// ---------------------------------------------------------------------------
+
+/**
+ * A one-time code the website hands the iPhone app after sign-in. The app proves it started the
+ * sign-in by sending the verifier whose SHA-256 is `challenge` (PKCE), so a stolen code is useless.
+ */
+export const mobileAuthCodes = sqliteTable("mobile_auth_codes", {
+  id: id(),
+  codeHash: text("code_hash").notNull().unique(),
+  challenge: text("challenge").notNull(),
+  userId: text("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  firmId: text("firm_id")
+    .notNull()
+    .references(() => firms.id, { onDelete: "cascade" }),
+  expiresAt: integer("expires_at", { mode: "timestamp" }).notNull(),
+  createdAt: createdAt(),
+});
+
+/** An iPhone that gets push notifications for a person (Apple device token). */
+export const pushDevices = sqliteTable(
+  "push_devices",
+  {
+    id: id(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    token: text("token").notNull().unique(),
+    /** "production" for TestFlight / App Store builds, "sandbox" for development builds. */
+    environment: text("environment", { enum: ["production", "sandbox"] }).notNull().default("production"),
+    createdAt: createdAt(),
+  },
+  (t) => [index("push_devices_user").on(t.userId)],
+);
+
 export const TODO_STATUSES = ["suggested", "open", "done", "dismissed"] as const;
 export type TodoStatus = (typeof TODO_STATUSES)[number];
 
