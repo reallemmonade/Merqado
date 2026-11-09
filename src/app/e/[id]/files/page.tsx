@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { desc, eq, inArray } from "drizzle-orm";
 import { CaseShell } from "@/components/case/CaseShell";
-import { FilesWorkspace, MoveFile, NewFolder, ReviewTable, type PendingFile } from "@/components/case/Files";
+import { DeleteFolder, FilesWorkspace, MoveFile, NewFolder, ReviewTable, type PendingFile } from "@/components/case/Files";
 import { experts, expertTranscripts, sources, users } from "@/db/schema";
 import { loadCase } from "@/lib/case/page";
 import { shortDate } from "@/lib/case/progress";
@@ -180,6 +180,12 @@ export default async function FilesPage({ params, searchParams }: { params: Prom
                         </span>
                       ))}
                     </h2>
+                    {canUpload && folders.includes(current) && !all.some((f) => inFolder(f, current)) && (
+                      <>
+                        <span className="grow" />
+                        <DeleteFolder engagementId={id} path={current} parent={href(current.split("/").slice(0, -1).join("/"))} />
+                      </>
+                    )}
                   </div>
                 )}
                 <div className="scroll-x">

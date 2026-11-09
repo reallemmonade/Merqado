@@ -43,6 +43,32 @@ describe("Google Drive storage", () => {
     expect(patch.url).toContain("removeParents=folder2");
   });
 
+  it("creates a folder once when uploads run in parallel", async () => {
+    vi.stubEnv("GOOGLE_CLIENT_ID", "id");
+    vi.stubEnv("GOOGLE_CLIENT_SECRET", "secret");
+    const made: string[] = [];
+    let n = 0;
+    vi.stubGlobal("fetch", async (url: string, init: RequestInit = {}) => {
+      const method = init.method ?? "GET";
+      if (url.startsWith("https://oauth2.googleapis.com/token")) return json({ access_token: "tok" });
+      if (method === "GET" && url.includes("mimeType")) {
+        await new Promise((r) => setTimeout(r, 5));
+        return json({ files: [] });
+      }
+      if (method === "POST" && url.includes("uploadType=resumable")) return new Response(null, { status: 200, headers: { location: "https://upload.example/s" } });
+      if (method === "POST" && url.includes("/drive/v3/files?")) {
+        made.push(JSON.parse(String(init.body)).name);
+        return json({ id: `folder${++n}` });
+      }
+      if (method === "PUT") return json({ id: `file${++n}` });
+      throw new Error(`unexpected ${method} ${url}`);
+    });
+    // Each upload resolves its own storage object, as the upload route does.
+    const put = (name: string) => new GDriveStorage({ refreshToken: "r", rootFolderId: "root2" }).put(`Case/To file/${name}`, new Uint8Array([1]));
+    await Promise.all([put("a.txt"), put("b.txt"), put("c.txt")]);
+    expect(made).toEqual(["Case", "To file"]);
+  });
+
   it("reads folder ids from links", () => {
     expect(folderIdFromLink("https://drive.google.com/drive/folders/1AbCdEfGhIjKlMnOp?usp=sharing")).toBe("1AbCdEfGhIjKlMnOp");
     expect(folderIdFromLink("not a link")).toBeNull();
