@@ -8,6 +8,7 @@ import type { DB } from "@/db/client";
 import {
   caseNotes,
   chatMessages,
+  chatReactions,
   chatRooms,
   deckIssues,
   deckLearnings,
@@ -88,7 +89,8 @@ export async function seedCaseWorkspace(db: DB, engagementId: string, members: C
       .returning();
     const room = (n: string) => rooms.find((r) => r.name === n)!.id;
     const at = (d: string) => new Date(d);
-    await db.insert(chatMessages).values([
+    const first = (id: string) => (members.find((m) => m.id === id)?.name ?? "").split(/\s+/)[0] ?? "";
+    const msgs = await db.insert(chatMessages).values([
       { engagementId, roomId: room("Core team"), userId: A1, body: "Customer list by end market is done. Automotive is a bigger share than we assumed.", createdAt: at("2026-11-04T09:12:00Z") },
       { engagementId, roomId: room("Core team"), userId: C, body: "Bottom-up model is within 8% of the top-down frame now. Writing it up for the market slide.", createdAt: at("2026-11-04T09:40:00Z") },
       { engagementId, roomId: room("Core team"), userId: A2, body: "Second competitor call booked for Nov 9.", createdAt: at("2026-11-04T10:05:00Z") },
@@ -97,7 +99,47 @@ export async function seedCaseWorkspace(db: DB, engagementId: string, members: C
       { engagementId, roomId: room("Chat with MDs"), userId: M, body: "Agreed. I will reorder the storyline and share v2 by Wednesday.", createdAt: at("2026-11-02T21:02:00Z") },
       { engagementId, roomId: room("MDs only"), userId: P, body: "Sponsor wants a view on exit timing at the next check-in.", createdAt: at("2026-11-01T11:10:00Z") },
       { engagementId, roomId: room("Associates only"), userId: A1, body: "Splitting the remaining interview write-ups: I take customers, you take competitors?", createdAt: at("2026-11-03T22:40:00Z") },
+    ]).returning();
+    // Thread replies, reactions, a mention and a meeting, so every part of the channel has something in it.
+    const model = msgs[1]!;
+    await db.insert(chatMessages).values([
+      { engagementId, roomId: model.roomId, parentId: model.id, userId: A1, body: "Does that include the recycled grades?", createdAt: at("2026-11-04T09:52:00Z") },
+      { engagementId, roomId: model.roomId, parentId: model.id, userId: C, body: "Not yet. Adding them as a separate line.", createdAt: at("2026-11-04T09:58:00Z") },
+      { engagementId, roomId: model.roomId, parentId: model.id, userId: A2, body: "I can pull the recycled volumes from the competitor calls.", createdAt: at("2026-11-04T10:12:00Z") },
+      {
+        engagementId,
+        roomId: room("Core team"),
+        userId: C,
+        body: `@${first(A1)} can you send the end-market split to the full team before the dry run?`,
+        mentions: JSON.stringify([A1]),
+        createdAt: at("2026-11-04T11:20:00Z"),
+      },
+      {
+        engagementId,
+        roomId: room("Full team"),
+        userId: M,
+        body: "",
+        kind: "meeting" as const,
+        meta: JSON.stringify({ title: "Client update 1 dry run", startsAt: "2026-11-13T15:00:00.000Z", minutes: 60, link: null }),
+        createdAt: at("2026-11-03T16:05:00Z"),
+      },
     ]);
+    const rx = [
+      [msgs[0]!.id, C, "👍"],
+      [msgs[0]!.id, A2, "👍"],
+      [model.id, A1, "🔥"],
+      [model.id, M, "🔥"],
+      [model.id, P, "👀"],
+      [msgs[3]!.id, C, "✅"],
+    ];
+    await db.insert(chatReactions).values(rx.map(([messageId, userId, emoji]) => ({ messageId: messageId!, userId: userId!, emoji: emoji! }))).onConflictDoNothing();
+    if (C !== M) {
+      const [dm] = await db.insert(chatRooms).values({ engagementId, kind: "dm", name: "", memberIds: JSON.stringify([C, M]), createdBy: M }).returning();
+      await db.insert(chatMessages).values([
+        { engagementId, roomId: dm!.id, userId: M, body: "Can you take the market slide in the dry run?", createdAt: at("2026-11-04T12:30:00Z") },
+        { engagementId, roomId: dm!.id, userId: C, body: "Yes. I will send a draft tonight.", createdAt: at("2026-11-04T12:34:00Z") },
+      ]);
+    }
     added.push("channel");
   }
 

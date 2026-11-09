@@ -50,6 +50,48 @@
       "when": 1794087320533,
       "tag": "0006_case_workspace",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "6",
+      "when": 1794185518538,
+      "tag": "0007_smart_filing",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "6",
+      "when": 1794196369933,
+      "tag": "0008_team_chat",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "6",
+      "when": 1794197964396,
+      "tag": "0009_tasks_and_case_roles",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "6",
+      "when": 1794200629737,
+      "tag": "0010_expert_signoffs",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "6",
+      "when": 1794201241533,
+      "tag": "0011_todos",
+      "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "6",
+      "when": 1794201478009,
+      "tag": "0012_mobile_app",
+      "breakpoints": true
     }
   ]
 }

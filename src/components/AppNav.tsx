@@ -20,7 +20,7 @@ export function AppNav({
   return (
     <nav className="nav" aria-label="Main">
       <Link href="/" className="brand" style={{ padding: 0 }}>
-        merqado
+        Merqado
       </Link>
       <div>
         <div className="eyebrow">Engagements</div>

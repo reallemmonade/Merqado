@@ -1,0 +1,46 @@
+{
+  "expo": {
+    "name": "Merqado",
+    "slug": "merqado",
+    "scheme": "merqado",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "ios": {
+      "bundleIdentifier": "ai.merqado.app",
+      "buildNumber": "1",
+      "supportsTablet": false,
+      "config": { "usesNonExemptEncryption": false },
+      "infoPlist": {
+        "UIBackgroundModes": ["remote-notification"]
+      },
+      "entitlements": {
+        "aps-environment": "production"
+      }
+    },
+    "plugins": [
+      "expo-router",
+      "expo-secure-store",
+      "expo-web-browser",
+      "expo-font",
+      [
+        "expo-splash-screen",
+        { "image": "./assets/splash-icon.png", "imageWidth": 160, "backgroundColor": "#ffffff" }
+      ],
+      [
+        "expo-notifications",
+        { "enableBackgroundRemoteNotifications": true }
+      ],
+      [
+        "expo-build-properties",
+        { "ios": { "deploymentTarget": "16.4" } }
+      ]
+    ],
+    "experiments": { "typedRoutes": false },
+    "extra": {
+      "apiUrl": "https://merqado.ai",
+      "apnsEnvironment": "production"
+    }
+  }
+}

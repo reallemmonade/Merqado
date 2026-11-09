@@ -12,7 +12,7 @@ import type { Snippet } from "./search";
  */
 export async function loadCorpus(db: DB, engagementId: string, viewer: { id: string; archetype: Archetype }): Promise<Snippet[]> {
   const base = `/e/${engagementId}`;
-  const rooms = await visibleRooms(db, engagementId, viewer.archetype);
+  const rooms = await visibleRooms(db, engagementId, viewer);
   const roomIds = rooms.map((r) => r.id);
   const [people, transcripts, takeaways, notes, messages, slides, terms, hyps, tasks, files] = await Promise.all([
     db.select({ id: experts.id, company: experts.company, title: experts.title, anonTitle: experts.anonTitle, isFormer: experts.isFormer }).from(experts).where(eq(experts.engagementId, engagementId)),
@@ -27,7 +27,7 @@ export async function loadCorpus(db: DB, engagementId: string, viewer: { id: str
     db.select().from(glossaryTerms).where(and(eq(glossaryTerms.engagementId, engagementId), eq(glossaryTerms.status, "active"))),
     db.select().from(hypotheses).where(eq(hypotheses.engagementId, engagementId)),
     db.select().from(workplanTasks).where(eq(workplanTasks.engagementId, engagementId)),
-    db.select({ id: sources.id, filename: sources.filename, folder: sources.folder }).from(sources).where(eq(sources.engagementId, engagementId)),
+    db.select({ id: sources.id, filename: sources.filename, folder: sources.folder, textBody: sources.textBody, roomId: sources.roomId }).from(sources).where(eq(sources.engagementId, engagementId)),
   ]);
   const who = new Map(people.map((p) => [p.id, p.anonTitle || anonymizeTitle(p.company, p.title, p.isFormer)]));
   const roomName = new Map(rooms.map((r) => [r.id, r.name]));
@@ -44,6 +44,16 @@ export async function loadCorpus(db: DB, engagementId: string, viewer: { id: str
   for (const g of terms) out.push({ kind: "term", label: `Dictionary · ${g.term}`, href: `${base}/dictionary`, text: `${g.term}: ${g.definition}` });
   for (const h of hyps) out.push({ kind: "hypothesis", label: "Hypothesis", href: `${base}/experts/ktas`, text: h.statement });
   for (const t of tasks) out.push({ kind: "task", label: "Workplan", href: `${base}/workplan`, text: t.title });
-  for (const f of files) out.push({ kind: "file", label: `File${f.folder ? " · " + f.folder : ""}`, href: `/api/engagements/${engagementId}/sources/${f.id}`, text: f.filename });
+  const roomSet = new Set(roomIds);
+  for (const f of files) {
+    // A file shared in a chat is only searchable by that chat's members.
+    if (f.roomId && !roomSet.has(f.roomId)) continue;
+    out.push({
+      kind: "file",
+      label: `${f.filename}${f.folder ? " · " + f.folder : ""}`,
+      href: `/api/engagements/${engagementId}/sources/${f.id}`,
+      text: f.textBody ? `${f.filename}\n\n${f.textBody}` : f.filename,
+    });
+  }
   return out;
 }

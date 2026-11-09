@@ -12,6 +12,7 @@ import {
   runningGuides,
   users,
 } from "@/db/schema";
+import { parseApprovals } from "./approval";
 import { anonymizeTitle, honorarium, isBilled, parseIdList, totalMinutes, type Status } from "./calc";
 
 export type ExpertRow = {
@@ -39,6 +40,9 @@ export type ExpertRow = {
   notes: string;
   guide: string | null;
   proposedByName: string | null;
+  requestedBy: string | null;
+  requestedByName: string | null;
+  approvals: string[];
   transcriptCount: number;
   takeawayCount: number;
 };
@@ -96,6 +100,9 @@ export async function loadExperts(db: DB, engagementId: string) {
     notes: e.notes,
     guide: e.guide,
     proposedByName: e.proposedBy ? (nameOf.get(e.proposedBy) ?? null) : null,
+    requestedBy: e.requestedBy,
+    requestedByName: e.requestedBy ? (nameOf.get(e.requestedBy) ?? null) : null,
+    approvals: parseApprovals(e.approvals),
     transcriptCount: transcripts.filter((t) => t.expertId === e.id).length,
     takeawayCount: takeaways.filter((k) => k.expertId === e.id).length,
   }));

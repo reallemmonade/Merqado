@@ -3,11 +3,14 @@ import { and, asc, eq } from "drizzle-orm";
 import { CaseShell } from "@/components/case/CaseShell";
 import { SampleButton } from "@/components/case/SampleButton";
 import { TaskCheck } from "@/components/case/TaskCheck";
+import { TodoAdd, TodoItem, TodoSuggestions } from "@/components/case/Todos";
 import { caseBudgets, chatRooms, experts, expertTypes, hypotheses, keyTakeaways, sources } from "@/db/schema";
 import { loadDeck, loadNotes, loadWorkplan } from "@/lib/case/data";
 import { loadCase } from "@/lib/case/page";
 import { progressPct, shortDate, TASK_STATUS_LABEL, timelinePct, todayIso } from "@/lib/case/progress";
-import { can } from "@/lib/roles";
+import { checkMove, dueOf, reviewerOf } from "@/lib/case/tasks";
+import { parseApprovals, waitingOn } from "@/lib/experts/approval";
+import { todoViews } from "@/lib/todos/view";
 
 export const dynamic = "force-dynamic";
 
@@ -23,7 +26,6 @@ export default async function OverviewPage({
   const ctx = await loadCase(id);
   const { db, user } = ctx;
   const team = sp.todo === "team";
-  const canApprove = can(ctx.access, "approve_experts");
 
   const [wp, notes, deck, hyps, takeaways, expertRows, types, budget, rooms, files] = await Promise.all([
     loadWorkplan(db, id),
@@ -46,12 +48,21 @@ export default async function OverviewPage({
   const end = milestones[milestones.length - 1]?.date;
   const nextMilestone = milestones.find((m) => m.date >= today);
 
-  const openTasks = wp.tasks.filter((t) => t.status !== "done" && (team || t.assigneeId === user.id));
-  const proposed = expertRows.filter((e) => e.status === "proposed");
+  const leadOf = new Map(wp.modules.map((m) => [m.id, m.leadId]));
+  const openTasks = wp.tasks.filter(
+    (t) =>
+      t.status !== "done" &&
+      (team || t.assigneeId === user.id || (t.status === "almost_done" && reviewerOf(t, leadOf.get(t.moduleId)) === user.id)),
+  );
+  const proposed = expertRows.filter(
+    (e) => e.status === "proposed" && (team || waitingOn({ requestedBy: e.requestedBy, approvals: parseApprovals(e.approvals) }, ctx.members).includes(user.id)),
+  );
   const openItems = notes.filter((n) => n.kind === "open" && !n.resolved);
   const decisions = notes.filter((n) => n.kind === "decision");
   const openContradictions = deck.issues.filter((i) => i.kind === "contradiction" && i.status === "open");
   const milestoneOf = new Map(milestones.map((m) => [m.id, m]));
+  const milestoneDate = new Map(milestones.map((m) => [m.id, m.date]));
+  const todo = await todoViews(ctx, id, team);
 
   const setup = [
     { label: "Workplan", done: wp.modules.length > 0, href: "/workplan" },
@@ -145,18 +156,25 @@ export default async function OverviewPage({
               {openTasks.map((t) => (
                 <div className="row todo" key={t.id}>
                   <label className="check" style={{ flex: 1 }}>
-                    <TaskCheck engagementId={id} taskId={t.id} done={false} label={`Done: ${t.title}`} disabled={!ctx.canEdit} />
+                    <TaskCheck
+                      engagementId={id}
+                      taskId={t.id}
+                      next={checkMove(t, user.id, ctx.canEdit, leadOf.get(t.moduleId))}
+                      label={t.title}
+                    />
                     <span>{t.title}</span>
                   </label>
                   <span className="meta">
                     {team && t.assigneeId && <span>{nameOf.get(t.assigneeId)}</span>}
-                    {t.milestoneId && milestoneOf.get(t.milestoneId) && <span>{shortDate(milestoneOf.get(t.milestoneId)!.date)}</span>}
+                    {dueOf(t, milestoneDate) && <span>{shortDate(dueOf(t, milestoneDate))}</span>}
                     <span className={`pill ts-${t.status}`}>{TASK_STATUS_LABEL[t.status]}</span>
                   </span>
                 </div>
               ))}
-              {(canApprove || team) &&
-                proposed.map((e) => (
+              {todo.open.map((t) => (
+                <TodoItem key={t.id} engagementId={id} t={t} showAssignee={team} />
+              ))}
+              {proposed.map((e) => (
                   <div className="row todo" key={e.id}>
                     <Link href={`${base}/experts?expert=${e.id}`} style={{ flex: 1 }}>
                       Approve {[e.firstName, e.lastName].filter(Boolean).join(" ")}
@@ -180,7 +198,9 @@ export default async function OverviewPage({
                   <span className="tag">Open</span>
                 </div>
               ))}
-              {openTasks.length + openItems.length + proposed.length + openContradictions.length === 0 && <p className="muted">Nothing open</p>}
+              {openTasks.length + todo.open.length + openItems.length + proposed.length + openContradictions.length === 0 && <p className="muted">Nothing open</p>}
+              <TodoAdd key={team ? "team" : "mine"} engagementId={id} me={user.id} members={ctx.members} team={team} />
+              <TodoSuggestions engagementId={id} items={todo.suggested} showAssignee={team} />
             </div>
           </section>
 

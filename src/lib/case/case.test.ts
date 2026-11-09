@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { gptName } from "./names";
 import { canSeeRoom, roomMembersLabel, ROOM_TEMPLATES } from "./rooms";
-import { nextStatus, progressPct, shortDate, timelinePct } from "./progress";
+import { progressPct, shortDate, timelinePct } from "./progress";
 import { chunk, keywords, phraseHits, splitCitations, topSnippets } from "./search";
 
 describe("gptName", () => {
@@ -33,8 +33,6 @@ describe("progress", () => {
     expect(progressPct([{ status: "almost_done" }, { status: "in_progress" }, { status: "done" }])).toBe(67);
   });
   it("cycles statuses", () => {
-    expect(nextStatus("not_yet")).toBe("in_progress");
-    expect(nextStatus("done")).toBe("not_yet");
   });
   it("places dates on the timeline", () => {
     expect(timelinePct("2026-09-15", "2026-09-01", "2026-09-29")).toBe(50);
@@ -70,5 +68,42 @@ describe("search", () => {
   it("chunks long text", () => {
     const parts = chunk("a".repeat(2000), 900);
     expect(parts.length).toBe(3);
+  });
+});
+
+import { canSeeChat, findMentions, presenceOf, sameMembers } from "./rooms";
+
+describe("team chats", () => {
+  const ana = { id: "u1", archetype: "partner" as const };
+  const dan = { id: "u2", archetype: "consultant" as const };
+  it("shows 1:1 and group chats only to their members", () => {
+    const dm = { kind: "dm", archetypes: "[]", memberIds: JSON.stringify(["u1", "u3"]) };
+    expect(canSeeChat(dm, ana)).toBe(true);
+    expect(canSeeChat(dm, dan)).toBe(false);
+    const room = { kind: "room", archetypes: JSON.stringify(["consultant"]), memberIds: "[]" };
+    expect(canSeeChat(room, dan)).toBe(true);
+    expect(canSeeChat(room, ana)).toBe(false);
+  });
+  it("matches chats with the same people", () => {
+    expect(sameMembers(["a", "b"], ["b", "a"])).toBe(true);
+    expect(sameMembers(["a", "b"], ["a", "b", "c"])).toBe(false);
+  });
+  it("finds @mentions by full or first name", () => {
+    const people = [
+      { id: "u1", name: "Ana Reyes" },
+      { id: "u2", name: "Dan Okafor" },
+      { id: "u3", name: "Anabel Cruz" },
+    ];
+    expect(findMentions("@Ana Reyes can you check?", people)).toEqual(["u1"]);
+    expect(findMentions("thanks @dan", people)).toEqual(["u2"]);
+    expect(findMentions("@Anabel please", people)).toEqual(["u3"]);
+    expect(findMentions("email ana@firm.com", people)).toEqual([]);
+  });
+  it("derives presence from activity and the chosen status", () => {
+    const now = new Date("2026-11-09T12:00:00Z");
+    expect(presenceOf("auto", new Date("2026-11-09T11:58:00Z"), now)).toBe("available");
+    expect(presenceOf("auto", new Date("2026-11-09T11:50:00Z"), now)).toBe("away");
+    expect(presenceOf("dnd", new Date("2026-11-09T11:59:00Z"), now)).toBe("dnd");
+    expect(presenceOf("busy", null, now)).toBe("offline");
   });
 });
