@@ -397,6 +397,10 @@ export const experts = sqliteTable(
     guide: text("guide"),
     guideUpdatedAt: integer("guide_updated_at", { mode: "timestamp" }),
     proposedBy: text("proposed_by").references(() => users.id),
+    /** Who asked for this expert, if not a consultant. They sign off too, on top of a consultant. */
+    requestedBy: text("requested_by").references(() => users.id, { onDelete: "set null" }),
+    /** JSON array of user ids who have signed off so far (see lib/experts/approval). */
+    approvals: text("approvals").notNull().default("[]"),
     approvedBy: text("approved_by").references(() => users.id),
     createdAt: createdAt(),
   },
