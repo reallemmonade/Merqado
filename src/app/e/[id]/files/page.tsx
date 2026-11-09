@@ -8,7 +8,7 @@ import { shortDate } from "@/lib/case/progress";
 import { anonymizeTitle } from "@/lib/experts/calc";
 import { sourceVisibility } from "@/lib/files/access";
 import { loadCaseFolders } from "@/lib/files/folders";
-import { can } from "@/lib/roles";
+import { allows } from "@/lib/roles";
 
 export const dynamic = "force-dynamic";
 
@@ -36,7 +36,7 @@ export default async function FilesPage({ params, searchParams }: { params: Prom
   const sp = await searchParams;
   const ctx = await loadCase(id, "/files");
   const { db, user } = ctx;
-  const canUpload = can(ctx.access, "upload");
+  const canUpload = allows(ctx.membership, "upload");
   const [all, transcripts, people, folders, visible] = await Promise.all([
     db.select().from(sources).where(eq(sources.engagementId, id)).orderBy(desc(sources.createdAt)),
     db

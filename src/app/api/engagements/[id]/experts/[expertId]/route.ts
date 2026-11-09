@@ -4,7 +4,7 @@ import { experts } from "@/db/schema";
 import { authorize, badRequest } from "@/lib/experts/api";
 import { findExpert } from "@/lib/experts/data";
 import { expertPatch } from "@/lib/experts/schemas";
-import { can } from "@/lib/roles";
+import { allows } from "@/lib/roles";
 import { getEngagementAccess } from "@/lib/session";
 
 type Ctx = { params: Promise<{ id: string; expertId: string }> };
@@ -27,7 +27,7 @@ export async function PATCH(req: Request, { params }: Ctx) {
   }
   if (rest.status && current.status === "proposed" && rest.status !== "proposed") {
     const membership = await getEngagementAccess(auth.db, auth.user, id);
-    if (!can(membership?.access, "approve_experts")) {
+    if (!allows(membership, "approve_experts")) {
       return NextResponse.json({ error: "You can't approve experts on this engagement." }, { status: 403 });
     }
     update.approvedBy = auth.user.id;

@@ -7,7 +7,8 @@ import { caseBudgets, chatRooms, experts, expertTypes, hypotheses, keyTakeaways,
 import { loadDeck, loadNotes, loadWorkplan } from "@/lib/case/data";
 import { loadCase } from "@/lib/case/page";
 import { progressPct, shortDate, TASK_STATUS_LABEL, timelinePct, todayIso } from "@/lib/case/progress";
-import { can } from "@/lib/roles";
+import { checkMove, dueOf, reviewerOf } from "@/lib/case/tasks";
+import { allows } from "@/lib/roles";
 
 export const dynamic = "force-dynamic";
 
@@ -23,7 +24,7 @@ export default async function OverviewPage({
   const ctx = await loadCase(id);
   const { db, user } = ctx;
   const team = sp.todo === "team";
-  const canApprove = can(ctx.access, "approve_experts");
+  const canApprove = allows(ctx.membership, "approve_experts");
 
   const [wp, notes, deck, hyps, takeaways, expertRows, types, budget, rooms, files] = await Promise.all([
     loadWorkplan(db, id),
@@ -46,12 +47,18 @@ export default async function OverviewPage({
   const end = milestones[milestones.length - 1]?.date;
   const nextMilestone = milestones.find((m) => m.date >= today);
 
-  const openTasks = wp.tasks.filter((t) => t.status !== "done" && (team || t.assigneeId === user.id));
+  const leadOf = new Map(wp.modules.map((m) => [m.id, m.leadId]));
+  const openTasks = wp.tasks.filter(
+    (t) =>
+      t.status !== "done" &&
+      (team || t.assigneeId === user.id || (t.status === "almost_done" && reviewerOf(t, leadOf.get(t.moduleId)) === user.id)),
+  );
   const proposed = expertRows.filter((e) => e.status === "proposed");
   const openItems = notes.filter((n) => n.kind === "open" && !n.resolved);
   const decisions = notes.filter((n) => n.kind === "decision");
   const openContradictions = deck.issues.filter((i) => i.kind === "contradiction" && i.status === "open");
   const milestoneOf = new Map(milestones.map((m) => [m.id, m]));
+  const milestoneDate = new Map(milestones.map((m) => [m.id, m.date]));
 
   const setup = [
     { label: "Workplan", done: wp.modules.length > 0, href: "/workplan" },
@@ -145,12 +152,17 @@ export default async function OverviewPage({
               {openTasks.map((t) => (
                 <div className="row todo" key={t.id}>
                   <label className="check" style={{ flex: 1 }}>
-                    <TaskCheck engagementId={id} taskId={t.id} done={false} label={`Done: ${t.title}`} disabled={!ctx.canEdit} />
+                    <TaskCheck
+                      engagementId={id}
+                      taskId={t.id}
+                      next={checkMove(t, user.id, ctx.canEdit, leadOf.get(t.moduleId))}
+                      label={t.title}
+                    />
                     <span>{t.title}</span>
                   </label>
                   <span className="meta">
                     {team && t.assigneeId && <span>{nameOf.get(t.assigneeId)}</span>}
-                    {t.milestoneId && milestoneOf.get(t.milestoneId) && <span>{shortDate(milestoneOf.get(t.milestoneId)!.date)}</span>}
+                    {dueOf(t, milestoneDate) && <span>{shortDate(dueOf(t, milestoneDate))}</span>}
                     <span className={`pill ts-${t.status}`}>{TASK_STATUS_LABEL[t.status]}</span>
                   </span>
                 </div>

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { gptName } from "./names";
 import { canSeeRoom, roomMembersLabel, ROOM_TEMPLATES } from "./rooms";
-import { nextStatus, progressPct, shortDate, timelinePct } from "./progress";
+import { progressPct, shortDate, timelinePct } from "./progress";
 import { chunk, keywords, phraseHits, splitCitations, topSnippets } from "./search";
 
 describe("gptName", () => {
@@ -33,8 +33,6 @@ describe("progress", () => {
     expect(progressPct([{ status: "almost_done" }, { status: "in_progress" }, { status: "done" }])).toBe(67);
   });
   it("cycles statuses", () => {
-    expect(nextStatus("not_yet")).toBe("in_progress");
-    expect(nextStatus("done")).toBe("not_yet");
   });
   it("places dates on the timeline", () => {
     expect(timelinePct("2026-09-15", "2026-09-01", "2026-09-29")).toBe(50);

@@ -29,6 +29,7 @@ beforeAll(async () => {
     db: db as unknown as Authorized["db"],
     user: { id: user!.id, firmId: firm!.id, email: user!.email, name: "A", title: "Partner", archetype: "partner", isAdmin: true } as Authorized["user"],
     engagement: eng!,
+    membership: { engagement: eng!, access: "lead", role: "partner" },
   };
 });
 

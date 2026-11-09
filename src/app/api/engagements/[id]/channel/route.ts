@@ -6,7 +6,7 @@ import { fileSources } from "@/lib/files/intake";
 import { notFoundJson, ok, parseOp } from "@/lib/case/api";
 import { loadMembers } from "@/lib/case/page";
 import { canSeeChat, findMentions, parseIds, ROOM_TEMPLATES, sameMembers } from "@/lib/case/rooms";
-import { can } from "@/lib/roles";
+import { allows } from "@/lib/roles";
 import { getEngagementAccess } from "@/lib/session";
 
 const ref = z.string().min(1).max(64);
@@ -57,7 +57,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
 
   if (ROOM_OPS.has(op.op)) {
     const access = await getEngagementAccess(db, user, id);
-    if (!can(access?.access, "edit_findings")) return NextResponse.json({ error: "You can't change this case's chats." }, { status: 403 });
+    if (!allows(access, "edit_findings")) return NextResponse.json({ error: "You can't change this case's chats." }, { status: 403 });
   }
 
   /** A chat on this case that this person can see. */
@@ -180,7 +180,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       const access = await getEngagementAccess(db, user, id);
       if (!access) return notFoundJson();
       try {
-        await fileSources({ db, user, engagement: access.engagement }, [{ sourceId: src.id, folder: op.folder, asVersion: !!src.versionCandidate }]);
+        await fileSources({ db, user, engagement: access.engagement, membership: access }, [{ sourceId: src.id, folder: op.folder, asVersion: !!src.versionCandidate }]);
       } catch (err) {
         return NextResponse.json({ error: err instanceof Error ? err.message : "Filing failed." }, { status: 502 });
       }
