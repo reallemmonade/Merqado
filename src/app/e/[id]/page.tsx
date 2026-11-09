@@ -3,12 +3,14 @@ import { and, asc, eq } from "drizzle-orm";
 import { CaseShell } from "@/components/case/CaseShell";
 import { SampleButton } from "@/components/case/SampleButton";
 import { TaskCheck } from "@/components/case/TaskCheck";
+import { TodoAdd, TodoItem, TodoSuggestions } from "@/components/case/Todos";
 import { caseBudgets, chatRooms, experts, expertTypes, hypotheses, keyTakeaways, sources } from "@/db/schema";
 import { loadDeck, loadNotes, loadWorkplan } from "@/lib/case/data";
 import { loadCase } from "@/lib/case/page";
 import { progressPct, shortDate, TASK_STATUS_LABEL, timelinePct, todayIso } from "@/lib/case/progress";
 import { checkMove, dueOf, reviewerOf } from "@/lib/case/tasks";
 import { parseApprovals, waitingOn } from "@/lib/experts/approval";
+import { todoViews } from "@/lib/todos/view";
 
 export const dynamic = "force-dynamic";
 
@@ -60,6 +62,7 @@ export default async function OverviewPage({
   const openContradictions = deck.issues.filter((i) => i.kind === "contradiction" && i.status === "open");
   const milestoneOf = new Map(milestones.map((m) => [m.id, m]));
   const milestoneDate = new Map(milestones.map((m) => [m.id, m.date]));
+  const todo = await todoViews(ctx, id, team);
 
   const setup = [
     { label: "Workplan", done: wp.modules.length > 0, href: "/workplan" },
@@ -168,6 +171,9 @@ export default async function OverviewPage({
                   </span>
                 </div>
               ))}
+              {todo.open.map((t) => (
+                <TodoItem key={t.id} engagementId={id} t={t} showAssignee={team} />
+              ))}
               {proposed.map((e) => (
                   <div className="row todo" key={e.id}>
                     <Link href={`${base}/experts?expert=${e.id}`} style={{ flex: 1 }}>
@@ -192,7 +198,9 @@ export default async function OverviewPage({
                   <span className="tag">Open</span>
                 </div>
               ))}
-              {openTasks.length + openItems.length + proposed.length + openContradictions.length === 0 && <p className="muted">Nothing open</p>}
+              {openTasks.length + todo.open.length + openItems.length + proposed.length + openContradictions.length === 0 && <p className="muted">Nothing open</p>}
+              <TodoAdd key={team ? "team" : "mine"} engagementId={id} me={user.id} members={ctx.members} team={team} />
+              <TodoSuggestions engagementId={id} items={todo.suggested} showAssignee={team} />
             </div>
           </section>
 
