@@ -2,31 +2,20 @@
 
 import { useEffect, useState } from "react";
 import type { Prefs } from "@/lib/prefs";
-import { GUAVA_AT_EVENT, GUAVA_PREFS_EVENT, applyGuava, clearGuava } from "@/lib/guava/apply";
+import { GUAVA_PREFS_EVENT, applyGuava } from "@/lib/guava/apply";
 
-/** The Guava sky behind every page when the Guava theme is on. Refreshes every 5 minutes and on return. */
+/** The Guava sky behind every page. Refreshes every 5 minutes and when the window comes back to the front. */
 export function GuavaSky({ initial }: { initial: Prefs }) {
-  const [prefs, setPrefs] = useState(initial);
-  const [at, setAt] = useState<number | null>(null);
-  const on = prefs.theme === "guava";
+  const [guava, setGuava] = useState(initial.guava);
 
   useEffect(() => {
-    const onPrefs = (e: Event) => setPrefs((e as CustomEvent<Prefs>).detail);
-    const onAt = (e: Event) => setAt((e as CustomEvent<number | null>).detail);
+    const onPrefs = (e: Event) => setGuava((e as CustomEvent<Prefs>).detail.guava);
     window.addEventListener(GUAVA_PREFS_EVENT, onPrefs);
-    window.addEventListener(GUAVA_AT_EVENT, onAt);
-    return () => {
-      window.removeEventListener(GUAVA_PREFS_EVENT, onPrefs);
-      window.removeEventListener(GUAVA_AT_EVENT, onAt);
-    };
+    return () => window.removeEventListener(GUAVA_PREFS_EVENT, onPrefs);
   }, []);
 
   useEffect(() => {
-    if (!on) {
-      clearGuava();
-      return;
-    }
-    const paint = () => applyGuava(prefs.guava, at);
+    const paint = () => applyGuava(guava);
     paint();
     const timer = setInterval(paint, 5 * 60 * 1000);
     const onVisible = () => {
@@ -39,13 +28,8 @@ export function GuavaSky({ initial }: { initial: Prefs }) {
       document.removeEventListener("visibilitychange", onVisible);
       window.removeEventListener("focus", paint);
     };
-  }, [on, prefs.guava, at]);
+  }, [guava]);
 
-  useEffect(() => {
-    document.documentElement.classList.toggle("guava-playing", at != null);
-  }, [at]);
-
-  if (!on) return null;
   return (
     <div id="backdrop" aria-hidden="true">
       <i className="sun" />

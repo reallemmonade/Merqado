@@ -7,9 +7,12 @@ const date = new Date(Date.UTC(2026, 10, 7, 17));
 
 describe("guava theme", () => {
   it("keeps Guava settings in the prefs cookie", () => {
-    const p = { ...DEFAULT_PREFS, theme: "guava" as const, guava: { look: "marigold" as const, font: "poster" as const, city: "London", cycle: false, freeze: 7.25 } };
+    const p = { ...DEFAULT_PREFS, guava: { look: "marigold" as const, font: "poster" as const, city: { name: "London", lat: 51.5, lon: -0.1, tz: "Europe/London" }, cycle: false, freeze: 7.25 } };
     expect(parsePrefs(serializePrefs(p))).toEqual(p);
-    expect(parsePrefs(serializePrefs({ ...p, guava: { look: "neon", freeze: 99 } } as never)).guava).toEqual(DEFAULT_PREFS.guava);
+    expect(parsePrefs(serializePrefs({ ...p, guava: { look: "neon", freeze: 99, city: { name: "X", lat: 300 } } } as never)).guava).toEqual(DEFAULT_PREFS.guava);
+    // A location is kept to about 0.1 degree.
+    const near = parsePrefs(serializePrefs({ ...p, guava: { ...p.guava, city: { name: "My location", lat: 40.71234, lon: -74.00597, tz: "America/New_York" } } }));
+    expect(near.guava.city).toEqual({ name: "My location", lat: 40.7, lon: -74, tz: "America/New_York" });
   });
 
   it("is light at noon, dark at night, and Night Shift is always dark", () => {
