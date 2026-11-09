@@ -3,6 +3,7 @@ import { and, eq, max } from "drizzle-orm";
 import { z } from "zod";
 import { TASK_STATUSES, workplanMilestones, workplanModules, workplanTasks } from "@/db/schema";
 import { notFoundJson, ok, parseOp } from "@/lib/case/api";
+import { allowedMoves, reviewerOf } from "@/lib/case/tasks";
 
 const date = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Pick a date.");
 const name = z.string().trim().min(1, "Add a name.").max(200);
@@ -15,14 +16,25 @@ const Op = z.discriminatedUnion("op", [
   z.object({ op: z.literal("milestone.add"), label: name, date, isColumn: z.boolean().optional() }),
   z.object({ op: z.literal("milestone.update"), id: ref, label: name.optional(), date: date.optional(), isColumn: z.boolean().optional() }),
   z.object({ op: z.literal("milestone.delete"), id: ref }),
-  z.object({ op: z.literal("task.add"), moduleId: ref, milestoneId: ref.nullable().optional(), title: name, assigneeId: ref.nullable().optional() }),
+  z.object({
+    op: z.literal("task.add"),
+    moduleId: ref,
+    milestoneId: ref.nullable().optional(),
+    title: name,
+    assigneeId: ref.nullable().optional(),
+    reviewerId: ref.nullable().optional(),
+    dueDate: date.nullable().optional(),
+  }),
   z.object({
     op: z.literal("task.update"),
     id: ref,
     title: name.optional(),
     status: z.enum(TASK_STATUSES).optional(),
     assigneeId: ref.nullable().optional(),
+    reviewerId: ref.nullable().optional(),
     milestoneId: ref.nullable().optional(),
+    dueDate: date.nullable().optional(),
+    note: z.string().trim().max(1000).optional(),
   }),
   z.object({ op: z.literal("task.delete"), id: ref }),
 ]);
@@ -75,25 +87,60 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       if (!mod) return notFoundJson();
       const [row] = await db
         .insert(workplanTasks)
-        .values({ engagementId: id, moduleId: op.moduleId, milestoneId: op.milestoneId ?? null, title: op.title, assigneeId: op.assigneeId ?? null })
+        .values({
+          engagementId: id,
+          moduleId: op.moduleId,
+          milestoneId: op.milestoneId ?? null,
+          title: op.title,
+          assigneeId: op.assigneeId ?? null,
+          reviewerId: op.reviewerId ?? auth.user.id,
+          dueDate: op.dueDate ?? null,
+          createdBy: auth.user.id,
+        })
         .returning();
       return ok({ id: row!.id });
     }
     case "task.update": {
-      const res = await db
+      const task = await db.query.workplanTasks.findFirst({ where: and(eq(workplanTasks.id, op.id), eq(workplanTasks.engagementId, id)) });
+      if (!task) return notFoundJson();
+      const mod = await db.query.workplanModules.findFirst({ where: eq(workplanModules.id, task.moduleId) });
+      const lead = mod?.leadId ?? null;
+      const me = auth.user.id;
+      if (op.status !== undefined && op.status !== task.status && !allowedMoves(task, me, true, lead).includes(op.status)) {
+        const msg = op.status === "done" ? "Only the reviewer can mark this done." : "Only the assignee or reviewer can change this.";
+        return NextResponse.json({ error: msg }, { status: 403 });
+      }
+      const reviewer = reviewerOf(task, lead);
+      const manages = reviewer === null || reviewer === me || task.createdBy === me;
+      const reassigns = op.title !== undefined || op.assigneeId !== undefined || op.reviewerId !== undefined || op.milestoneId !== undefined || op.dueDate !== undefined;
+      if (reassigns && !manages) return NextResponse.json({ error: "Only whoever assigned this can change it." }, { status: 403 });
+      // A reviewer sending work back can leave a note; it clears once the task is done.
+      const sendBack = op.status === "in_progress" && (task.status === "almost_done" || task.status === "done");
+      await db
         .update(workplanTasks)
         .set({
           ...(op.title !== undefined && { title: op.title }),
           ...(op.status !== undefined && { status: op.status }),
           ...(op.assigneeId !== undefined && { assigneeId: op.assigneeId }),
+          ...(op.reviewerId !== undefined && { reviewerId: op.reviewerId }),
           ...(op.milestoneId !== undefined && { milestoneId: op.milestoneId }),
+          ...(op.dueDate !== undefined && { dueDate: op.dueDate }),
+          ...(sendBack && { reviewNote: op.note ?? "" }),
+          ...(op.status === "done" && { reviewNote: "" }),
         })
-        .where(and(eq(workplanTasks.id, op.id), eq(workplanTasks.engagementId, id)))
-        .returning({ id: workplanTasks.id });
-      return res.length ? ok() : notFoundJson();
-    }
-    case "task.delete":
-      await db.delete(workplanTasks).where(and(eq(workplanTasks.id, op.id), eq(workplanTasks.engagementId, id)));
+        .where(and(eq(workplanTasks.id, op.id), eq(workplanTasks.engagementId, id)));
       return ok();
+    }
+    case "task.delete": {
+      const task = await db.query.workplanTasks.findFirst({ where: and(eq(workplanTasks.id, op.id), eq(workplanTasks.engagementId, id)) });
+      if (!task) return notFoundJson();
+      const mod = await db.query.workplanModules.findFirst({ where: eq(workplanModules.id, task.moduleId) });
+      const reviewer = reviewerOf(task, mod?.leadId ?? null);
+      if (reviewer !== null && reviewer !== auth.user.id && task.createdBy !== auth.user.id) {
+        return NextResponse.json({ error: "Only whoever assigned this can delete it." }, { status: 403 });
+      }
+      await db.delete(workplanTasks).where(eq(workplanTasks.id, op.id));
+      return ok();
+    }
   }
 }

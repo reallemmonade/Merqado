@@ -510,6 +510,10 @@ export const workplanMilestones = sqliteTable(
   (t) => [index("workplan_milestones_engagement").on(t.engagementId)],
 );
 
+/**
+ * Stored keys predate the current labels: not_yet = Not started, in_progress = Started,
+ * almost_done = Ready for review, done = Done (see TASK_STATUS_LABEL).
+ */
 export const TASK_STATUSES = ["not_yet", "in_progress", "almost_done", "done"] as const;
 export type TaskStatus = (typeof TASK_STATUSES)[number];
 
@@ -527,6 +531,13 @@ export const workplanTasks = sqliteTable(
     title: text("title").notNull(),
     assigneeId: text("assignee_id").references(() => users.id, { onDelete: "set null" }),
     status: text("status", { enum: TASK_STATUSES }).notNull().default("not_yet"),
+    /** ISO date; falls back to the milestone's date when empty. */
+    dueDate: text("due_date"),
+    /** Who marks it done. Falls back to whoever assigned it, then the module lead. */
+    reviewerId: text("reviewer_id").references(() => users.id, { onDelete: "set null" }),
+    createdBy: text("created_by").references(() => users.id, { onDelete: "set null" }),
+    /** The reviewer's note when sending a task back. */
+    reviewNote: text("review_note").notNull().default(""),
     sort: integer("sort").notNull().default(0),
     createdAt: createdAt(),
   },

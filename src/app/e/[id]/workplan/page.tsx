@@ -1,17 +1,63 @@
+import Link from "next/link";
+import { and, eq } from "drizzle-orm";
 import { CaseShell } from "@/components/case/CaseShell";
+import { MyTasks, ReviewList, type ReviewExpert } from "@/components/case/TaskViews";
 import { WorkplanGrid } from "@/components/case/WorkplanGrid";
+import { experts } from "@/db/schema";
 import { loadWorkplan } from "@/lib/case/data";
 import { loadCase } from "@/lib/case/page";
+import { reviewerOf } from "@/lib/case/tasks";
+import { anonymizeTitle, honorarium } from "@/lib/experts/calc";
+import { can } from "@/lib/roles";
 
 export const dynamic = "force-dynamic";
 
-export default async function WorkplanPage({ params }: { params: Promise<{ id: string }> }) {
+type View = "plan" | "mine" | "review";
+
+export default async function WorkplanPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ view?: string }> }) {
   const { id } = await params;
-  const ctx = await loadCase(id, "/workplan");
-  const wp = await loadWorkplan(ctx.db, id);
+  const sp = await searchParams;
+  const view: View = sp.view === "mine" || sp.view === "review" ? sp.view : "plan";
+  const ctx = await loadCase(id, view === "plan" ? "/workplan" : `/workplan?view=${view}`);
+  const me = ctx.user.id;
+  const canApprove = can(ctx.access, "approve_experts");
+  const [wp, proposedRows] = await Promise.all([
+    loadWorkplan(ctx.db, id),
+    canApprove ? ctx.db.select().from(experts).where(and(eq(experts.engagementId, id), eq(experts.status, "proposed"))) : Promise.resolve([]),
+  ]);
+
+  const leadOf = new Map(wp.modules.map((m) => [m.id, m.leadId]));
+  const mine = wp.tasks.filter((t) => t.assigneeId === me);
+  const toReview = wp.tasks.filter((t) => t.status === "almost_done" && reviewerOf(t, leadOf.get(t.moduleId)) === me);
+  const nameOf = new Map(ctx.members.map((m) => [m.id, m.name]));
+  const proposed: ReviewExpert[] = proposedRows.map((e) => ({
+    id: e.id,
+    name: [e.firstName, e.lastName].filter(Boolean).join(" "),
+    title: e.anonTitle || anonymizeTitle(e.company, e.title, e.isFormer),
+    cost: honorarium(e),
+    proposedBy: e.proposedBy ? (nameOf.get(e.proposedBy) ?? null) : null,
+  }));
+
+  const base = `/e/${id}/workplan`;
+  const tabs: { key: View; label: string; href: string; count?: number }[] = [
+    { key: "plan", label: "Plan", href: base },
+    { key: "mine", label: "My tasks", href: `${base}?view=mine`, count: mine.filter((t) => t.status !== "done").length },
+    { key: "review", label: "To review", href: `${base}?view=review`, count: toReview.length + proposed.length },
+  ];
+
   return (
     <CaseShell ctx={ctx} section="workplan" title="Workplan">
-      <WorkplanGrid engagementId={id} wp={wp} members={ctx.members} canEdit={ctx.canEdit} />
+      <nav className="seg" aria-label="Workplan view" style={{ alignSelf: "flex-start" }}>
+        {tabs.map((t) => (
+          <Link key={t.key} href={t.href} className="seg-link" aria-current={view === t.key ? "page" : undefined}>
+            {t.label}
+            {t.count ? <span className="seg-count">{t.count}</span> : null}
+          </Link>
+        ))}
+      </nav>
+      {view === "plan" && <WorkplanGrid engagementId={id} wp={wp} members={ctx.members} canEdit={ctx.canEdit} me={me} />}
+      {view === "mine" && <MyTasks engagementId={id} wp={wp} tasks={mine} members={ctx.members} canEdit={ctx.canEdit} me={me} />}
+      {view === "review" && <ReviewList engagementId={id} wp={wp} tasks={toReview} experts={proposed} members={ctx.members} canEdit={ctx.canEdit} />}
     </CaseShell>
   );
 }
