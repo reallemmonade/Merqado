@@ -130,7 +130,7 @@ export default async function ExpertsMetricsPage({ params }: { params: Promise<{
             <span><i className="seg-approved" />Approved</span>
             <span><i className="seg-proposed" />Proposed</span>
           </div>
-          {typeRows.length === 0 && <p className="muted">Add interviewee types and targets in {setupLink}.</p>}
+          {typeRows.length === 0 && <p className="toolbar"><span className="muted">No types</span>{setupLink}</p>}
           {typeRows.map((t) => {
             const inMotion = t.cov.scheduled + t.cov.approved + t.cov.proposed;
             const target = Math.max(t.target, t.cov.completed + inMotion, 1);
@@ -158,7 +158,7 @@ export default async function ExpertsMetricsPage({ params }: { params: Promise<{
             Case budget
           </h2>
           {b.total === 0 ? (
-            <p className="muted">Set the case budget and planned interviews in {setupLink}.</p>
+            <p className="toolbar"><span className="muted">No budget</span>{setupLink}</p>
           ) : (
             <>
               <div className="tiles">
@@ -239,7 +239,7 @@ export default async function ExpertsMetricsPage({ params }: { params: Promise<{
           <span><i className="seg-completed" />Discussed in an interview</span>
           <span><i style={{ background: "var(--st-approved)", border: "1px solid var(--st-scheduled)", boxSizing: "border-box" }} />Know it, not discussed yet</span>
         </div>
-        {topicRows.length === 0 && <p className="muted">Add the case topics in {setupLink}.</p>}
+        {topicRows.length === 0 && <p className="toolbar"><span className="muted">No topics</span>{setupLink}</p>}
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 380px), 1fr))", gap: "16px 40px" }}>
           {topicRows.map((t) => (
             <div key={t.id} style={{ display: "flex", flexDirection: "column", gap: 6 }}>

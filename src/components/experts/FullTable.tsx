@@ -372,7 +372,7 @@ export function FullTable({
                 drag?.kind === "col" && drag.id === c.key ? "dragging" : "",
                 drag?.kind === "col" && over === c.key ? "drop-here" : "",
               ].join(" ")}
-              title="Drag to move this column"
+              title="Move"
               {...source("col", c.key)}
               {...target("col", c.key)}
             >
@@ -395,7 +395,7 @@ export function FullTable({
             <tr key={e.id} className={cls || undefined} {...target("row", e.id)}>
               <td style={{ paddingLeft: 4 }}>
                 <div style={{ display: "flex", alignItems: "flex-start", gap: 2 }}>
-                  <span className="row-handle" title="Drag to move this row" aria-hidden="true" {...source("row", e.id)}>
+                  <span className="row-handle" title="Move" aria-hidden="true" {...source("row", e.id)}>
                     ⋮⋮
                   </span>
                   <button type="button" className="linklike" onClick={() => onOpen(e.id)} title="Open details">

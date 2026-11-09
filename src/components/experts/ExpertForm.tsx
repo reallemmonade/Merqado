@@ -92,7 +92,7 @@ export function ExpertForm({
         </label>
         <label className="field">
           Full title
-          <input type="text" value={v.title} onChange={(e) => set("title", e.target.value)} placeholder="Senior Director, Commercial Strategy" />
+          <input type="text" value={v.title} onChange={(e) => set("title", e.target.value)} placeholder="Title" />
         </label>
       </div>
       <label className="check">

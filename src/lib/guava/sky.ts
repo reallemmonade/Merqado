@@ -305,4 +305,4 @@ function fmtHour(h) {
 
 
 
-export { guavaSky, sunTimes, place, fmtHour, LOOKS, FONTS, CITIES, PALETTES };
+export { guavaSky, sunTimes, place, fmtHour, LOOKS, FONTS, CITIES, PALETTES, reach, contrast };
