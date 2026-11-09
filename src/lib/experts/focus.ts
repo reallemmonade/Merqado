@@ -7,6 +7,8 @@ import type { ExpertRow } from "./data";
  * suits the question (e.g. most recent call first for "discussed").
  *
  *   type:<typeId>:<status>        Coverage by type segment
+ *   type:<typeId>                 Everyone of that type (Overview category row)
+ *   status:<status>               Everyone at that status (Overview interviews bar)
  *   topic:<topicId>:discussed     Topic coverage, talked about it in a transcript
  *   topic:<topicId>:notyet        Topic coverage, tagged with it but not discussed yet
  *   budget:spent | budget:booked | budget:expected
@@ -46,6 +48,16 @@ export function resolveFocus(data: Data, key: string | undefined): Focus | null 
     const type = data.types.find((t) => t.id === id);
     if (!type) return null;
     return pick(`${type.name} · ${STATUS_LABEL[part].toLowerCase()}`, live.filter((e) => e.typeId === id && e.status === part), part === "completed" ? byDateDesc : bySoonest);
+  }
+
+  if (kind === "type" && id && !part) {
+    const type = data.types.find((t) => t.id === id);
+    if (!type) return null;
+    return pick(type.name, live.filter((e) => e.typeId === id), byProgress);
+  }
+
+  if (kind === "status" && id && isStatus(id)) {
+    return pick(STATUS_LABEL[id], live.filter((e) => e.status === id), id === "completed" ? byDateDesc : bySoonest);
   }
 
   if (kind === "topic" && id && (part === "discussed" || part === "notyet")) {

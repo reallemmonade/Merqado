@@ -10,6 +10,7 @@ import { loadCase } from "@/lib/case/page";
 import { progressPct, shortDate, TASK_STATUS_LABEL, timelinePct, todayIso } from "@/lib/case/progress";
 import { checkMove, dueOf, reviewerOf } from "@/lib/case/tasks";
 import { parseApprovals, waitingOn } from "@/lib/experts/approval";
+import { focusHref } from "@/lib/experts/focus";
 import { todoViews } from "@/lib/todos/view";
 
 export const dynamic = "force-dynamic";
@@ -68,11 +69,12 @@ export default async function OverviewPage({
     { label: "Workplan", done: wp.modules.length > 0, href: "/workplan" },
     { label: "Team chats", done: rooms.length > 0, href: "/channel" },
     { label: "Experts", done: expertRows.length > 0, href: "/experts" },
-    { label: "Hypotheses", done: hyps.length > 0, href: "/experts/ktas" },
+    { label: "Hypotheses", done: hyps.length > 0, href: "/experts/setup" },
     { label: "Files", done: files.length > 0, href: "/files" },
     { label: "Deck", done: deck.slides.length > 0, href: "/deck" },
   ];
   const setupDone = setup.filter((s) => s.done).length;
+  const kta = (h: string, v?: "supports" | "challenges") => `${base}/experts/ktas?h=${h}${v ? `&v=${v}` : ""}#hyp-${h}`;
 
   const completed = expertRows.filter((e) => e.status === "completed").length;
   const scheduled = expertRows.filter((e) => e.status === "scheduled").length;
@@ -90,12 +92,16 @@ export default async function OverviewPage({
       {milestones.length > 0 && start && end && (
         <section className="card">
           <div className="toolbar">
-            <h2 style={{ fontSize: 16 }}>Timeline</h2>
+            <h2 style={{ fontSize: 16 }}>
+              <Link href={`${base}/workplan`} className="plain">
+                Timeline
+              </Link>
+            </h2>
             <span className="grow" />
             {nextMilestone && (
-              <span className="muted" style={{ fontSize: 13 }}>
+              <Link href={`${base}/workplan#ms-${nextMilestone.id}`} className="muted plain" style={{ fontSize: 13 }}>
                 Next: {nextMilestone.label} · {shortDate(nextMilestone.date)}
-              </span>
+              </Link>
             )}
           </div>
           <div className="tl" role="list">
@@ -103,11 +109,17 @@ export default async function OverviewPage({
               <span className="tl-fill" style={{ width: `${timelinePct(today, start, end)}%` }} />
             </div>
             {milestones.map((m) => (
-              <div key={m.id} role="listitem" className={`tl-point${m.date < today ? " past" : ""}`} style={{ left: `${timelinePct(m.date, start, end)}%` }}>
+              <Link
+                key={m.id}
+                href={`${base}/workplan#ms-${m.id}`}
+                role="listitem"
+                className={`tl-point plain${m.date < today ? " past" : ""}`}
+                style={{ left: `${timelinePct(m.date, start, end)}%` }}
+              >
                 <i />
                 <span className="tl-label">{m.label}</span>
                 <span className="mono">{shortDate(m.date)}</span>
-              </div>
+              </Link>
             ))}
             {today >= start && today <= end && (
               <div className="tl-today" style={{ left: `${timelinePct(today, start, end)}%` }}>
@@ -124,7 +136,7 @@ export default async function OverviewPage({
             const tasks = wp.tasks.filter((t) => t.moduleId === m.id);
             const pct = progressPct(tasks);
             return (
-              <Link key={m.id} href={`${base}/workplan`} className="card mod-card">
+              <Link key={m.id} href={`${base}/workplan#mod-${m.id}`} className="card mod-card">
                 <span style={{ fontWeight: 600 }}>{m.name}</span>
                 <span className="tile-value" style={{ fontSize: 22 }}>{pct}%</span>
                 <span className="bar">
@@ -141,7 +153,11 @@ export default async function OverviewPage({
         <div className="primary">
           <section className="panel">
             <div className="group-head">
-              <h2>To do</h2>
+              <h2>
+                <Link href={`${base}/workplan`} className="plain">
+                  To do
+                </Link>
+              </h2>
               <span className="grow" style={{ flex: 1 }} />
               <nav className="seg" aria-label="Whose to-dos">
                 <Link href={base} className="seg-link" aria-current={!team ? "page" : undefined}>
@@ -155,19 +171,23 @@ export default async function OverviewPage({
             <div className="panel-body" style={{ gap: 0 }}>
               {openTasks.map((t) => (
                 <div className="row todo" key={t.id}>
-                  <label className="check" style={{ flex: 1 }}>
+                  <span className="check" style={{ flex: 1 }}>
                     <TaskCheck
                       engagementId={id}
                       taskId={t.id}
                       next={checkMove(t, user.id, ctx.canEdit, leadOf.get(t.moduleId))}
                       label={t.title}
                     />
-                    <span>{t.title}</span>
-                  </label>
+                    <Link href={`${base}/workplan#task-${t.id}`} className="plain">
+                      {t.title}
+                    </Link>
+                  </span>
                   <span className="meta">
                     {team && t.assigneeId && <span>{nameOf.get(t.assigneeId)}</span>}
                     {dueOf(t, milestoneDate) && <span>{shortDate(dueOf(t, milestoneDate))}</span>}
-                    <span className={`pill ts-${t.status}`}>{TASK_STATUS_LABEL[t.status]}</span>
+                    <Link href={`${base}/workplan#task-${t.id}`} className={`pill ts-${t.status}`}>
+                      {TASK_STATUS_LABEL[t.status]}
+                    </Link>
                   </span>
                 </div>
               ))}
@@ -179,7 +199,9 @@ export default async function OverviewPage({
                     <Link href={`${base}/experts?expert=${e.id}`} style={{ flex: 1 }}>
                       Approve {[e.firstName, e.lastName].filter(Boolean).join(" ")}
                     </Link>
-                    <span className="pill pill-proposed">Proposed</span>
+                    <Link href={`${base}/experts?expert=${e.id}`} className="pill pill-proposed">
+                      Proposed
+                    </Link>
                   </div>
                 ))}
               {openContradictions.length > 0 && (
@@ -187,15 +209,19 @@ export default async function OverviewPage({
                   <Link href={`${base}/deck/contradictions`} style={{ flex: 1 }}>
                     Contradictions in the deck
                   </Link>
-                  <span className="pill sev-high">{openContradictions.length}</span>
+                  <Link href={`${base}/deck/contradictions`} className="pill sev-high">
+                    {openContradictions.length}
+                  </Link>
                 </div>
               )}
               {openItems.map((n) => (
                 <div className="row todo" key={n.id}>
-                  <Link href={`${base}/notes`} style={{ flex: 1 }}>
+                  <Link href={`${base}/notes#note-${n.id}`} style={{ flex: 1 }}>
                     {n.body}
                   </Link>
-                  <span className="tag">Open</span>
+                  <Link href={`${base}/notes#note-${n.id}`} className="tag">
+                    Open
+                  </Link>
                 </div>
               ))}
               {openTasks.length + todo.open.length + openItems.length + proposed.length + openContradictions.length === 0 && <p className="muted">Nothing open</p>}
@@ -206,7 +232,11 @@ export default async function OverviewPage({
 
           <section className="panel">
             <div className="group-head">
-              <h2>Hypotheses</h2>
+              <h2>
+                <Link href={`${base}/experts/ktas`} className="plain">
+                  Hypotheses
+                </Link>
+              </h2>
             </div>
             <div className="panel-body" style={{ gap: 0 }}>
               {hyps.map((h) => {
@@ -215,12 +245,16 @@ export default async function OverviewPage({
                 const chal = mine.filter((k) => k.verdict === "challenges").length;
                 return (
                   <div className="row" key={h.id}>
-                    <Link href={`${base}/experts/ktas`} style={{ flex: 1 }}>
+                    <Link href={kta(h.id)} style={{ flex: 1 }}>
                       {h.statement}
                     </Link>
                     <span className="meta">
-                      <span className="tag v-supports">{sup} supports</span>
-                      <span className="tag v-challenges">{chal} challenges</span>
+                      <Link href={kta(h.id, "supports")} className="tag v-supports">
+                        {sup} supports
+                      </Link>
+                      <Link href={kta(h.id, "challenges")} className="tag v-challenges">
+                        {chal} challenges
+                      </Link>
                     </span>
                   </div>
                 );
@@ -233,40 +267,54 @@ export default async function OverviewPage({
         <div className="side" style={{ display: "flex", flexDirection: "column", gap: 14 }}>
           <section className="card">
             <div className="toolbar">
-              <h2 style={{ fontSize: 16 }}>Interviews</h2>
+              <h2 style={{ fontSize: 16 }}>
+                <Link href={`${base}/experts/metrics`} className="plain">
+                  Interviews
+                </Link>
+              </h2>
               <span className="grow" />
-              <span className="mono">
+              <Link href={focusHref(id, "status:completed")} className="mono plain">
                 {completed}/{planned || expertRows.length}
-              </span>
+              </Link>
             </div>
             <span className="covbar big">
-              <span className="seg-completed" style={{ width: `${pctOf(completed, planned || expertRows.length)}%` }} />
-              <span className="seg-scheduled" style={{ width: `${pctOf(scheduled, planned || expertRows.length)}%` }} />
+              {completed > 0 && (
+                <Link href={focusHref(id, "status:completed")} className="seg-completed" aria-label={`Completed: ${completed}`} style={{ width: `${pctOf(completed, planned || expertRows.length)}%` }} />
+              )}
+              {scheduled > 0 && (
+                <Link href={focusHref(id, "status:scheduled")} className="seg-scheduled" aria-label={`Scheduled: ${scheduled}`} style={{ width: `${pctOf(scheduled, planned || expertRows.length)}%` }} />
+              )}
             </span>
             <div className="legend">
-              <span><i className="seg-completed" />Completed</span>
-              <span><i className="seg-scheduled" />Scheduled</span>
+              <Link href={focusHref(id, "status:completed")}><i className="seg-completed" />Completed</Link>
+              <Link href={focusHref(id, "status:scheduled")}><i className="seg-scheduled" />Scheduled</Link>
             </div>
             {types.map((t) => {
               const rows = expertRows.filter((e) => e.typeId === t.id);
               return (
                 <div className="row" key={t.id} style={{ padding: "6px 0" }}>
-                  <span>{t.name}</span>
-                  <span className="mono">
+                  <Link href={focusHref(id, `type:${t.id}`)} className="plain" style={{ flex: 1 }}>
+                    {t.name}
+                  </Link>
+                  <Link href={focusHref(id, `type:${t.id}:completed`)} className="mono plain">
                     {rows.filter((e) => e.status === "completed").length}/{t.target || rows.length}
-                  </span>
+                  </Link>
                 </div>
               );
             })}
           </section>
 
           <section className="card">
-            <h2 style={{ fontSize: 16 }}>Decisions</h2>
+            <h2 style={{ fontSize: 16 }}>
+              <Link href={`${base}/notes`} className="plain">
+                Decisions
+              </Link>
+            </h2>
             {decisions.slice(0, 6).map((n) => (
-              <div className="row" key={n.id} style={{ padding: "6px 0" }}>
+              <Link href={`${base}/notes#note-${n.id}`} className="row plain" key={n.id} style={{ padding: "6px 0" }}>
                 <span>{n.body}</span>
-                <span className="mono">{shortDate(isoOf(n.createdAt))}</span>
-              </div>
+                <span className="mono" style={{ whiteSpace: "nowrap" }}>{shortDate(isoOf(n.createdAt))}</span>
+              </Link>
             ))}
             {decisions.length === 0 && <p className="muted">None</p>}
           </section>

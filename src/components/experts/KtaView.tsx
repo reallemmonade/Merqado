@@ -12,9 +12,28 @@ const VERDICTS = [
   ["new", "New point"],
 ] as const;
 
-export function KtaView({ engagementId, data, canEdit }: { engagementId: string; data: ExpertsData; canEdit: boolean }) {
+export function KtaView({
+  engagementId,
+  data,
+  canEdit,
+  focusHyp,
+  focusVerdict,
+}: {
+  engagementId: string;
+  data: ExpertsData;
+  canEdit: boolean;
+  /** Opened from a hypothesis (or its supports / challenges count): show only the takeaways behind it. */
+  focusHyp?: string;
+  focusVerdict?: "supports" | "challenges";
+}) {
   const api = useApi();
-  const interviews = data.experts.filter((e) => data.takeaways.some((k) => k.expertId === e.id));
+  const base = `/e/${engagementId}/experts/ktas`;
+  const hypHref = (h: string, v?: "supports" | "challenges") => `${base}?h=${h}${v ? `&v=${v}` : ""}#hyp-${h}`;
+  const inFocus = (k: ExpertsData["takeaways"][number]) =>
+    !focusHyp || (k.included && k.hypothesisId === focusHyp && (!focusVerdict || k.verdict === focusVerdict));
+  const takeaways = data.takeaways.filter(inFocus);
+  const focused = data.hypotheses.find((h) => h.id === focusHyp);
+  const interviews = data.experts.filter((e) => takeaways.some((k) => k.expertId === e.id));
   const patch = (id: string, json: Record<string, unknown>) =>
     api.call(`kta-${id}`, `/api/engagements/${engagementId}/takeaways/${id}`, { method: "PATCH", json });
   const included = data.takeaways.filter((k) => k.included);
@@ -22,7 +41,7 @@ export function KtaView({ engagementId, data, canEdit }: { engagementId: string;
 
   const themes = data.hypotheses.map((h) => {
     const ks = included.filter((k) => k.hypothesisId === h.id);
-    const sup = ks.filter((k) => k.verdict !== "challenges").length;
+    const sup = ks.filter((k) => k.verdict === "supports").length;
     const ch = ks.filter((k) => k.verdict === "challenges").length;
     const read = !ks.length ? "Not tested yet" : ch === 0 ? "Holding up" : sup > ch ? "Mostly holding, with exceptions" : "Under pressure";
     return { h, ks, sup, ch, read };
@@ -33,13 +52,21 @@ export function KtaView({ engagementId, data, canEdit }: { engagementId: string;
     <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
       <div className="split">
         <section className="primary" aria-label="Takeaways by interview">
+          {focused && (
+            <span className="pill filter-chip">
+              {[focused.statement, focusVerdict === "supports" ? "Supports" : focusVerdict === "challenges" ? "Challenges" : ""].filter(Boolean).join(" · ")}
+              <Link href={base} className="x" aria-label="Show all takeaways">
+                ×
+              </Link>
+            </span>
+          )}
           {interviews.length === 0 && (
             <div className="empty">
-              <strong>No takeaways yet</strong>
+              <strong>{focused ? "None" : "No takeaways yet"}</strong>
             </div>
           )}
           {interviews.map((e) => {
-            const ks = data.takeaways.filter((k) => k.expertId === e.id);
+            const ks = takeaways.filter((k) => k.expertId === e.id);
             const on = ks.filter((k) => k.included).length;
             const type = data.types.find((t) => t.id === e.typeId);
             return (
@@ -131,18 +158,24 @@ export function KtaView({ engagementId, data, canEdit }: { engagementId: string;
           </div>
           {themes.length === 0 && <p className="muted">No hypotheses</p>}
           {themes.map(({ h, ks, sup, ch, read }) => (
-            <div key={h.id} className="card" style={{ gap: 10, padding: 16 }}>
+            <div key={h.id} id={`hyp-${h.id}`} className={`card${h.id === focusHyp ? " hyp-on" : ""}`} style={{ gap: 10, padding: 16 }}>
               <div>
                 {h.slideRef && (
                   <div className="muted" style={{ fontSize: 12 }}>
                     {h.slideRef}
                   </div>
                 )}
-                <strong>{h.statement}</strong>
+                <Link href={hypHref(h.id)} className="plain">
+                  <strong>{h.statement}</strong>
+                </Link>
               </div>
               <div className="meta">
-                <span className="tag v-supports">{sup} support</span>
-                <span className="tag v-challenges">{ch} challenge</span>
+                <Link href={hypHref(h.id, "supports")} className="tag v-supports">
+                  {sup} support
+                </Link>
+                <Link href={hypHref(h.id, "challenges")} className="tag v-challenges">
+                  {ch} challenge
+                </Link>
                 <span style={{ fontWeight: 600, color: "var(--ink)" }}>{read}</span>
               </div>
               {ks.length > 0 && (

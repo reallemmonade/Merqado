@@ -71,7 +71,7 @@ export function WorkplanGrid({ engagementId, wp, members, canEdit, canAssign, ca
               <tr>
                 <th style={{ width: 200 }}>Module</th>
                 {cols.map((c) => (
-                  <th key={c.id ?? "none"} className={c.id && c.id === nextCol ? "wp-next" : undefined}>
+                  <th key={c.id ?? "none"} id={c.id ? `ms-${c.id}` : undefined} className={c.id && c.id === nextCol ? "wp-next" : undefined}>
                     <div style={{ fontWeight: 600, color: "var(--ink)", fontSize: 13 }}>{c.label}</div>
                     <div className="mono">{c.date ? shortDate(c.date) : ""}</div>
                   </th>
@@ -80,7 +80,7 @@ export function WorkplanGrid({ engagementId, wp, members, canEdit, canAssign, ca
             </thead>
             <tbody>
               {wp.modules.map((m) => (
-                <tr key={m.id}>
+                <tr key={m.id} id={`mod-${m.id}`}>
                   <td>
                     <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                       <strong>{m.name}</strong>

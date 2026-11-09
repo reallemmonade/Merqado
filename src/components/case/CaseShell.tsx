@@ -1,8 +1,10 @@
+import { Suspense } from "react";
 import Link from "next/link";
 import { NavUser } from "@/components/NavUser";
 import type { CaseContext } from "@/lib/case/page";
 import { getPrefs } from "@/lib/prefs.server";
 import { GptBar } from "./GptBar";
+import { HashFocus } from "./HashFocus";
 import { Icon, type IconName } from "./icons";
 import { Shortcuts } from "./Shortcuts";
 
@@ -49,6 +51,9 @@ export async function CaseShell({
   return (
     <div className="shell">
       <Shortcuts engagementId={id} />
+      <Suspense>
+        <HashFocus />
+      </Suspense>
       {full ? (
         <nav className="nav" aria-label="Case sections">
           <Link href="/" className="brand" style={{ padding: 0 }}>
