@@ -8,7 +8,7 @@ import { loadDeck, loadNotes, loadWorkplan } from "@/lib/case/data";
 import { loadCase } from "@/lib/case/page";
 import { progressPct, shortDate, TASK_STATUS_LABEL, timelinePct, todayIso } from "@/lib/case/progress";
 import { checkMove, dueOf, reviewerOf } from "@/lib/case/tasks";
-import { can } from "@/lib/roles";
+import { allows } from "@/lib/roles";
 
 export const dynamic = "force-dynamic";
 
@@ -24,7 +24,7 @@ export default async function OverviewPage({
   const ctx = await loadCase(id);
   const { db, user } = ctx;
   const team = sp.todo === "team";
-  const canApprove = can(ctx.access, "approve_experts");
+  const canApprove = allows(ctx.membership, "approve_experts");
 
   const [wp, notes, deck, hyps, takeaways, expertRows, types, budget, rooms, files] = await Promise.all([
     loadWorkplan(db, id),

@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { and, eq, max } from "drizzle-orm";
 import { z } from "zod";
-import { TASK_STATUSES, workplanMilestones, workplanModules, workplanTasks } from "@/db/schema";
+import { ARCHETYPES, engagementMembers, TASK_STATUSES, workplanMilestones, workplanModules, workplanTasks } from "@/db/schema";
+import { allows } from "@/lib/roles";
 import { notFoundJson, ok, parseOp } from "@/lib/case/api";
 import { allowedMoves, reviewerOf } from "@/lib/case/tasks";
 
@@ -37,14 +38,21 @@ const Op = z.discriminatedUnion("op", [
     note: z.string().trim().max(1000).optional(),
   }),
   z.object({ op: z.literal("task.delete"), id: ref }),
+  z.object({ op: z.literal("member.role"), userId: ref, role: z.enum(ARCHETYPES).nullable() }),
 ]);
+
+const PLAN_OPS = new Set(["module.add", "module.update", "module.delete", "milestone.add", "milestone.update", "milestone.delete"]);
+const deny = (error: string) => NextResponse.json({ error }, { status: 403 });
 
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const r = await parseOp(req, id, "edit_findings", Op);
   if (r instanceof NextResponse) return r;
   const { auth, op } = r;
-  const { db } = auth;
+  const { db, membership } = auth;
+  if (PLAN_OPS.has(op.op) && !allows(membership, "edit_plan")) return deny("Only managers can change modules and dates.");
+  if (op.op === "task.add" && !allows(membership, "assign_tasks")) return deny("Only consultants and up can assign tasks.");
+  if (op.op === "member.role" && !allows(membership, "set_roles")) return deny("Only managers can change roles.");
 
   switch (op.op) {
     case "module.add": {
@@ -113,7 +121,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       const reviewer = reviewerOf(task, lead);
       const manages = reviewer === null || reviewer === me || task.createdBy === me;
       const reassigns = op.title !== undefined || op.assigneeId !== undefined || op.reviewerId !== undefined || op.milestoneId !== undefined || op.dueDate !== undefined;
-      if (reassigns && !manages) return NextResponse.json({ error: "Only whoever assigned this can change it." }, { status: 403 });
+      if (reassigns && !(manages && allows(membership, "assign_tasks"))) return deny("Only whoever assigned this can change it.");
       // A reviewer sending work back can leave a note; it clears once the task is done.
       const sendBack = op.status === "in_progress" && (task.status === "almost_done" || task.status === "done");
       await db
@@ -136,11 +144,18 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       if (!task) return notFoundJson();
       const mod = await db.query.workplanModules.findFirst({ where: eq(workplanModules.id, task.moduleId) });
       const reviewer = reviewerOf(task, mod?.leadId ?? null);
-      if (reviewer !== null && reviewer !== auth.user.id && task.createdBy !== auth.user.id) {
-        return NextResponse.json({ error: "Only whoever assigned this can delete it." }, { status: 403 });
-      }
+      const manages = reviewer === null || reviewer === auth.user.id || task.createdBy === auth.user.id;
+      if (!manages || !allows(membership, "assign_tasks")) return deny("Only whoever assigned this can delete it.");
       await db.delete(workplanTasks).where(eq(workplanTasks.id, op.id));
       return ok();
+    }
+    case "member.role": {
+      const res = await db
+        .update(engagementMembers)
+        .set({ caseRole: op.role })
+        .where(and(eq(engagementMembers.engagementId, id), eq(engagementMembers.userId, op.userId)))
+        .returning({ userId: engagementMembers.userId });
+      return res.length ? ok() : notFoundJson();
     }
   }
 }

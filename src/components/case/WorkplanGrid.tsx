@@ -14,7 +14,7 @@ function initials(name: string) {
   return ((p[0]?.[0] ?? "") + (p.length > 1 ? p[p.length - 1]![0] : "")).toUpperCase();
 }
 
-export function WorkplanGrid({ engagementId, wp, members, canEdit, me }: { engagementId: string; wp: Workplan; members: CaseMember[]; canEdit: boolean; me: string }) {
+export function WorkplanGrid({ engagementId, wp, members, canEdit, canAssign, canPlan, me }: { engagementId: string; wp: Workplan; members: CaseMember[]; canEdit: boolean; canAssign: boolean; canPlan: boolean; me: string }) {
   const { call, busy, error } = useApi();
   const url = `/api/engagements/${engagementId}/workplan`;
   const [who, setWho] = useState<string>("all");
@@ -33,7 +33,7 @@ export function WorkplanGrid({ engagementId, wp, members, canEdit, me }: { engag
   const nextCol = columns.find((c) => c.date >= today)?.id;
   const memberName = new Map(members.map((m) => [m.id, m.name]));
 
-  if (wp.modules.length === 0 && !canEdit) return <p className="muted">No workplan</p>;
+  if (wp.modules.length === 0 && !canPlan) return <p className="muted">No workplan</p>;
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
@@ -84,7 +84,7 @@ export function WorkplanGrid({ engagementId, wp, members, canEdit, me }: { engag
                   <td>
                     <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                       <strong>{m.name}</strong>
-                      {canEdit ? (
+                      {canPlan ? (
                         <select
                           aria-label={`Lead for ${m.name}`}
                           value={m.leadId ?? ""}
@@ -103,7 +103,7 @@ export function WorkplanGrid({ engagementId, wp, members, canEdit, me }: { engag
                           {m.leadId ? memberName.get(m.leadId) : ""}
                         </span>
                       )}
-                      {canEdit && (
+                      {canPlan && (
                         <button
                           type="button"
                           className="linkbtn"
@@ -125,7 +125,7 @@ export function WorkplanGrid({ engagementId, wp, members, canEdit, me }: { engag
                           {tasks.map((t) => {
                             const next = primaryMove(t, me, canEdit, m.leadId);
                             const reviewer = reviewerOf(t, m.leadId);
-                            const manages = canEdit && (reviewer === null || reviewer === me || t.createdBy === me);
+                            const manages = canAssign && (reviewer === null || reviewer === me || t.createdBy === me);
                             return (
                             <div key={t.id} id={`task-${t.id}`} className="wp-task" style={{ opacity: who === "all" || t.assigneeId === who ? 1 : 0.35 }}>
                               <span className="avatar" title={t.assigneeId ? memberName.get(t.assigneeId) : "Unassigned"}>
@@ -150,7 +150,7 @@ export function WorkplanGrid({ engagementId, wp, members, canEdit, me }: { engag
                             </div>
                             );
                           })}
-                          {canEdit &&
+                          {canAssign &&
                             (adding === key ? (
                               <form
                                 onSubmit={async (e) => {
@@ -220,7 +220,7 @@ export function WorkplanGrid({ engagementId, wp, members, canEdit, me }: { engag
         </div>
       )}
 
-      {canEdit && (
+      {canPlan && (
         <div className="toolbar">
           <form
             className="toolbar"

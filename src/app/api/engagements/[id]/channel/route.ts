@@ -4,7 +4,7 @@ import { z } from "zod";
 import { ARCHETYPES, caseNotes, chatMessages, chatRooms } from "@/db/schema";
 import { notFoundJson, ok, parseOp } from "@/lib/case/api";
 import { canSeeRoom, ROOM_TEMPLATES } from "@/lib/case/rooms";
-import { can } from "@/lib/roles";
+import { allows } from "@/lib/roles";
 import { getEngagementAccess } from "@/lib/session";
 
 const ref = z.string().min(1).max(64);
@@ -29,7 +29,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
 
   if (ROOM_OPS.has(op.op)) {
     const access = await getEngagementAccess(db, user, id);
-    if (!can(access?.access, "edit_findings")) return NextResponse.json({ error: "You can't change this case's chats." }, { status: 403 });
+    if (!allows(access, "edit_findings")) return NextResponse.json({ error: "You can't change this case's chats." }, { status: 403 });
   }
 
   /** A room on this case that this person's role can see. */

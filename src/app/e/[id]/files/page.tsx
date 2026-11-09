@@ -6,7 +6,7 @@ import { experts, expertTranscripts, sources, users } from "@/db/schema";
 import { loadCase } from "@/lib/case/page";
 import { shortDate } from "@/lib/case/progress";
 import { anonymizeTitle } from "@/lib/experts/calc";
-import { can } from "@/lib/roles";
+import { allows } from "@/lib/roles";
 
 export const dynamic = "force-dynamic";
 
@@ -24,7 +24,7 @@ export default async function FilesPage({ params, searchParams }: { params: Prom
   const sp = await searchParams;
   const ctx = await loadCase(id, "/files");
   const { db } = ctx;
-  const canUpload = can(ctx.access, "upload");
+  const canUpload = allows(ctx.membership, "upload");
   const [files, transcripts, people] = await Promise.all([
     db.select().from(sources).where(eq(sources.engagementId, id)).orderBy(desc(sources.createdAt)),
     db

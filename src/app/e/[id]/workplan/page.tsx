@@ -1,26 +1,28 @@
 import Link from "next/link";
 import { and, eq } from "drizzle-orm";
 import { CaseShell } from "@/components/case/CaseShell";
-import { MyTasks, ReviewList, type ReviewExpert } from "@/components/case/TaskViews";
+import { MyTasks, ReviewList, TeamRoles, type ReviewExpert } from "@/components/case/TaskViews";
 import { WorkplanGrid } from "@/components/case/WorkplanGrid";
 import { experts } from "@/db/schema";
 import { loadWorkplan } from "@/lib/case/data";
 import { loadCase } from "@/lib/case/page";
 import { reviewerOf } from "@/lib/case/tasks";
 import { anonymizeTitle, honorarium } from "@/lib/experts/calc";
-import { can } from "@/lib/roles";
+import { allows } from "@/lib/roles";
 
 export const dynamic = "force-dynamic";
 
-type View = "plan" | "mine" | "review";
+type View = "plan" | "mine" | "review" | "team";
 
 export default async function WorkplanPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ view?: string }> }) {
   const { id } = await params;
   const sp = await searchParams;
-  const view: View = sp.view === "mine" || sp.view === "review" ? sp.view : "plan";
+  const view: View = sp.view === "mine" || sp.view === "review" || sp.view === "team" ? sp.view : "plan";
   const ctx = await loadCase(id, view === "plan" ? "/workplan" : `/workplan?view=${view}`);
   const me = ctx.user.id;
-  const canApprove = can(ctx.access, "approve_experts");
+  const canApprove = allows(ctx.membership, "approve_experts");
+  const canAssign = allows(ctx.membership, "assign_tasks");
+  const canPlan = allows(ctx.membership, "edit_plan");
   const [wp, proposedRows] = await Promise.all([
     loadWorkplan(ctx.db, id),
     canApprove ? ctx.db.select().from(experts).where(and(eq(experts.engagementId, id), eq(experts.status, "proposed"))) : Promise.resolve([]),
@@ -43,6 +45,7 @@ export default async function WorkplanPage({ params, searchParams }: { params: P
     { key: "plan", label: "Plan", href: base },
     { key: "mine", label: "My tasks", href: `${base}?view=mine`, count: mine.filter((t) => t.status !== "done").length },
     { key: "review", label: "To review", href: `${base}?view=review`, count: toReview.length + proposed.length },
+    { key: "team", label: "Team", href: `${base}?view=team` },
   ];
 
   return (
@@ -55,9 +58,10 @@ export default async function WorkplanPage({ params, searchParams }: { params: P
           </Link>
         ))}
       </nav>
-      {view === "plan" && <WorkplanGrid engagementId={id} wp={wp} members={ctx.members} canEdit={ctx.canEdit} me={me} />}
+      {view === "plan" && <WorkplanGrid engagementId={id} wp={wp} members={ctx.members} canEdit={ctx.canEdit} canAssign={canAssign} canPlan={canPlan} me={me} />}
       {view === "mine" && <MyTasks engagementId={id} wp={wp} tasks={mine} members={ctx.members} canEdit={ctx.canEdit} me={me} />}
       {view === "review" && <ReviewList engagementId={id} wp={wp} tasks={toReview} experts={proposed} members={ctx.members} canEdit={ctx.canEdit} />}
+      {view === "team" && <TeamRoles engagementId={id} members={ctx.members} canSet={allows(ctx.membership, "set_roles")} />}
     </CaseShell>
   );
 }

@@ -1,12 +1,13 @@
 import { NextResponse } from "next/server";
 import { getDb, type DB } from "@/db/client";
-import { can, type Action } from "@/lib/roles";
+import { allows, type Action } from "@/lib/roles";
 import { getEngagementAccess, getSessionUser, type SessionUser } from "@/lib/session";
 
 export interface Authorized {
   db: DB;
   user: SessionUser;
   engagement: NonNullable<Awaited<ReturnType<typeof getEngagementAccess>>>["engagement"];
+  membership: NonNullable<Awaited<ReturnType<typeof getEngagementAccess>>>;
 }
 
 /** Signs the caller in and checks engagement access; returns an error response otherwise. */
@@ -15,10 +16,11 @@ export async function authorize(engagementId: string, action: Action): Promise<A
   const user = await getSessionUser(db);
   if (!user) return NextResponse.json({ error: "Sign in to continue." }, { status: 401 });
   const membership = await getEngagementAccess(db, user, engagementId);
-  if (!membership || !can(membership.access, action)) {
+  if (!membership || !allows(membership, action)) {
     return NextResponse.json({ error: "You don't have access to do that on this engagement." }, { status: 403 });
   }
-  return { db, user, engagement: membership.engagement };
+  // The case role stands in for the firm title everywhere on this case.
+  return { db, user: { ...user, archetype: membership.role }, engagement: membership.engagement, membership };
 }
 
 export function badRequest(message: string) {

@@ -104,6 +104,8 @@ export const engagementMembers = sqliteTable(
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
     access: text("access", { enum: ACCESS_LEVELS }).notNull().default("editor"),
+    /** Role on this case; null means the person's firm title decides it. Rights like approving follow it. */
+    caseRole: text("case_role", { enum: ARCHETYPES }),
   },
   (t) => [primaryKey({ columns: [t.engagementId, t.userId] })],
 );

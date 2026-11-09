@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getDb } from "@/db/client";
-import { can } from "@/lib/roles";
+import { allows } from "@/lib/roles";
 import { getEngagementAccess, getSessionUser } from "@/lib/session";
 import { saveSourceFile } from "@/lib/storage/files";
 
@@ -14,7 +14,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   if (!user) return NextResponse.json({ error: "Sign in to continue." }, { status: 401 });
 
   const membership = await getEngagementAccess(db, user, id);
-  if (!membership || !can(membership.access, "upload")) {
+  if (!membership || !allows(membership, "upload")) {
     return NextResponse.json({ error: "You can't upload to this engagement." }, { status: 403 });
   }
 

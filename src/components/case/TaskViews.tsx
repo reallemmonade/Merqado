@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import type { TaskStatus } from "@/db/schema";
+import { ROLE_LABEL, ROLE_ORDER } from "@/lib/roles";
 import type { Workplan } from "@/lib/case/data";
 import type { CaseMember } from "@/lib/case/page";
 import { shortDate, TASK_STATUS_LABEL, todayIso } from "@/lib/case/progress";
@@ -222,6 +223,55 @@ export function ReviewList({
                   </td>
                 </tr>
               ))}
+          </tbody>
+        </table>
+      </div>
+      {error && <p className="error">{error}</p>}
+    </>
+  );
+}
+
+/** Who plays which role on this case. A blank role follows the person's firm title. */
+export function TeamRoles({ engagementId, members, canSet }: { engagementId: string; members: CaseMember[]; canSet: boolean }) {
+  const { call, busy, error } = useApi();
+  const url = `/api/engagements/${engagementId}/workplan`;
+  return (
+    <>
+      <div className="group">
+        <table className="grid">
+          <thead>
+            <tr>
+              <th>Name</th>
+              <th>Title</th>
+              <th style={{ width: 260 }}>Role on case</th>
+            </tr>
+          </thead>
+          <tbody>
+            {members.map((m) => (
+              <tr key={m.id}>
+                <td>{m.name}</td>
+                <td className="muted">{m.title}</td>
+                <td>
+                  {canSet ? (
+                    <select
+                      aria-label={`Role for ${m.name}`}
+                      value={m.caseRole ?? ""}
+                      disabled={busy !== null}
+                      onChange={(e) => call(m.id, url, { json: { op: "member.role", userId: m.id, role: e.target.value || null } })}
+                    >
+                      <option value="">{ROLE_LABEL[m.firmArchetype]} (title)</option>
+                      {ROLE_ORDER.map((a) => (
+                        <option key={a} value={a}>
+                          {ROLE_LABEL[a]}
+                        </option>
+                      ))}
+                    </select>
+                  ) : (
+                    ROLE_LABEL[m.archetype]
+                  )}
+                </td>
+              </tr>
+            ))}
           </tbody>
         </table>
       </div>

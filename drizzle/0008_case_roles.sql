@@ -1,0 +1,1 @@
+ALTER TABLE `engagement_members` ADD `case_role` text;

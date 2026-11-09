@@ -57,6 +57,13 @@
       "when": 1794186821231,
       "tag": "0007_task_review",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "6",
+      "when": 1794187427662,
+      "tag": "0008_case_roles",
+      "breakpoints": true
     }
   ]
 }
