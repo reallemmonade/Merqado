@@ -268,6 +268,9 @@ kbd { font-family: var(--font-data); font-size: 11px; color: inherit; opacity: 0
 .nav-foot { margin-top: auto; display: flex; flex-direction: column; gap: 10px; }
 .rail-foot { margin-top: auto; display: flex; flex-direction: column; align-items: center; gap: 6px; }
 .nav-foot, .rail-foot { z-index: 2; }
+.nav-search { gap: 8px !important; }
+.nav-search > span { white-space: nowrap; }
+.nav-search > kbd { font-size: 10px; }
 @media (min-width: 840px) {
   .nav { position: sticky; top: 0; align-self: flex-start; height: 100vh; height: 100dvh; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; scrollbar-color: var(--nav-line) transparent; }
   .nav-foot { position: sticky; bottom: 0; margin: auto -16px -20px; padding: 12px 16px 20px; }
