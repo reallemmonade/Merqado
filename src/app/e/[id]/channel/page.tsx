@@ -1,8 +1,9 @@
 import Link from "next/link";
-import { inArray } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import { CaseShell } from "@/components/case/CaseShell";
 import { NewRoom, RoomSetup, RoomView, type ChatLine } from "@/components/case/Channel";
-import { users } from "@/db/schema";
+import { sources, users } from "@/db/schema";
+import { loadCaseFolders } from "@/lib/files/folders";
 import { loadRoomMessages, loadWorkplan, visibleRooms } from "@/lib/case/data";
 import { initials, loadCase } from "@/lib/case/page";
 import { shortDate, todayIso } from "@/lib/case/progress";
@@ -21,6 +22,19 @@ export default async function ChannelPage({ params, searchParams }: { params: Pr
   const authorIds = [...new Set(messages.map((m) => m.userId).filter((x): x is string => !!x))];
   const authors = authorIds.length ? await db.select({ id: users.id, name: users.name }).from(users).where(inArray(users.id, authorIds)) : [];
   const nameOf = new Map(authors.map((a) => [a.id, a.name]));
+  const msgIds = messages.map((m) => m.id);
+  const [attached, folders] = await Promise.all([
+    msgIds.length ? db.select().from(sources).where(and(eq(sources.engagementId, id), inArray(sources.messageId, msgIds))) : Promise.resolve([]),
+    loadCaseFolders(db, id),
+  ]);
+  const list = (json: string): unknown[] => {
+    try {
+      const v = JSON.parse(json);
+      return Array.isArray(v) ? v : [];
+    } catch {
+      return [];
+    }
+  };
   const lines: ChatLine[] = messages.map((m) => {
     const author = (m.userId && nameOf.get(m.userId)) || "Former member";
     return {
@@ -28,6 +42,17 @@ export default async function ChannelPage({ params, searchParams }: { params: Pr
       body: m.body,
       pinned: m.pinned,
       mine: m.userId === user.id,
+      files: attached
+        .filter((f) => f.messageId === m.id)
+        .map((f) => ({
+          id: f.id,
+          filename: f.filename,
+          folder: f.folder,
+          pending: f.filing === "pending",
+          mine: f.uploadedBy === user.id,
+          suggestions: list(f.suggestions).filter((x): x is string => typeof x === "string"),
+          links: list(f.links).map((l) => (l as { label?: string }).label ?? "").filter(Boolean),
+        })),
       author,
       initials: initials(author),
       time: m.createdAt
@@ -58,7 +83,7 @@ export default async function ChannelPage({ params, searchParams }: { params: Pr
                 <h2># {room.name}</h2>
                 <span className="muted" style={{ fontSize: 13 }}>{roomMembersLabel(room.archetypes)}</span>
               </div>
-              <RoomView engagementId={id} roomId={room.id} lines={lines} />
+              <RoomView engagementId={id} roomId={room.id} lines={lines} folders={folders} />
             </section>
           )}
           {wp.milestones.length > 0 && (

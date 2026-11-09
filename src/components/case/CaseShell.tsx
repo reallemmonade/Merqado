@@ -1,6 +1,7 @@
 import Link from "next/link";
-import { NavTitleSwitch } from "@/components/NavTitleSwitch";
+import { NavUser } from "@/components/NavUser";
 import type { CaseContext } from "@/lib/case/page";
+import { getPrefs } from "@/lib/prefs.server";
 import { GptBar } from "./GptBar";
 import { Icon, type IconName } from "./icons";
 import { Shortcuts } from "./Shortcuts";
@@ -22,10 +23,10 @@ function sections(gpt: string): { key: CaseSection; label: string; icon: IconNam
 }
 
 /**
- * Every case page: the side menu (full on the Overview, icons elsewhere), the page itself and
- * the case GPT bar along the bottom.
+ * Every case page: the side menu (by default full on the Overview, icons elsewhere), the page
+ * itself and the case GPT bar along the bottom.
  */
-export function CaseShell({
+export async function CaseShell({
   ctx,
   section,
   title,
@@ -42,7 +43,8 @@ export function CaseShell({
 }) {
   const id = ctx.engagement.id;
   const base = `/e/${id}`;
-  const full = section === "overview";
+  const { caseMenu } = await getPrefs();
+  const full = caseMenu === "full" || (caseMenu === "auto" && section === "overview");
   const items = sections(ctx.gpt);
   return (
     <div className="shell">
@@ -69,23 +71,13 @@ export function CaseShell({
               </Link>
             ))}
           </div>
-          <div style={{ marginTop: "auto", display: "flex", flexDirection: "column", gap: 10 }}>
+          <div className="nav-foot">
             <Link href={`${base}/search`} className="nav-search">
               <Icon name="search" size={16} />
               <span style={{ flex: 1 }}>Keyword search</span>
               <kbd>Ctrl K</kbd>
             </Link>
-            <span className="nav-item nav-later">
-              <Icon name="proposals" />
-              <span style={{ flex: 1 }}>Client development</span>
-              <span className="tag">Later</span>
-            </span>
-            <NavTitleSwitch />
-            <form method="post" action="/api/auth/logout">
-              <button type="submit" className="nav-signout">
-                Sign out
-              </button>
-            </form>
+            <NavUser />
           </div>
         </nav>
       ) : (
@@ -98,9 +90,12 @@ export function CaseShell({
               <Icon name={s.icon} size={20} />
             </Link>
           ))}
-          <Link href={`${base}/search`} aria-label="Keyword search" title="Keyword search · Ctrl K" className="rail-search" aria-current={section === "search" ? "page" : undefined}>
-            <Icon name="search" />
-          </Link>
+          <div className="rail-foot">
+            <Link href={`${base}/search`} aria-label="Keyword search" title="Keyword search · Ctrl K" className="rail-search" aria-current={section === "search" ? "page" : undefined}>
+              <Icon name="search" />
+            </Link>
+            <NavUser compact />
+          </div>
         </nav>
       )}
       <main className="main case-main">
