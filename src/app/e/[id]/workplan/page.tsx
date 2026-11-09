@@ -7,6 +7,7 @@ import { experts } from "@/db/schema";
 import { loadWorkplan } from "@/lib/case/data";
 import { loadCase } from "@/lib/case/page";
 import { reviewerOf } from "@/lib/case/tasks";
+import { parseApprovals, slots, waitingOn } from "@/lib/experts/approval";
 import { anonymizeTitle, honorarium } from "@/lib/experts/calc";
 import { allows } from "@/lib/roles";
 
@@ -20,25 +21,32 @@ export default async function WorkplanPage({ params, searchParams }: { params: P
   const view: View = sp.view === "mine" || sp.view === "review" || sp.view === "team" ? sp.view : "plan";
   const ctx = await loadCase(id, view === "plan" ? "/workplan" : `/workplan?view=${view}`);
   const me = ctx.user.id;
-  const canApprove = allows(ctx.membership, "approve_experts");
   const canAssign = allows(ctx.membership, "assign_tasks");
   const canPlan = allows(ctx.membership, "edit_plan");
   const [wp, proposedRows] = await Promise.all([
     loadWorkplan(ctx.db, id),
-    canApprove ? ctx.db.select().from(experts).where(and(eq(experts.engagementId, id), eq(experts.status, "proposed"))) : Promise.resolve([]),
+    ctx.canEdit ? ctx.db.select().from(experts).where(and(eq(experts.engagementId, id), eq(experts.status, "proposed"))) : Promise.resolve([]),
   ]);
 
   const leadOf = new Map(wp.modules.map((m) => [m.id, m.leadId]));
   const mine = wp.tasks.filter((t) => t.assigneeId === me);
   const toReview = wp.tasks.filter((t) => t.status === "almost_done" && reviewerOf(t, leadOf.get(t.moduleId)) === me);
   const nameOf = new Map(ctx.members.map((m) => [m.id, m.name]));
-  const proposed: ReviewExpert[] = proposedRows.map((e) => ({
-    id: e.id,
-    name: [e.firstName, e.lastName].filter(Boolean).join(" "),
-    title: e.anonTitle || anonymizeTitle(e.company, e.title, e.isFormer),
-    cost: honorarium(e),
-    proposedBy: e.proposedBy ? (nameOf.get(e.proposedBy) ?? null) : null,
-  }));
+  // An expert waits in the inbox of everyone who still has a sign-off to give: a consultant, plus whoever asked.
+  const proposed: ReviewExpert[] = proposedRows
+    .map((e) => ({ e, state: { requestedBy: e.requestedBy, approvals: parseApprovals(e.approvals) } }))
+    .filter(({ state }) => waitingOn(state, ctx.members).includes(me))
+    .map(({ e, state }) => ({
+      id: e.id,
+      name: [e.firstName, e.lastName].filter(Boolean).join(" "),
+      title: e.anonTitle || anonymizeTitle(e.company, e.title, e.isFormer),
+      cost: honorarium(e),
+      proposedBy: e.proposedBy ? (nameOf.get(e.proposedBy) ?? null) : null,
+      signoffs: slots(state, ctx.members).map((s): [string, boolean] => [
+        s.slot === "requester" ? (nameOf.get(e.requestedBy!) ?? "") : s.by ? (nameOf.get(s.by) ?? "") : "Consultant",
+        s.done,
+      ]),
+    }));
 
   const base = `/e/${id}/workplan`;
   const tabs: { key: View; label: string; href: string; count?: number }[] = [
