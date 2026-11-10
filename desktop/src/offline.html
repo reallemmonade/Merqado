@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; img-src file:">
+<title>Merqado</title>
+<style>
+  :root { color-scheme: light dark; --bg: #f6f5f9; --fg: #1b1a22; }
+  @media (prefers-color-scheme: dark) { :root { --bg: #17132a; --fg: #f6f5f9; } }
+  body { margin: 0; min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 28px;
+    background: var(--bg); color: var(--fg); font-family: Inter, -apple-system, "Segoe UI", system-ui, sans-serif; }
+  img { width: 96px; height: 96px; }
+  button { height: 44px; padding: 0 28px; border: 0; border-radius: 22px; background: #9a4a96; color: #fff; font: inherit; font-size: 15px; font-weight: 600; cursor: pointer; }
+</style>
+</head>
+<body>
+  <img src="../build/icon.png" alt="">
+  <button id="retry">Retry</button>
+  <script>
+    const target = new URLSearchParams(location.search).get("retry") || "https://merqado.ai";
+    const go = () => { if (/^https:\/\/merqado\.ai(\/|$)/.test(target) || /^http:\/\/localhost:/.test(target)) location.href = target; };
+    document.getElementById("retry").onclick = go;
+    window.addEventListener("online", go);
+  </script>
+</body>
+</html>

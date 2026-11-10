@@ -1,0 +1,36 @@
+appId: ai.merqado.desktop
+productName: Merqado
+copyright: Copyright © 2026 Guava Ventures
+directories:
+  output: dist
+  buildResources: build
+files:
+  - src/**
+  - build/icon.png
+  - package.json
+protocols:
+  - name: Merqado
+    schemes: [merqado]
+mac:
+  category: public.app-category.productivity
+  icon: build/icon-mac.png
+  target:
+    - target: dmg
+      arch: [arm64, x64]
+  # No Developer ID certificate yet: ad-hoc signed.
+  identity: "-"
+  hardenedRuntime: false
+  artifactName: Merqado-mac-${arch}.${ext}
+dmg:
+  artifactName: Merqado-mac-${arch}.${ext}
+win:
+  icon: build/icon.png
+  target:
+    - target: nsis
+      arch: [x64]
+  artifactName: Merqado-windows-setup.${ext}
+nsis:
+  oneClick: true
+  perMachine: false
+  createDesktopShortcut: true
+  shortcutName: Merqado
