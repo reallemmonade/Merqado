@@ -65,5 +65,5 @@ jobs:
           GH_REPO: ${{ github.repository }}
         run: |
           gh release view desktop >/dev/null 2>&1 || \
-            gh release create desktop --title "Merqado desktop" --notes "Mac: Merqado-mac-arm64.dmg (Apple silicon) or Merqado-mac-x64.dmg (Intel). Windows: Merqado-windows-setup.exe." --target "$GITHUB_SHA" --latest
+            gh release create desktop --title "Merqado desktop" --notes "Mac: Merqado-mac-universal.dmg. Windows: Merqado-windows-setup.exe." --target "$GITHUB_SHA" --latest
           gh release upload desktop out/* --clobber
