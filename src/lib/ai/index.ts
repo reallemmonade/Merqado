@@ -5,10 +5,15 @@ import { decryptJson } from "@/lib/crypto";
 import { aiProviderConfigSchema, type AIProviderConfig } from "./config";
 import { AnthropicFamilyProvider } from "./providers/anthropic";
 import { OpenAIFamilyProvider } from "./providers/openai";
+import { assertUnderSpendCap } from "./spend";
+import { tierForFeature } from "./tiers";
 import type { AIProvider, CompletionRequest, CompletionResult } from "./types";
 
 export * from "./types";
 export { aiProviderConfigSchema, type AIProviderConfig } from "./config";
+export { AI_TIERS, FEATURE_TIERS, modelForTier, tierForFeature, type AITier } from "./tiers";
+export { SpendCapError, assertUnderSpendCap, monthlySpendUsd } from "./spend";
+export { costUsd } from "./pricing";
 
 export function createProvider(config: AIProviderConfig): AIProvider {
   switch (config.kind) {
@@ -65,14 +70,18 @@ export async function resolveProvider(
   };
 }
 
-/** Runs a completion and records a usage row, whoever pays for it. */
+/**
+ * Runs a completion and records a usage row, whoever pays for it.
+ * Checks the firm's monthly spend cap first; the tier comes from the feature unless the request sets one.
+ */
 export async function completeAndMeter(
   db: DB,
   resolved: ResolvedProvider,
   req: CompletionRequest,
   ctx: { firmId: string; engagementId?: string; userId?: string; feature: string },
 ): Promise<CompletionResult> {
-  const result = await resolved.provider.complete(req);
+  await assertUnderSpendCap(db, ctx.firmId);
+  const result = await resolved.provider.complete({ ...req, tier: req.tier ?? tierForFeature(ctx.feature) });
   await db.insert(usageEvents).values({
     firmId: ctx.firmId,
     engagementId: ctx.engagementId,

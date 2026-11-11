@@ -3,7 +3,7 @@ import { desc, eq } from "drizzle-orm";
 import { z } from "zod";
 import { getDb } from "@/db/client";
 import { findings, sources } from "@/db/schema";
-import { completeAndMeter, resolveProvider } from "@/lib/ai";
+import { completeAndMeter, resolveProvider, SpendCapError } from "@/lib/ai";
 import { allows } from "@/lib/roles";
 import { getEngagementAccess, getSessionUser } from "@/lib/session";
 
@@ -56,6 +56,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     }
     return NextResponse.json({ answer: result.text, model: result.model });
   } catch (err) {
+    if (err instanceof SpendCapError) return NextResponse.json({ error: "Monthly AI budget reached." }, { status: 402 });
     console.error("ask failed", err);
     // Show configuration problems to developers; keep production errors generic.
     const message =

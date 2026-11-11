@@ -2,6 +2,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import { AnthropicBedrockMantle } from "@anthropic-ai/bedrock-sdk";
 import { AnthropicVertex } from "@anthropic-ai/vertex-sdk";
 import type { AIProviderConfig } from "../config";
+import { modelForTier } from "../tiers";
 import type { AIProvider, CompletionRequest, CompletionResult } from "../types";
 
 type AnthropicFamilyConfig = Extract<AIProviderConfig, { kind: "anthropic" | "bedrock" | "vertex" }>;
@@ -24,8 +25,9 @@ export class AnthropicFamilyProvider implements AIProvider {
   }
 
   async complete(req: CompletionRequest): Promise<CompletionResult> {
+    const model = req.tier ? modelForTier(this.config, req.tier) : this.config.model;
     const params = {
-      model: this.config.model,
+      model,
       max_tokens: req.maxTokens ?? DEFAULT_MAX_TOKENS,
       ...(req.system ? { system: req.system } : {}),
       messages: req.messages,
@@ -34,11 +36,12 @@ export class AnthropicFamilyProvider implements AIProvider {
     if (this.config.kind === "anthropic") {
       const client = new Anthropic({ apiKey: this.config.apiKey });
       // Server-side fallback reroutes a refused request to a suitable model instead of failing.
-      const msg = await client.beta.messages.create({
-        ...params,
-        betas: ["server-side-fallback-2026-07-01"],
-        fallbacks: "default",
-      });
+      // Haiku has no server-side fallback, so it is sent without one.
+      const msg = await client.beta.messages.create(
+        /haiku/.test(model)
+          ? params
+          : { ...params, betas: ["server-side-fallback-2026-07-01"], fallbacks: "default" as const },
+      );
       return {
         text: textOf(msg.content),
         model: msg.model,

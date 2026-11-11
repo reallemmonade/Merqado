@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getDb, type DB } from "@/db/client";
+import { SpendCapError } from "@/lib/ai/spend";
 import { allows, type Action } from "@/lib/roles";
 import { getEngagementAccess, getSessionUser, type SessionUser } from "@/lib/session";
 
@@ -28,6 +29,7 @@ export function badRequest(message: string) {
 }
 
 export function aiError(err: unknown) {
+  if (err instanceof SpendCapError) return NextResponse.json({ error: "Monthly AI budget reached." }, { status: 402 });
   console.error("experts AI call failed", err);
   const message =
     process.env.NODE_ENV !== "production" && err instanceof Error
