@@ -952,3 +952,4 @@ html:root:root[data-style="normal"] .settings-head { background: var(--ground); 
 
 /* The storage card in use keeps its accent edge under every look. */
 html:root:root .storage-card.on { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+.cite-flag { display: inline-flex; align-items: center; justify-content: center; width: 16px; height: 16px; margin: 0 2px; border-radius: 99px; background: color-mix(in srgb, var(--signal) 18%, var(--panel)); color: var(--signal); font-size: 11px; font-weight: 700; vertical-align: 1px; cursor: help; }

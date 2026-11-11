@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useRef, useState } from "react";
+import { Fragment, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useApi } from "@/components/experts/useApi";
 import type { SourceKind } from "@/lib/case/gptSources";
@@ -15,29 +15,48 @@ export interface GptSource {
   href: string;
   text: string;
 }
+/** A citing sentence the cited passage doesn't back; `at` is the offset just after its last citation. */
+export interface GptFlag {
+  at: number;
+  problems: string[];
+}
 export interface GptLine {
   id: string;
   role: "user" | "assistant";
   body: string;
   sources: GptSource[];
+  flags?: GptFlag[];
 }
 
 function Answer({ m }: { m: GptLine }) {
   const known = new Set(m.sources.map((s) => s.n));
+  const flagAt = new Map((m.flags ?? []).map((f) => [f.at, f]));
+  let offset = 0;
   return (
     <div className="gpt-answer">
       <div className="chat-body">
-        {splitCitations(m.body).map((p, i) =>
-          "cite" in p ? (
-            known.has(p.cite) ? (
-              <a key={i} href={`#src-${m.id}-${p.cite}`} className="cite">
-                {p.cite}
-              </a>
-            ) : null
-          ) : (
-            <span key={i}>{p.text}</span>
-          ),
-        )}
+        {splitCitations(m.body).map((p, i) => {
+          offset += "cite" in p ? `[${p.cite}]`.length : p.text.length;
+          const flag = flagAt.get(offset);
+          return (
+            <Fragment key={i}>
+              {"cite" in p ? (
+                known.has(p.cite) ? (
+                  <a href={`#src-${m.id}-${p.cite}`} className="cite">
+                    {p.cite}
+                  </a>
+                ) : null
+              ) : (
+                <span>{p.text}</span>
+              )}
+              {flag && (
+                <span className="cite-flag" role="img" aria-label="Not in source" title={flag.problems.join("\n")}>
+                  !
+                </span>
+              )}
+            </Fragment>
+          );
+        })}
       </div>
       {m.sources.length > 0 && (
         <ol className="gpt-sources">

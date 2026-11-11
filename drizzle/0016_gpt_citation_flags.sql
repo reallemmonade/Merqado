@@ -1,0 +1,1 @@
+ALTER TABLE `gpt_messages` ADD `flags` text DEFAULT '[]' NOT NULL;
