@@ -1,0 +1,1 @@
+ALTER TABLE `firms` ADD `ai_monthly_cap_usd` real;

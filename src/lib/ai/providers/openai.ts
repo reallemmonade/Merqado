@@ -1,5 +1,6 @@
 import OpenAI, { AzureOpenAI } from "openai";
 import type { AIProviderConfig } from "../config";
+import { baseModel, modelForTier } from "../tiers";
 import type { AIProvider, CompletionRequest, CompletionResult } from "../types";
 
 type OpenAIFamilyConfig = Extract<AIProviderConfig, { kind: "openai" | "azure-openai" }>;
@@ -14,11 +15,11 @@ export class OpenAIFamilyProvider implements AIProvider {
 
   async complete(req: CompletionRequest): Promise<CompletionResult> {
     const c = this.config;
+    const model = req.tier ? modelForTier(c, req.tier) : baseModel(c);
     const client =
       c.kind === "azure-openai"
-        ? new AzureOpenAI({ apiKey: c.apiKey, endpoint: c.endpoint, deployment: c.deployment, apiVersion: c.apiVersion })
+        ? new AzureOpenAI({ apiKey: c.apiKey, endpoint: c.endpoint, deployment: model, apiVersion: c.apiVersion })
         : new OpenAI({ apiKey: c.apiKey, baseURL: c.baseURL });
-    const model = c.kind === "azure-openai" ? c.deployment : c.model;
 
     const res = await client.chat.completions.create({
       model,

@@ -1,3 +1,5 @@
+import type { AITier } from "./tiers";
+
 export interface ChatTurn {
   role: "user" | "assistant";
   content: string;
@@ -7,6 +9,8 @@ export interface CompletionRequest {
   system?: string;
   messages: ChatTurn[];
   maxTokens?: number;
+  /** Picks fast / standard / deep model. Omitted: the connection's own model. */
+  tier?: AITier;
 }
 
 export interface CompletionResult {

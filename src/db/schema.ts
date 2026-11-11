@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { blob, integer, primaryKey, sqliteTable, text, uniqueIndex, index } from "drizzle-orm/sqlite-core";
+import { blob, integer, real, primaryKey, sqliteTable, text, uniqueIndex, index } from "drizzle-orm/sqlite-core";
 
 const id = () =>
   text("id")
@@ -32,6 +32,8 @@ export const firms = sqliteTable("firms", {
   name: text("name").notNull(),
   slug: text("slug").notNull().unique(),
   aiBillingMode: text("ai_billing_mode", { enum: BILLING_MODES }).notNull().default("managed"),
+  /** Monthly AI spend cap in USD, checked before each model call. Null: no firm cap. */
+  aiMonthlyCapUsd: real("ai_monthly_cap_usd"),
   createdAt: createdAt(),
 });
 
