@@ -96,7 +96,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       }
       return [...new Set([...mentions, ...direct, ...thread])].filter((u) => u !== user.id && seeIt.has(u));
     };
-    notifyLater(db, to, {
+    notifyLater(db, user.firmId, to, {
       title: chat.kind === "room" ? `${user.name} · ${chat.name}` : user.name,
       body: (body || "Sent a file").slice(0, 300),
       threadId: `room-${chat.id}`,
@@ -205,7 +205,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       const before = new Set(parseIds(found.row.mentions));
       const added = mentions.filter((u) => !before.has(u) && u !== user.id);
       if (added.length) {
-        notifyLater(db, added, {
+        notifyLater(db, user.firmId, added, {
           title: found.room.kind === "room" ? `${user.name} · ${found.room.name}` : user.name,
           body: op.body.slice(0, 300),
           threadId: `room-${found.room.id}`,
