@@ -11,6 +11,7 @@ import { mkdirSync } from "node:fs";
 import { migrate } from "drizzle-orm/libsql/migrator";
 import { getDb } from "../src/db/client";
 import { setupFirm, slugify } from "../src/lib/auth/setup-sso";
+import { syncAllNotifications } from "../src/lib/notifications/sync";
 
 if ((process.env.TURSO_DATABASE_URL ?? "file:.data/local.db").startsWith("file:")) {
   mkdirSync(".data", { recursive: true });
@@ -18,6 +19,13 @@ if ((process.env.TURSO_DATABASE_URL ?? "file:.data/local.db").startsWith("file:"
 const db = getDb();
 await migrate(db, { migrationsFolder: "./drizzle" });
 console.log("Migrations applied.");
+
+// Keeps stored notifications filled for everyone (and backfills them the first time).
+try {
+  console.log(`Notifications synced for ${await syncAllNotifications(db)} people.`);
+} catch (err) {
+  console.error("Notification sync failed", err);
+}
 
 const { SSO_ADMIN_EMAIL } = process.env;
 if (SSO_ADMIN_EMAIL) {

@@ -183,7 +183,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
 function taskPush(auth: Authorized, to: (string | null)[], title: string, taskTitle: string, moduleName: string) {
   const ids = to.filter((u): u is string => !!u && u !== auth.user.id);
   if (!ids.length) return;
-  notifyLater(auth.db, ids, {
+  notifyLater(auth.db, auth.user.firmId, ids, {
     title,
     body: moduleName ? `${taskTitle} · ${moduleName}` : taskTitle,
     threadId: `tasks-${auth.engagement.id}`,

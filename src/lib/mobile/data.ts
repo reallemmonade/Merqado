@@ -13,7 +13,7 @@ export async function mobileAuth(): Promise<{ db: DB; user: SessionUser } | Next
 }
 
 /** The cases this person is on, newest first, with their role on each. */
-export async function myCases(db: DB, user: SessionUser) {
+export async function myCases(db: DB, user: Pick<SessionUser, "id" | "firmId" | "archetype">) {
   const rows = await db
     .select({
       id: engagements.id,
