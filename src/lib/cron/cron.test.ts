@@ -8,7 +8,8 @@ import { eq } from "drizzle-orm";
 import { beforeEach, describe, expect, it } from "vitest";
 import * as schema from "@/db/schema";
 import type { DB } from "@/db/client";
-import { cronAuthorized, CRON_SECRET_HEADER } from "./auth";
+import { createLocalJWKSet, exportJWK, generateKeyPair, SignJWT } from "jose";
+import { CRON_AUDIENCE, CRON_SECRET_HEADER, GITHUB_OIDC_ISSUER, githubWorkflowAuthorized, secretAuthorized } from "./auth";
 import type { Job } from "./jobs";
 import { runDueJobs } from "./run";
 import { slotKey } from "./slot";
@@ -41,11 +42,44 @@ describe("cron auth", () => {
   const h = (v?: string) => new Headers(v ? { [CRON_SECRET_HEADER]: v } : {});
   it("needs the exact secret, and a secret to be set", () => {
     const secret = "s".repeat(32);
-    expect(cronAuthorized(h(secret), secret)).toBe(true);
-    expect(cronAuthorized(h("wrong"), secret)).toBe(false);
-    expect(cronAuthorized(h(), secret)).toBe(false);
-    expect(cronAuthorized(h(""), "")).toBe(false);
-    expect(cronAuthorized(h("short"), "short")).toBe(false);
+    expect(secretAuthorized(h(secret), secret)).toBe(true);
+    expect(secretAuthorized(h("wrong"), secret)).toBe(false);
+    expect(secretAuthorized(h(), secret)).toBe(false);
+    expect(secretAuthorized(h(""), "")).toBe(false);
+    expect(secretAuthorized(h("short"), "short")).toBe(false);
+  });
+
+  it("accepts only this repo's Scheduler workflow token on main", async () => {
+    const { privateKey, publicKey } = await generateKeyPair("RS256");
+    const other = await generateKeyPair("RS256");
+    const keys = createLocalJWKSet({ keys: [{ ...(await exportJWK(publicKey)), kid: "k1", alg: "RS256" }] });
+    const good = {
+      repository: "reallemmonade/Merqado",
+      workflow_ref: "reallemmonade/Merqado/.github/workflows/cron.yml@refs/heads/main",
+      ref: "refs/heads/main",
+    };
+    const sign = (claims: Record<string, unknown>, opts: { aud?: string; iss?: string; key?: CryptoKey } = {}) =>
+      new SignJWT(claims)
+        .setProtectedHeader({ alg: "RS256", kid: "k1" })
+        .setIssuer(opts.iss ?? GITHUB_OIDC_ISSUER)
+        .setAudience(opts.aud ?? CRON_AUDIENCE)
+        .setIssuedAt()
+        .setExpirationTime("5m")
+        .sign(opts.key ?? privateKey);
+    const bearer = async (t: Promise<string>) => new Headers({ authorization: `Bearer ${await t}` });
+    expect(await githubWorkflowAuthorized(await bearer(sign(good)), keys)).toBe(true);
+    expect(await githubWorkflowAuthorized(await bearer(sign({ ...good, repository: "someone/Merqado" })), keys)).toBe(false);
+    expect(
+      await githubWorkflowAuthorized(
+        await bearer(sign({ ...good, workflow_ref: "reallemmonade/Merqado/.github/workflows/other.yml@refs/heads/main" })),
+        keys,
+      ),
+    ).toBe(false);
+    expect(await githubWorkflowAuthorized(await bearer(sign({ ...good, ref: "refs/heads/feature" })), keys)).toBe(false);
+    expect(await githubWorkflowAuthorized(await bearer(sign(good, { aud: "other" })), keys)).toBe(false);
+    expect(await githubWorkflowAuthorized(await bearer(sign(good, { iss: "https://evil.example" })), keys)).toBe(false);
+    expect(await githubWorkflowAuthorized(await bearer(sign(good, { key: other.privateKey })), keys)).toBe(false);
+    expect(await githubWorkflowAuthorized(new Headers(), keys)).toBe(false);
   });
 });
 

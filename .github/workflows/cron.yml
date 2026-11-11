@@ -1,11 +1,16 @@
 name: Scheduler
 
 # Calls Merqado's job runner every 15 minutes. Each job runs at most once per slot
-# (see src/lib/cron), so late, duplicate or manual runs are safe.
+# (see src/lib/cron), so late, duplicate or manual runs are safe. The call is signed
+# with GitHub's OIDC token for this workflow, so no shared secret is needed.
 on:
   schedule:
     - cron: "*/15 * * * *"
   workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
 
 concurrency:
   group: scheduler
@@ -18,12 +23,10 @@ jobs:
     steps:
       - name: Run due jobs
         env:
-          CRON_SECRET: ${{ secrets.CRON_SECRET }}
           APP_URL: ${{ vars.APP_URL || 'https://merqado.ai' }}
         run: |
-          if [ -z "$CRON_SECRET" ]; then
-            echo "::warning::CRON_SECRET is not set; skipping."
-            exit 0
-          fi
+          TOKEN=$(curl -fsS -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
+            "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=merqado-cron" | jq -r .value)
+          echo "::add-mask::$TOKEN"
           curl -fsS --retry 3 --retry-all-errors --retry-delay 20 --max-time 300 \
-            -X POST -H "x-cron-secret: $CRON_SECRET" "$APP_URL/api/internal/cron"
+            -X POST -H "Authorization: Bearer $TOKEN" "$APP_URL/api/internal/cron"
