@@ -63,6 +63,8 @@ export const users = sqliteTable("users", {
   lastSeenAt: integer("last_seen_at", { mode: "timestamp" }),
   /** "auto" follows activity; the others are set by the person. */
   presence: text("presence", { enum: PRESENCE_STATUSES }).notNull().default("auto"),
+  /** IANA time zone (e.g. "America/New_York"), picked up from the person's browser. Null until seen. */
+  timeZone: text("time_zone"),
   createdAt: createdAt(),
 });
 
@@ -898,4 +900,27 @@ export const todos = sqliteTable(
     doneAt: integer("done_at", { mode: "timestamp" }),
   },
   (t) => [index("todos_engagement").on(t.engagementId, t.status)],
+);
+
+export const JOB_RUN_STATUSES = ["running", "done", "failed"] as const;
+export type JobRunStatus = (typeof JOB_RUN_STATUSES)[number];
+
+/**
+ * One row per scheduled job per time slot. The unique (job, slot) key is what makes a job run
+ * at most once per slot, however many times the scheduler calls in. See src/lib/cron.
+ */
+export const jobRuns = sqliteTable(
+  "job_runs",
+  {
+    id: id(),
+    job: text("job").notNull(),
+    /** Start of the slot, ISO UTC (e.g. "2026-11-11T20:15:00.000Z"). */
+    slot: text("slot").notNull(),
+    status: text("status", { enum: JOB_RUN_STATUSES }).notNull().default("running"),
+    startedAt: integer("started_at", { mode: "timestamp" }).notNull(),
+    finishedAt: integer("finished_at", { mode: "timestamp" }),
+    /** Short JSON summary from the job, or the error message when it failed. */
+    result: text("result"),
+  },
+  (t) => [uniqueIndex("job_runs_job_slot").on(t.job, t.slot), index("job_runs_started").on(t.startedAt)],
 );

@@ -14,6 +14,8 @@ export interface SessionUser {
   title: string;
   archetype: Archetype;
   isAdmin: boolean;
+  /** IANA time zone from the person's browser; null until first seen. */
+  timeZone: string | null;
 }
 
 /**
@@ -43,6 +45,7 @@ async function loadUser(db: DB, who: ReturnType<typeof eq>, firmId?: string): Pr
       title: firmRoles.title,
       archetype: firmRoles.archetype,
       isAdmin: firmMembers.isAdmin,
+      timeZone: users.timeZone,
     })
     .from(users)
     .innerJoin(firmMembers, eq(firmMembers.userId, users.id))

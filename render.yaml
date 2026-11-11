@@ -38,6 +38,9 @@ services:
       # They join SSO_ADMIN_EMAIL's firm as regular (non-admin) members. See src/lib/auth/test-accounts.ts.
       - key: TEST_ACCOUNT_EMAILS
         sync: false
+      # Shared with the GitHub "CRON_SECRET" secret; the Scheduler workflow sends it to /api/internal/cron.
+      - key: CRON_SECRET
+        sync: false
       # Set when using a custom domain; SSO redirects use it.
       - key: APP_URL
         sync: false
