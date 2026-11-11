@@ -3,6 +3,7 @@ import { inArray } from "drizzle-orm";
 import type { DB } from "@/db/client";
 import { pushDevices } from "@/db/schema";
 import { apnsConfig, isDeadToken, sendApns, type ApnsMessage } from "@/lib/push/apns";
+import { syncNotificationsFor } from "@/lib/notifications/sync";
 
 /**
  * Sends a notification to everyone listed on every iPhone they signed in on.
@@ -30,9 +31,16 @@ export async function notifyUsers(db: DB, userIds: string[], msg: ApnsMessage): 
   }
 }
 
-/** Fire and forget, so the person who acted doesn't wait on Apple. */
-export function notifyLater(db: DB, userIds: string[] | (() => Promise<string[]>), msg: ApnsMessage): void {
-  const run = async () => notifyUsers(db, typeof userIds === "function" ? await userIds() : userIds, msg);
+/**
+ * Fire and forget, so the person who acted doesn't wait on Apple. Also brings the stored
+ * notifications of everyone told up to date, so their inbox and reminders see it straight away.
+ */
+export function notifyLater(db: DB, firmId: string, userIds: string[] | (() => Promise<string[]>), msg: ApnsMessage): void {
+  const run = async () => {
+    const ids = typeof userIds === "function" ? await userIds() : userIds;
+    await notifyUsers(db, ids, msg);
+    await syncNotificationsFor(db, firmId, ids);
+  };
   try {
     after(run);
   } catch {

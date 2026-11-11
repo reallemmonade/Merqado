@@ -41,7 +41,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   /** iPhone notification for someone else being given a to-do. */
   function notifyAssigned(assigneeId: string | null | undefined, todoTitle: string) {
     if (!assigneeId || assigneeId === user.id) return;
-    notifyLater(db, [assigneeId], {
+    notifyLater(db, user.firmId, [assigneeId], {
       title: `${user.name} gave you a to-do`,
       body: todoTitle.slice(0, 300),
       threadId: `todos-${id}`,

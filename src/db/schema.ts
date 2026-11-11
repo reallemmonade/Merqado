@@ -924,3 +924,51 @@ export const jobRuns = sqliteTable(
   },
   (t) => [uniqueIndex("job_runs_job_slot").on(t.job, t.slot), index("job_runs_started").on(t.startedAt)],
 );
+
+export const NOTIFICATION_KINDS = ["mention", "reply", "task", "review", "todo"] as const;
+export type NotificationKind = (typeof NOTIFICATION_KINDS)[number];
+
+export const NOTIFICATION_STATUSES = ["unread", "read", "snoozed", "done"] as const;
+export type NotificationStatus = (typeof NOTIFICATION_STATUSES)[number];
+
+/**
+ * Something that needs a person: the phone Activity inbox reads these, and reminders will nudge
+ * from `next_nudge_at`. Rows are kept in step with their source by src/lib/notifications.
+ */
+export const notifications = sqliteTable(
+  "notifications",
+  {
+    id: id(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    engagementId: text("engagement_id")
+      .notNull()
+      .references(() => engagements.id, { onDelete: "cascade" }),
+    kind: text("kind", { enum: NOTIFICATION_KINDS }).notNull(),
+    /** Stable id of the source item (e.g. "m-<message id>", "t-<task id>"), one row per person. */
+    key: text("key").notNull(),
+    title: text("title").notNull().default(""),
+    body: text("body").notNull().default(""),
+    /** In-app link to the item. */
+    link: text("link").notNull(),
+    /** JSON with the ids the apps open it by: roomId, messageId, threadId, taskId, todoId. */
+    data: text("data").notNull().default("{}"),
+    status: text("status", { enum: NOTIFICATION_STATUSES }).notNull().default("unread"),
+    snoozeUntil: integer("snooze_until", { mode: "timestamp" }),
+    nextNudgeAt: integer("next_nudge_at", { mode: "timestamp" }),
+    /** "system" when it was closed because the source went away; "user" when the person closed it. */
+    doneBy: text("done_by", { enum: ["system", "user"] }),
+    /** When the source happened (message sent, task or to-do made). */
+    occurredAt: integer("occurred_at", { mode: "timestamp" }).notNull(),
+    createdAt: createdAt(),
+    updatedAt: integer("updated_at", { mode: "timestamp" })
+      .notNull()
+      .default(sql`(unixepoch())`),
+  },
+  (t) => [
+    uniqueIndex("notifications_user_key").on(t.userId, t.key),
+    index("notifications_user_status").on(t.userId, t.status, t.occurredAt),
+    index("notifications_nudge").on(t.nextNudgeAt),
+  ],
+);
