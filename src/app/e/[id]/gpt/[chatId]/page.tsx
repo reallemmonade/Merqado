@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import { and, asc, eq, or } from "drizzle-orm";
 import { CaseShell } from "@/components/case/CaseShell";
-import { GptChat, type GptLine, type GptSource } from "@/components/case/GptChat";
+import { GptChat, type GptFlag, type GptLine, type GptSource } from "@/components/case/GptChat";
 import { GptList } from "@/components/case/GptList";
 import { gptChats, gptMessages } from "@/db/schema";
 import { loadGptList } from "@/lib/case/gpt";
@@ -10,7 +10,7 @@ import { loadCase } from "@/lib/case/page";
 
 export const dynamic = "force-dynamic";
 
-function parseSources(json: string): GptSource[] {
+function parseList<T>(json: string): T[] {
   try {
     const v = JSON.parse(json);
     return Array.isArray(v) ? v : [];
@@ -33,7 +33,7 @@ export default async function GptChatPage({ params, searchParams }: { params: Pr
     db.select().from(gptMessages).where(eq(gptMessages.chatId, chatId)).orderBy(asc(gptMessages.createdAt)),
   ]);
   const mine = chat.userId === user.id;
-  const lines: GptLine[] = msgs.map((m) => ({ id: m.id, role: m.role, body: m.body, sources: parseSources(m.sources) }));
+  const lines: GptLine[] = msgs.map((m) => ({ id: m.id, role: m.role, body: m.body, sources: parseList<GptSource>(m.sources), flags: parseList<GptFlag>(m.flags) }));
   const folders = [...new Set(chats.filter((c) => c.mine && c.folder).map((c) => c.folder))];
   return (
     <CaseShell ctx={ctx} section="gpt" hideGptBar>

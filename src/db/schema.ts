@@ -822,6 +822,8 @@ export const gptMessages = sqliteTable(
     body: text("body").notNull(),
     /** JSON array of { n, label, href, text } the answer cites. */
     sources: text("sources").notNull().default("[]"),
+    /** JSON array of { at, problems }: citing sentences the cited passage doesn't back (see lib/ai/verify). */
+    flags: text("flags").notNull().default("[]"),
     createdAt: createdAt(),
   },
   (t) => [index("gpt_messages_chat").on(t.chatId, t.createdAt)],

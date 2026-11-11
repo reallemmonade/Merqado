@@ -8,6 +8,7 @@ import { loadCorpus } from "@/lib/case/corpus";
 import { gptName } from "@/lib/case/names";
 import { SOURCE_KINDS, type SourceKind } from "@/lib/case/gptSources";
 import { chunk, topSnippets, type Snippet } from "@/lib/case/search";
+import { checkAnswer } from "@/lib/ai/verify";
 
 const ref = z.string().min(1).max(64);
 const question = z.string().trim().min(1, "Ask a question.").max(4000);
@@ -122,7 +123,9 @@ async function answer(auth: Authorized, chatId: string, only: SourceKind[] = [])
   }
   const cited = new Set([...text.matchAll(/\[(\d{1,3})\]/g)].map((m) => Number(m[1])));
   const sources = numbered.filter((s) => cited.has(s.n)).map((s) => ({ ...s, text: s.text.slice(0, 600) }));
-  await db.insert(gptMessages).values({ chatId, role: "assistant", body: text, sources: JSON.stringify(sources) });
+  // Check each citing sentence against the full passage it cites before the answer is shown.
+  const flags = checkAnswer(text, new Map(numbered.map((s) => [s.n, s.text])));
+  await db.insert(gptMessages).values({ chatId, role: "assistant", body: text, sources: JSON.stringify(sources), flags: JSON.stringify(flags) });
   await db.update(gptChats).set({ updatedAt: new Date() }).where(eq(gptChats.id, chatId));
   return ok();
 }
