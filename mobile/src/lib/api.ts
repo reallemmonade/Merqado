@@ -108,7 +108,8 @@ export type Task = {
 };
 export type InboxItem = {
   id: string;
-  kind: "mention" | "reply" | "task" | "review" | "todo";
+  kind: "mention" | "reply" | "task" | "review" | "todo" | "approval";
+  status?: "unread" | "read" | "snoozed";
   caseId: string;
   caseName: string;
   title: string;
@@ -119,6 +120,9 @@ export type InboxItem = {
   threadId?: string;
   taskId?: string;
   todoId?: string;
+  expertId?: string;
+  flag?: "overdue" | "idle";
+  days?: number;
 };
 export type Todo = {
   id: string;

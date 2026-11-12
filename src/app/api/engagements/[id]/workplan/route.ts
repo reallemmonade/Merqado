@@ -6,6 +6,7 @@ import { allows } from "@/lib/roles";
 import { notFoundJson, ok, parseOp } from "@/lib/case/api";
 import { allowedMoves, reviewerOf } from "@/lib/case/tasks";
 import type { Authorized } from "@/lib/experts/api";
+import { NEEDS_CATEGORY } from "@/lib/inbox/nudge";
 import { notifyLater } from "@/lib/push/notify";
 
 const date = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Pick a date.");
@@ -123,7 +124,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
           createdBy: auth.user.id,
         })
         .returning();
-      if (op.assigneeId) taskPush(auth, [op.assigneeId], `${auth.user.name} gave you a task`, op.title, mod.name);
+      if (op.assigneeId) taskPush(auth, [op.assigneeId], `${auth.user.name} gave you a task`, op.title, mod.name, row!.id);
       return ok({ id: row!.id });
     }
     case "task.update": {
@@ -181,15 +182,14 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
 }
 
 /** One task notification to the given people (never to whoever made the change). */
-function taskPush(auth: Authorized, to: (string | null)[], title: string, taskTitle: string, moduleName: string) {
+function taskPush(auth: Authorized, to: (string | null)[], title: string, taskTitle: string, moduleName: string, taskId?: string) {
   const ids = to.filter((u): u is string => !!u && u !== auth.user.id);
   if (!ids.length) return;
   notifyLater(auth.db, auth.user.firmId, ids, {
     title,
     body: moduleName ? `${taskTitle} · ${moduleName}` : taskTitle,
     threadId: `tasks-${auth.engagement.id}`,
-    category: "TASK",
-    data: { url: "/tasks", caseId: auth.engagement.id },
+    ...(taskId ? { category: NEEDS_CATEGORY, data: { url: "/tasks", caseId: auth.engagement.id, key: `t-${taskId}` } } : { category: "TASK", data: { url: "/tasks", caseId: auth.engagement.id } }),
   });
 }
 
@@ -204,10 +204,10 @@ function notifyTaskChange(
 ) {
   const title = op.title ?? task.title;
   const who = auth.user.name;
-  if (op.assigneeId && op.assigneeId !== task.assigneeId) taskPush(auth, [op.assigneeId], `${who} gave you a task`, title, moduleName);
+  if (op.assigneeId && op.assigneeId !== task.assigneeId) taskPush(auth, [op.assigneeId], `${who} gave you a task`, title, moduleName, task.id);
   if (!op.status || op.status === task.status) return;
   const assignee = op.assigneeId !== undefined ? op.assigneeId : task.assigneeId;
-  if (op.status === "almost_done") taskPush(auth, [reviewer], `${who} sent a task for review`, title, moduleName);
+  if (op.status === "almost_done") taskPush(auth, [reviewer], `${who} sent a task for review`, title, moduleName, task.id);
   else if (op.status === "done") taskPush(auth, [assignee], `${who} approved your task`, title, moduleName);
-  else if (sendBack) taskPush(auth, [assignee], `${who} sent a task back`, op.note ? `${title}: ${op.note}` : title, moduleName);
+  else if (sendBack) taskPush(auth, [assignee], `${who} sent a task back`, op.note ? `${title}: ${op.note}` : title, moduleName, task.id);
 }
