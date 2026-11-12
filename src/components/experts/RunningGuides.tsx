@@ -6,16 +6,13 @@ import { useApi } from "./useApi";
 
 /** The team's running interview guides: one general guide plus one per interviewee type. */
 export function RunningGuides({ engagementId, data, canEdit }: { engagementId: string; data: ExpertsData; canEdit: boolean }) {
-  const slots = [{ id: null as string | null, name: "General (used when a type has no guide)" }, ...data.types.map((t) => ({ id: t.id as string | null, name: t.name }))];
+  const slots = [{ id: null as string | null, name: "General" }, ...data.types.map((t) => ({ id: t.id as string | null, name: t.name }))];
   const [pick, setPick] = useState<string>("");
   const slot = slots.find((s) => (s.id ?? "") === pick) ?? slots[0]!;
   const saved = data.guides.find((g) => (g.typeId ?? null) === slot.id)?.body ?? "";
   return (
     <section className="card">
       <h2 style={{ fontSize: 18 }}>Running guides</h2>
-      <p className="muted" style={{ margin: 0, fontSize: 13 }}>
-        The questions you ask everyone of a type. Each expert&rsquo;s generated guide adds bespoke questions on top.
-      </p>
       <label className="field">
         Guide for
         <select value={pick} onChange={(e) => setPick(e.target.value)}>

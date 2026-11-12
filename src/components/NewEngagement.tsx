@@ -16,7 +16,7 @@ export function NewEngagement() {
     return (
       <div>
         <button type="button" className="secondary" onClick={() => setOpen(true)}>
-          + Start an engagement
+          + New case
         </button>
       </div>
     );
@@ -30,7 +30,11 @@ export function NewEngagement() {
           method: "POST",
           headers: { "content-type": "application/json" },
           body: JSON.stringify({ clientName, title, sample }),
-        });
+        }).catch(() => null);
+        if (!res) {
+          setBusy(false);
+          return setError("Couldn't reach Merqado. Try again.");
+        }
         const data = await res.json().catch(() => ({}));
         setBusy(false);
         if (!res.ok) return setError(data.error ?? "Something went wrong.");
@@ -44,13 +48,12 @@ export function NewEngagement() {
           <input type="text" required value={clientName} onChange={(e) => setClientName(e.target.value)} placeholder="Project Resin" />
         </label>
         <label className="field">
-          Engagement title
-          <input type="text" required value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Commercial due diligence" />
+          Case title
+          <input type="text" required value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Title" />
         </label>
       </div>
       <label className="check">
-        <input type="checkbox" checked={sample} onChange={(e) => setSample(e.target.checked)} /> Fill the Experts tab with sample data (a
-        made-up plastics case) to try it out
+        <input type="checkbox" checked={sample} onChange={(e) => setSample(e.target.checked)} /> Sample data
       </label>
       <div style={{ display: "flex", gap: 8 }}>
         <button type="submit" disabled={busy}>

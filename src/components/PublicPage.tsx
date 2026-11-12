@@ -3,7 +3,7 @@ import Link from "next/link";
 /** Shell for pages anyone can read without signing in. */
 export function PublicPage({ children, narrow }: { children: React.ReactNode; narrow?: boolean }) {
   return (
-    <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column" }}>
+    <div className="public" style={{ minHeight: "100vh", display: "flex", flexDirection: "column" }}>
       <header
         style={{
           display: "flex",
@@ -15,8 +15,8 @@ export function PublicPage({ children, narrow }: { children: React.ReactNode; na
           background: "var(--surface)",
         }}
       >
-        <Link href="/welcome" className="brand" style={{ color: "var(--ink)", textDecoration: "none" }}>
-          merqado
+        <Link href="/welcome" className="brand" style={{ textDecoration: "none" }}>
+          Merqado
         </Link>
         <Link href="/login" className="button" style={{ display: "inline-flex", alignItems: "center", textDecoration: "none" }}>
           Sign in

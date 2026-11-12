@@ -1,101 +1,363 @@
-import { CopyButton } from "@/components/CopyButton";
 import Link from "next/link";
-import { notFound, redirect } from "next/navigation";
-import { count, desc, eq } from "drizzle-orm";
-import { getDb } from "@/db/client";
-import { engagementMembers, engagements, findings, sources } from "@/db/schema";
-import { AppNav } from "@/components/AppNav";
-import { AskBox } from "@/components/AskBox";
-import { can, PERSONA_HOME } from "@/lib/roles";
-import { getEngagementAccess, getSessionUser } from "@/lib/session";
+import { and, asc, eq } from "drizzle-orm";
+import { CaseShell } from "@/components/case/CaseShell";
+import { DecisionAdd } from "@/components/case/Notes";
+import { SampleButton } from "@/components/case/SampleButton";
+import { TaskCheck } from "@/components/case/TaskCheck";
+import { TodoAdd, TodoItem, TodoSuggestions } from "@/components/case/Todos";
+import { caseBudgets, chatRooms, experts, expertTypes, hypotheses, keyTakeaways, sources } from "@/db/schema";
+import { loadDeck, loadNotes, loadWorkplan } from "@/lib/case/data";
+import { loadCase } from "@/lib/case/page";
+import { progressPct, shortDate, TASK_STATUS_LABEL, timelinePct, todayIso } from "@/lib/case/progress";
+import { checkMove, dueOf, reviewerOf } from "@/lib/case/tasks";
+import { parseApprovals, waitingOn } from "@/lib/experts/approval";
+import { focusHref } from "@/lib/experts/focus";
+import { todoViews } from "@/lib/todos/view";
 
 export const dynamic = "force-dynamic";
 
-const STATUS_LABEL: Record<string, string> = {
-  supported: "Supported",
-  needs_data: "Needs data",
-  contradicted: "Contradicted",
-  hypothesis: "Hypothesis",
-};
-
-export default async function EngagementPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function OverviewPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ id: string }>;
+  searchParams: Promise<{ todo?: string }>;
+}) {
   const { id } = await params;
-  const db = getDb();
-  const user = await getSessionUser(db);
-  if (!user) redirect(`/login?returnTo=/e/${id}`);
-  const membership = await getEngagementAccess(db, user, id);
-  if (!membership || !can(membership.access, "read")) notFound();
-  const { engagement } = membership;
+  const sp = await searchParams;
+  const ctx = await loadCase(id);
+  const { db, user } = ctx;
+  const team = sp.todo === "team";
 
-  const [navRows, [sourceCount], [findingCount], latest] = await Promise.all([
-    db
-      .select({ id: engagements.id, clientName: engagements.clientName, title: engagements.title })
-      .from(engagements)
-      .innerJoin(engagementMembers, eq(engagementMembers.engagementId, engagements.id))
-      .where(eq(engagementMembers.userId, user.id)),
-    db.select({ n: count() }).from(sources).where(eq(sources.engagementId, id)),
-    db.select({ n: count() }).from(findings).where(eq(findings.engagementId, id)),
-    db.select().from(findings).where(eq(findings.engagementId, id)).orderBy(desc(findings.createdAt)).limit(8),
+  const [wp, notes, deck, hyps, takeaways, expertRows, types, budget, rooms, files] = await Promise.all([
+    loadWorkplan(db, id),
+    loadNotes(db, id, user.id),
+    loadDeck(db, id),
+    db.select().from(hypotheses).where(eq(hypotheses.engagementId, id)).orderBy(asc(hypotheses.sort)),
+    db.select().from(keyTakeaways).where(and(eq(keyTakeaways.engagementId, id), eq(keyTakeaways.included, true))),
+    db.select().from(experts).where(eq(experts.engagementId, id)),
+    db.select().from(expertTypes).where(eq(expertTypes.engagementId, id)).orderBy(asc(expertTypes.sort)),
+    db.query.caseBudgets.findFirst({ where: eq(caseBudgets.engagementId, id) }),
+    db.select({ id: chatRooms.id }).from(chatRooms).where(eq(chatRooms.engagementId, id)),
+    db.select({ id: sources.id }).from(sources).where(eq(sources.engagementId, id)),
   ]);
 
-  return (
-    <div className="shell">
-      <AppNav engagements={navRows} activeId={id} />
-      <main className="main">
-        <header>
-          <div className="muted">
-            Engagements / {engagement.clientName} · You land on: {PERSONA_HOME[user.archetype].label}
-          </div>
-          <h1 style={{ fontSize: 30 }}>{engagement.title}</h1>
-        </header>
+  const base = `/e/${id}`;
+  const today = todayIso();
+  const nameOf = new Map(ctx.members.map((m) => [m.id, m.name]));
+  const milestones = wp.milestones;
+  const start = milestones[0]?.date;
+  const end = milestones[milestones.length - 1]?.date;
+  const nextMilestone = milestones.find((m) => m.date >= today);
 
-        <nav className="subtabs" aria-label="Engagement sections">
-          <Link href={`/e/${id}`} aria-current="page">
-            Overview
-          </Link>
-          <Link href={`/e/${id}/experts`}>Experts</Link>
-        </nav>
-
-        <section className="tiles copyable" aria-label="Status">
-          <CopyButton
-            tables={[
-              {
-                title: engagement.title,
-                columns: ["Item", "Count"],
-                rows: [
-                  ["Findings", findingCount?.n ?? 0],
-                  ["Sources", sourceCount?.n ?? 0],
-                ],
-              },
-            ]}
-          />
-          <div className="card">
-            <span className="muted">Findings</span>
-            <span className="tile-value">{findingCount?.n ?? 0}</span>
-          </div>
-          <div className="card">
-            <span className="muted">Sources</span>
-            <span className="tile-value">{sourceCount?.n ?? 0}</span>
-          </div>
-          <div className="card">
-            <span className="muted">Your access</span>
-            <span className="tile-value" style={{ fontSize: 20 }}>{membership.access}</span>
-          </div>
-        </section>
-
-        <AskBox engagementId={id} />
-
-        <section className="card">
-          <h2 style={{ fontSize: 18 }}>Latest findings</h2>
-          {latest.map((f) => (
-            <div className="row" key={f.id}>
-              <span>{f.statement}</span>
-              <span className={`status-${f.status}`}>{STATUS_LABEL[f.status]}</span>
-            </div>
-          ))}
-          {latest.length === 0 && <p className="muted">No findings yet. Pin an answer to start.</p>}
-        </section>
-      </main>
-    </div>
+  const leadOf = new Map(wp.modules.map((m) => [m.id, m.leadId]));
+  const openTasks = wp.tasks.filter(
+    (t) =>
+      t.status !== "done" &&
+      (team || t.assigneeId === user.id || (t.status === "almost_done" && reviewerOf(t, leadOf.get(t.moduleId)) === user.id)),
   );
+  const proposed = expertRows.filter(
+    (e) => e.status === "proposed" && (team || waitingOn({ requestedBy: e.requestedBy, approvals: parseApprovals(e.approvals) }, ctx.members).includes(user.id)),
+  );
+  const openItems = notes.filter((n) => n.kind === "open" && !n.resolved);
+  const decisions = notes.filter((n) => n.kind === "decision");
+  const openContradictions = deck.issues.filter((i) => i.kind === "contradiction" && i.status === "open");
+  const milestoneOf = new Map(milestones.map((m) => [m.id, m]));
+  const milestoneDate = new Map(milestones.map((m) => [m.id, m.date]));
+  const todo = await todoViews(ctx, id, team);
+
+  const setup = [
+    { label: "Workplan", done: wp.modules.length > 0, href: "/workplan" },
+    { label: "Team chats", done: rooms.length > 0, href: "/channel" },
+    { label: "Experts", done: expertRows.length > 0, href: "/experts" },
+    { label: "Hypotheses", done: hyps.length > 0, href: "/experts/setup" },
+    { label: "Files", done: files.length > 0, href: "/files" },
+    { label: "Deck", done: deck.slides.length > 0, href: "/deck" },
+  ];
+  const setupDone = setup.filter((s) => s.done).length;
+  const kta = (h: string, v?: "supports" | "challenges") => `${base}/experts/ktas?h=${h}${v ? `&v=${v}` : ""}#hyp-${h}`;
+
+  const completed = expertRows.filter((e) => e.status === "completed").length;
+  const scheduled = expertRows.filter((e) => e.status === "scheduled").length;
+  const planned = budget?.plannedInterviews ?? 0;
+
+  return (
+    <CaseShell ctx={ctx} section="overview" title="Overview">
+      {setupDone === 0 && ctx.canEdit && (
+        <div className="empty">
+          <strong>Empty case</strong>
+          <SampleButton engagementId={id} />
+        </div>
+      )}
+
+      {milestones.length > 0 && start && end && (
+        <section className="card">
+          <div className="toolbar">
+            <h2 style={{ fontSize: 16 }}>
+              <Link href={`${base}/workplan`} className="plain">
+                Timeline
+              </Link>
+            </h2>
+            <span className="grow" />
+            {nextMilestone && (
+              <Link href={`${base}/workplan#ms-${nextMilestone.id}`} className="muted plain" style={{ fontSize: 13 }}>
+                Next: {nextMilestone.label} · {shortDate(nextMilestone.date)}
+              </Link>
+            )}
+          </div>
+          <div className="tl" role="list">
+            <div className="tl-track">
+              <span className="tl-fill" style={{ width: `${timelinePct(today, start, end)}%` }} />
+            </div>
+            {milestones.map((m) => (
+              <Link
+                key={m.id}
+                href={`${base}/workplan#ms-${m.id}`}
+                role="listitem"
+                className={`tl-point plain${m.date < today ? " past" : ""}`}
+                style={{ left: `${timelinePct(m.date, start, end)}%` }}
+              >
+                <i />
+                <span className="tl-label">{m.label}</span>
+                <span className="mono">{shortDate(m.date)}</span>
+              </Link>
+            ))}
+            {today >= start && today <= end && (
+              <div className="tl-today" style={{ left: `${timelinePct(today, start, end)}%` }}>
+                Today
+              </div>
+            )}
+          </div>
+        </section>
+      )}
+
+      {wp.modules.length > 0 && (
+        <section className="tiles" aria-label="Modules">
+          {wp.modules.map((m) => {
+            const tasks = wp.tasks.filter((t) => t.moduleId === m.id);
+            const pct = progressPct(tasks);
+            return (
+              <Link key={m.id} href={`${base}/workplan#mod-${m.id}`} className="card mod-card">
+                <span style={{ fontWeight: 600 }}>{m.name}</span>
+                <span className="tile-value" style={{ fontSize: 22 }}>{pct}%</span>
+                <span className="bar">
+                  <span style={{ width: `${pct}%` }} />
+                </span>
+                <span className="muted" style={{ fontSize: 12 }}>{m.leadId ? nameOf.get(m.leadId) : ""}</span>
+              </Link>
+            );
+          })}
+        </section>
+      )}
+
+      <div className="split">
+        <div className="primary">
+          <section className="panel">
+            <div className="group-head">
+              <h2>
+                <Link href={`${base}/workplan`} className="plain">
+                  To do
+                </Link>
+              </h2>
+              <span className="grow" style={{ flex: 1 }} />
+              <nav className="seg" aria-label="Whose to-dos">
+                <Link href={base} className="seg-link" aria-current={!team ? "page" : undefined}>
+                  Mine
+                </Link>
+                <Link href={`${base}?todo=team`} className="seg-link" aria-current={team ? "page" : undefined}>
+                  Team
+                </Link>
+              </nav>
+            </div>
+            <div className="panel-body" style={{ gap: 0 }}>
+              {openTasks.map((t) => (
+                <div className="row todo" key={t.id}>
+                  <span className="check" style={{ flex: 1 }}>
+                    <TaskCheck
+                      engagementId={id}
+                      taskId={t.id}
+                      next={checkMove(t, user.id, ctx.canEdit, leadOf.get(t.moduleId))}
+                      label={t.title}
+                    />
+                    <Link href={`${base}/workplan#task-${t.id}`} className="plain">
+                      {t.title}
+                    </Link>
+                  </span>
+                  <span className="meta">
+                    {team && t.assigneeId && <span>{nameOf.get(t.assigneeId)}</span>}
+                    {dueOf(t, milestoneDate) && <span>{shortDate(dueOf(t, milestoneDate))}</span>}
+                    <Link href={`${base}/workplan#task-${t.id}`} className={`pill ts-${t.status}`}>
+                      {TASK_STATUS_LABEL[t.status]}
+                    </Link>
+                  </span>
+                </div>
+              ))}
+              {todo.open.map((t) => (
+                <TodoItem key={t.id} engagementId={id} t={t} showAssignee={team} />
+              ))}
+              {proposed.map((e) => (
+                  <div className="row todo" key={e.id}>
+                    <Link href={`${base}/experts?expert=${e.id}`} style={{ flex: 1 }}>
+                      Approve {[e.firstName, e.lastName].filter(Boolean).join(" ")}
+                    </Link>
+                    <Link href={`${base}/experts?expert=${e.id}`} className="pill pill-proposed">
+                      Proposed
+                    </Link>
+                  </div>
+                ))}
+              {openContradictions.length > 0 && (
+                <div className="row todo">
+                  <Link href={`${base}/deck/contradictions`} style={{ flex: 1 }}>
+                    Contradictions in the deck
+                  </Link>
+                  <Link href={`${base}/deck/contradictions`} className="pill sev-high">
+                    {openContradictions.length}
+                  </Link>
+                </div>
+              )}
+              {openItems.map((n) => (
+                <div className="row todo" key={n.id}>
+                  <Link href={`${base}/notes#note-${n.id}`} style={{ flex: 1 }}>
+                    {n.body}
+                  </Link>
+                  <Link href={`${base}/notes#note-${n.id}`} className="tag">
+                    Open
+                  </Link>
+                </div>
+              ))}
+              {openTasks.length + todo.open.length + openItems.length + proposed.length + openContradictions.length === 0 && <p className="muted">Nothing open</p>}
+              <TodoAdd key={team ? "team" : "mine"} engagementId={id} me={user.id} members={ctx.members} team={team} />
+              <TodoSuggestions engagementId={id} items={todo.suggested} showAssignee={team} canScan={ctx.canEdit} />
+            </div>
+          </section>
+        </div>
+
+        <aside className="side">
+          <section className="card">
+            <div className="toolbar">
+              <h2 style={{ fontSize: 16 }}>
+                <Link href={`${base}/experts/metrics`} className="plain">
+                  Interviews
+                </Link>
+              </h2>
+              <span className="grow" />
+              <Link href={focusHref(id, "status:completed")} className="mono plain">
+                {completed}/{planned || expertRows.length}
+              </Link>
+            </div>
+            <span className="covbar big">
+              {completed > 0 && (
+                <Link href={focusHref(id, "status:completed")} className="seg-completed" aria-label={`Completed: ${completed}`} style={{ width: `${pctOf(completed, planned || expertRows.length)}%` }} />
+              )}
+              {scheduled > 0 && (
+                <Link href={focusHref(id, "status:scheduled")} className="seg-scheduled" aria-label={`Scheduled: ${scheduled}`} style={{ width: `${pctOf(scheduled, planned || expertRows.length)}%` }} />
+              )}
+            </span>
+            <div className="legend">
+              <Link href={focusHref(id, "status:completed")}><i className="seg-completed" />Completed</Link>
+              <Link href={focusHref(id, "status:scheduled")}><i className="seg-scheduled" />Scheduled</Link>
+            </div>
+            {types.map((t) => {
+              const rows = expertRows.filter((e) => e.typeId === t.id);
+              return (
+                <div className="row" key={t.id} style={{ padding: "6px 0" }}>
+                  <Link href={focusHref(id, `type:${t.id}`)} className="plain" style={{ flex: 1 }}>
+                    {t.name}
+                  </Link>
+                  <Link href={focusHref(id, `type:${t.id}:completed`)} className="mono plain">
+                    {rows.filter((e) => e.status === "completed").length}/{t.target || rows.length}
+                  </Link>
+                </div>
+              );
+            })}
+          </section>
+        </aside>
+      </div>
+
+      <div className="split">
+        <div className="primary">
+          <section className="panel">
+            <div className="group-head">
+              <h2>
+                <Link href={`${base}/experts/ktas`} className="plain">
+                  Hypotheses
+                </Link>
+              </h2>
+            </div>
+            <div className="panel-body" style={{ gap: 0 }}>
+              {hyps.map((h) => {
+                const mine = takeaways.filter((k) => k.hypothesisId === h.id);
+                const sup = mine.filter((k) => k.verdict === "supports").length;
+                const chal = mine.filter((k) => k.verdict === "challenges").length;
+                return (
+                  <div className="row" key={h.id}>
+                    <Link href={kta(h.id)} style={{ flex: 1 }}>
+                      {h.statement}
+                    </Link>
+                    <span className="meta">
+                      <Link href={kta(h.id, "supports")} className="tag v-supports">
+                        {sup} {sup === 1 ? "support" : "supports"}
+                      </Link>
+                      <Link href={kta(h.id, "challenges")} className="tag v-challenges">
+                        {chal} {chal === 1 ? "challenge" : "challenges"}
+                      </Link>
+                    </span>
+                  </div>
+                );
+              })}
+              {hyps.length === 0 && (
+                <p className="muted">
+                  No hypotheses · <Link href={`${base}/experts/setup`}>Add</Link>
+                </p>
+              )}
+            </div>
+          </section>
+        </div>
+
+        <aside className="side">
+          <section className="card">
+            <h2 style={{ fontSize: 16 }}>
+              <Link href={`${base}/notes`} className="plain">
+                Decisions
+              </Link>
+            </h2>
+            {decisions.slice(0, 6).map((n) => (
+              <Link href={`${base}/notes#note-${n.id}`} className="row plain" key={n.id} style={{ padding: "6px 0" }}>
+                <span>{n.body}</span>
+                <span className="mono" style={{ whiteSpace: "nowrap" }}>{shortDate(isoOf(n.createdAt))}</span>
+              </Link>
+            ))}
+            {decisions.length === 0 && <p className="muted">None</p>}
+            <DecisionAdd engagementId={id} />
+          </section>
+
+          <section className="card">
+            <div className="toolbar">
+              <h2 style={{ fontSize: 16 }}>Case setup</h2>
+              <span className="grow" />
+              <span className="mono">
+                {setupDone}/{setup.length}
+              </span>
+            </div>
+            <div className="setup-list">
+              {setup.map((s) => (
+                <Link key={s.label} href={base + s.href} className={s.done ? "done" : undefined}>
+                  <span aria-hidden="true">{s.done ? "✓" : "○"}</span>
+                  {s.label}
+                </Link>
+              ))}
+            </div>
+          </section>
+        </aside>
+      </div>
+    </CaseShell>
+  );
+}
+
+function pctOf(n: number, total: number) {
+  return total > 0 ? Math.min(100, (n / total) * 100) : 0;
+}
+
+function isoOf(d: Date | null) {
+  return d ? d.toISOString().slice(0, 10) : "";
 }

@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 const TABS = [
-  { href: "", label: "Pipeline" },
+  { href: "", label: "Calls" },
   { href: "/metrics", label: "Metrics" },
   { href: "/ktas", label: "KTAs" },
   { href: "/transcripts", label: "Transcripts" },
@@ -22,9 +22,6 @@ export function SubTabs({ engagementId }: { engagementId: string }) {
           {t.label}
         </Link>
       ))}
-      <span className="muted" style={{ padding: "10px 0" }} title="Coming later">
-        Wish list (soon)
-      </span>
     </nav>
   );
 }

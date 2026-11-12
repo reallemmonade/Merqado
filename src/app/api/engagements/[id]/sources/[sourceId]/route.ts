@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { authorize } from "@/lib/experts/api";
+import { sourceVisibility } from "@/lib/files/access";
 import { fileResponse, findSource, readSourceFile } from "@/lib/storage/files";
 
 /** Opens (or downloads) the original file behind a source. */
@@ -8,7 +9,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
   const auth = await authorize(id, "read");
   if (auth instanceof NextResponse) return auth;
   const source = await findSource(auth.db, id, sourceId);
-  if (!source) return NextResponse.json({ error: "File not found." }, { status: 404 });
+  if (!source || !(await sourceVisibility(auth.db, id, auth.user))(source)) return NextResponse.json({ error: "File not found." }, { status: 404 });
   try {
     return fileResponse(await readSourceFile(auth.db, auth.user.firmId, source), source.filename, source.mimeType);
   } catch (err) {

@@ -13,7 +13,7 @@ export function TranscriptUploadForm({ engagementId, experts }: { engagementId: 
   const [fileKey, setFileKey] = useState(0);
   const [done, setDone] = useState<string | null>(null);
 
-  if (!experts.length) return <p className="muted">Add an expert in the Pipeline first, then upload their transcript here.</p>;
+  if (!experts.length) return <p className="muted">No experts</p>;
   return (
     <form
       onSubmit={async (e) => {
@@ -31,8 +31,8 @@ export function TranscriptUploadForm({ engagementId, experts }: { engagementId: 
           const cleaned = await api.call("clean", `/api/engagements/${engagementId}/transcripts/${res.id}/clean`);
           setDone(
             cleaned
-              ? "Uploaded and cleaned. Open the expert to generate key takeaways."
-              : "Uploaded. Cleaning didn't finish; you can retry it from the transcript.",
+              ? "Uploaded"
+              : "Uploaded, cleaning failed",
           );
         }
       }}
@@ -50,7 +50,7 @@ export function TranscriptUploadForm({ engagementId, experts }: { engagementId: 
           </select>
         </label>
         <label className="field">
-          This is the
+          Kind
           <select value={kind} onChange={(e) => setKind(e.target.value)}>
             <option value="call">Main call</option>
             <option value="followup">Follow-up</option>
@@ -58,12 +58,12 @@ export function TranscriptUploadForm({ engagementId, experts }: { engagementId: 
         </label>
       </div>
       <label className="field">
-        File (Word, text, .vtt or .srt)
+        File
         <input key={fileKey} type="file" accept={TRANSCRIPT_ACCEPT} onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
       </label>
       {!file && (
         <label className="field">
-          Or paste the transcript
+          Or paste
           <textarea rows={6} value={text} onChange={(e) => setText(e.target.value)} />
         </label>
       )}

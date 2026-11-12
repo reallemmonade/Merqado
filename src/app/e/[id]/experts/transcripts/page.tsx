@@ -47,7 +47,7 @@ export default async function ExpertsTranscriptsPage({
         )}
         <section className="card" aria-labelledby="list-h" style={{ padding: 0, gap: 0 }}>
           <h2 id="list-h" style={{ fontSize: 14, padding: "12px 16px", borderBottom: "1px solid var(--line)" }}>
-            {data.transcripts.length} transcripts
+            {data.transcripts.length} {data.transcripts.length === 1 ? "transcript" : "transcripts"}
           </h2>
           {[...data.transcripts].reverse().map((tr) => {
             const e = expertOf(tr.expertId);
@@ -99,7 +99,7 @@ export default async function ExpertsTranscriptsPage({
                 </div>
                 {parseIdList(open.discussedTopicIds).length > 0 && (
                   <div className="muted" style={{ fontSize: 12, marginTop: 4 }}>
-                    Topics discussed: {topicNames(parseIdList(open.discussedTopicIds))}
+                    Topics: {topicNames(parseIdList(open.discussedTopicIds))}
                   </div>
                 )}
               </div>
@@ -127,7 +127,7 @@ export default async function ExpertsTranscriptsPage({
                 </div>
               ) : (
                 <span className="muted" style={{ fontSize: 13 }}>
-                  {open.cleanStatus === "failed" ? "Cleaning failed. Showing the verbatim upload." : open.cleanStatus === "cleaning" ? "Cleaning in progress…" : "Not cleaned yet. Showing the verbatim upload."}
+                  {open.cleanStatus === "failed" ? "Cleaning failed" : open.cleanStatus === "cleaning" ? "Cleaning…" : "Verbatim"}
                 </span>
               )}
               {canEdit && <CleanButton engagementId={id} transcriptId={open.id} again={!!open.cleanedBody} />}
@@ -138,7 +138,7 @@ export default async function ExpertsTranscriptsPage({
                 <ul style={{ margin: "8px 0 0", paddingLeft: 18, color: "var(--ink)", lineHeight: 1.5 }}>
                   {flags.map((f, i) => (
                     <li key={i}>
-                      &ldquo;{f.quote}&rdquo; <span className="muted">{f.reason}</span>
+                      <span className="serif" style={{ fontStyle: "italic", fontSize: 15 }}>&ldquo;{f.quote}&rdquo;</span> <span className="muted">{f.reason}</span>
                     </li>
                   ))}
                 </ul>
@@ -149,7 +149,6 @@ export default async function ExpertsTranscriptsPage({
         ) : (
           <div className="empty">
             <strong>No transcripts yet</strong>
-            <span className="muted">Upload one on the left. It&rsquo;s matched to the expert you pick.</span>
           </div>
         )}
       </section>

@@ -36,6 +36,8 @@
     ".next/dev/types/**/*.ts"
   ],
   "exclude": [
+    "mobile",
+    "desktop",
     "node_modules"
   ]
 }

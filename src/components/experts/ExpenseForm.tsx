@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useApi } from "./useApi";
 
 const CATEGORIES = [
-  ["meals", "Meals (late dinners)"],
+  ["meals", "Meals"],
   ["travel", "Cabs and travel"],
   ["ai_tools", "AI tools"],
   ["other", "Other"],
@@ -43,7 +43,7 @@ export function ExpenseForm({ engagementId }: { engagementId: string }) {
         </label>
         <label className="field">
           What for
-          <input type="text" value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Team dinner, Nov 4" />
+          <input type="text" value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Description" />
         </label>
         <label className="field">
           Amount ($)

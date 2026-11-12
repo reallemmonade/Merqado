@@ -1,5 +1,5 @@
 import { and, eq } from "drizzle-orm";
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import type { DB } from "@/db/client";
 import { findSession, SESSION_COOKIE } from "@/lib/auth/session";
 import { findTestAccount } from "@/lib/auth/test-accounts";
@@ -14,15 +14,19 @@ export interface SessionUser {
   title: string;
   archetype: Archetype;
   isAdmin: boolean;
+  /** IANA time zone from the person's browser; null until first seen. */
+  timeZone: string | null;
 }
 
 /**
- * The signed-in person, from their SSO session cookie.
+ * The signed-in person, from their SSO session cookie, or from the iPhone app's
+ * `Authorization: Bearer <token>` header.
  * Outside production, DEV_USER_EMAIL signs in a seeded user without SSO.
  */
 export async function getSessionUser(db: DB): Promise<SessionUser | null> {
   const jar = await cookies();
-  const session = await findSession(db, jar.get(SESSION_COOKIE)?.value);
+  const bearer = (await headers()).get("authorization")?.match(/^Bearer\s+(\S+)$/i)?.[1];
+  const session = await findSession(db, bearer ?? jar.get(SESSION_COOKIE)?.value);
   if (session) return loadUser(db, eq(users.id, session.userId), session.firmId);
 
   if (process.env.NODE_ENV === "production") return null;
@@ -41,6 +45,7 @@ async function loadUser(db: DB, who: ReturnType<typeof eq>, firmId?: string): Pr
       title: firmRoles.title,
       archetype: firmRoles.archetype,
       isAdmin: firmMembers.isAdmin,
+      timeZone: users.timeZone,
     })
     .from(users)
     .innerJoin(firmMembers, eq(firmMembers.userId, users.id))
@@ -55,9 +60,9 @@ export async function getEngagementAccess(
   db: DB,
   user: SessionUser,
   engagementId: string,
-): Promise<{ engagement: typeof engagements.$inferSelect; access: AccessLevel } | null> {
+): Promise<{ engagement: typeof engagements.$inferSelect; access: AccessLevel; role: Archetype } | null> {
   const [row] = await db
-    .select({ engagement: engagements, access: engagementMembers.access })
+    .select({ engagement: engagements, access: engagementMembers.access, caseRole: engagementMembers.caseRole })
     .from(engagements)
     .innerJoin(
       engagementMembers,
@@ -65,7 +70,7 @@ export async function getEngagementAccess(
     )
     .where(and(eq(engagements.id, engagementId), eq(engagements.firmId, user.firmId)))
     .limit(1);
-  return row ?? null;
+  return row ? { engagement: row.engagement, access: row.access, role: row.caseRole ?? user.archetype } : null;
 }
 
 /**

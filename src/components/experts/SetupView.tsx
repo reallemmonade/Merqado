@@ -27,7 +27,6 @@ export function SetupView({
     <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 420px), 1fr))", gap: 16 }}>
       <NamedTargets
         title="Interviewee types"
-        hint="The archetypes you want to talk to, and how many calls with each."
         kind="type"
         rows={data.types.map((t) => ({ id: t.id, name: t.name, target: t.target }))}
         placeholder="Customers"
@@ -37,7 +36,6 @@ export function SetupView({
       />
       <NamedTargets
         title="Topics"
-        hint="What the case needs covered, and how many calls should discuss each."
         kind="topic"
         rows={data.topics.map((t) => ({ id: t.id, name: t.name, target: t.target }))}
         placeholder="Pricing power"
@@ -62,7 +60,6 @@ export function SetupView({
 
 function NamedTargets({
   title,
-  hint,
   kind,
   rows,
   placeholder,
@@ -71,7 +68,6 @@ function NamedTargets({
   api,
 }: {
   title: string;
-  hint: string;
   kind: "type" | "topic";
   rows: { id: string; name: string; target: number }[];
   placeholder: string;
@@ -84,9 +80,6 @@ function NamedTargets({
   return (
     <section className="card">
       <h2 style={{ fontSize: 18 }}>{title}</h2>
-      <p className="muted" style={{ margin: 0, fontSize: 13 }}>
-        {hint}
-      </p>
       {rows.map((r) => (
         <Row key={r.id} kind={kind} row={r} canEdit={canEdit} send={send} />
       ))}
@@ -102,11 +95,11 @@ function NamedTargets({
           <label className="sr-only" htmlFor={`new-${kind}`}>
             New {kind}
           </label>
-          <input id={`new-${kind}`} type="text" required placeholder={placeholder} value={name} onChange={(e) => setName(e.target.value)} />
+          <input id={`new-${kind}`} type="text" required placeholder={placeholder} value={name} onChange={(e) => setName(e.target.value)} style={{ flex: "1 1 auto", minWidth: 0 }} />
           <label className="sr-only" htmlFor={`new-${kind}-t`}>
             Target
           </label>
-          <input id={`new-${kind}-t`} type="number" min={0} placeholder="Target" value={target} onChange={(e) => setTarget(e.target.value)} style={{ width: 90 }} />
+          <input id={`new-${kind}-t`} type="number" min={0} placeholder="Target" value={target} onChange={(e) => setTarget(e.target.value)} style={{ flex: "0 0 72px", width: 72 }} />
           <button type="submit" disabled={api.busy === `add-${kind}`}>
             Add
           </button>
@@ -142,11 +135,11 @@ function Row({
       <label className="sr-only" htmlFor={`n-${row.id}`}>
         Name
       </label>
-      <input id={`n-${row.id}`} type="text" value={name} onChange={(e) => setName(e.target.value)} />
+      <input id={`n-${row.id}`} type="text" value={name} onChange={(e) => setName(e.target.value)} style={{ flex: "1 1 auto", minWidth: 0 }} />
       <label className="sr-only" htmlFor={`t-${row.id}`}>
         Target
       </label>
-      <input id={`t-${row.id}`} type="number" min={0} value={target} onChange={(e) => setTarget(e.target.value)} style={{ width: 90 }} />
+      <input id={`t-${row.id}`} type="number" min={0} value={target} onChange={(e) => setTarget(e.target.value)} style={{ flex: "0 0 72px", width: 72 }} />
       {dirty && (
         <button type="button" className="small" onClick={() => send(`s-${row.id}`, { kind, id: row.id, name, target: Number(target) || 0 })}>
           Save
@@ -175,9 +168,6 @@ function Hypotheses({
   return (
     <section className="card">
       <h2 style={{ fontSize: 18 }}>Hypotheses</h2>
-      <p className="muted" style={{ margin: 0, fontSize: 13 }}>
-        The themes you&rsquo;re testing. Guides aim questions at them and key takeaways roll up into them.
-      </p>
       {rows.map((h) => (
         <div className="row" key={h.id}>
           <span>
@@ -210,7 +200,7 @@ function Hypotheses({
           <label className="sr-only" htmlFor="new-h">
             Hypothesis
           </label>
-          <input id="new-h" type="text" required placeholder="Customers rarely switch suppliers" value={statement} onChange={(e) => setStatement(e.target.value)} style={{ flex: "1 1 220px" }} />
+          <input id="new-h" type="text" required placeholder="Hypothesis" value={statement} onChange={(e) => setStatement(e.target.value)} style={{ flex: "1 1 220px" }} />
           <button type="submit" disabled={api.busy === "add-h"}>
             Add
           </button>
@@ -244,9 +234,6 @@ function Budget({
   return (
     <section className="card">
       <h2 style={{ fontSize: 18 }}>Budget and timing</h2>
-      <p className="muted" style={{ margin: 0, fontSize: 13 }}>
-        Used for the budget bar and the projection on Metrics.
-      </p>
       <form
         onSubmit={async (ev) => {
           ev.preventDefault();

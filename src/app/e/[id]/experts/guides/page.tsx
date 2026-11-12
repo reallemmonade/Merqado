@@ -14,20 +14,17 @@ export default async function ExpertsGuidesPage({ params }: { params: Promise<{ 
       </div>
       <aside className="side card" aria-labelledby="eg-h">
         <h2 id="eg-h" style={{ fontSize: 18 }}>
-          Guides for each expert
+          Expert guides
         </h2>
-        <p className="muted" style={{ margin: 0, fontSize: 13 }}>
-          Open an expert to generate, edit or copy their guide.
-        </p>
         {upcoming.map((e) => (
           <div className="row" key={e.id}>
             <Link href={`/e/${id}/experts?expert=${e.id}&tab=guide`}>{e.anonTitle || e.name}</Link>
-            <span className="muted" style={{ fontSize: 12 }}>
+            <span className="muted" style={{ fontSize: 12, whiteSpace: "nowrap" }}>
               {e.guide ? "Guide ready" : "No guide"} · {STATUS_LABEL[e.status]}
             </span>
           </div>
         ))}
-        {upcoming.length === 0 && <p className="muted">No experts yet.</p>}
+        {upcoming.length === 0 && <p className="muted">No experts</p>}
       </aside>
     </div>
   );

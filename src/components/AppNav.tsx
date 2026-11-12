@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { NavTitleSwitch } from "./NavTitleSwitch";
+import { NavUser } from "./NavUser";
 
 export interface NavEngagement {
   id: string;
@@ -20,10 +20,10 @@ export function AppNav({
   return (
     <nav className="nav" aria-label="Main">
       <Link href="/" className="brand" style={{ padding: 0 }}>
-        merqado
+        Merqado
       </Link>
-      <div>
-        <div className="eyebrow">Engagements</div>
+      <div className="nav-cases">
+        <div className="eyebrow">Cases</div>
         {engagements.map((e) => (
           <div key={e.id}>
             <Link href={`/e/${e.id}`} aria-current={e.id === activeId && !section ? "page" : undefined}>
@@ -40,15 +40,10 @@ export function AppNav({
             )}
           </div>
         ))}
-        {engagements.length === 0 && <p className="muted">No engagements yet.</p>}
+        {engagements.length === 0 && <p className="muted">No cases</p>}
       </div>
-      <div style={{ marginTop: "auto", display: "flex", flexDirection: "column", gap: 12 }}>
-        <NavTitleSwitch />
-        <form method="post" action="/api/auth/logout">
-          <button type="submit" style={{ background: "transparent", color: "var(--nav-ink)", border: "1px solid #2b3a48", width: "100%" }}>
-            Sign out
-          </button>
-        </form>
+      <div className="nav-foot">
+        <NavUser />
       </div>
     </nav>
   );

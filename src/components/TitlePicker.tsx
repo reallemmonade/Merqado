@@ -11,10 +11,8 @@ export function TitlePicker({ current, titles }: { current: string; titles: { id
   const [error, setError] = useState<string | null>(null);
 
   return (
-    <div>
-      <label className="eyebrow" htmlFor="title-picker" style={{ display: "block" }}>
-        View as
-      </label>
+    <div className="field">
+      <label htmlFor="title-picker">Role</label>
       <select
         id="title-picker"
         value={value}
@@ -29,16 +27,15 @@ export function TitlePicker({ current, titles }: { current: string; titles: { id
             method: "POST",
             headers: { "content-type": "application/json" },
             body: JSON.stringify({ firmRoleId: next }),
-          });
+          }).catch(() => null);
           setBusy(false);
-          if (!res.ok) {
+          if (!res?.ok) {
             setValue(previous);
-            setError(((await res.json().catch(() => null)) as { error?: string } | null)?.error ?? "Couldn't switch.");
+            setError(((await res?.json().catch(() => null)) as { error?: string } | null)?.error ?? "Couldn't switch.");
             return;
           }
           router.refresh();
         }}
-        style={{ width: "100%", background: "var(--nav-active)", color: "#fff", border: "1px solid #2b3a48" }}
       >
         {titles.map((t) => (
           <option key={t.id} value={t.id}>

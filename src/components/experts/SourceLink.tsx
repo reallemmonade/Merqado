@@ -13,7 +13,7 @@ export function SourceLink({
   const tr = transcripts.find((t) => t.kind === "call") ?? transcripts[0];
   if (!tr) return <span>{locator}</span>;
   return (
-    <Link href={`/e/${engagementId}/experts/transcripts?t=${tr.id}`} title="Open the transcript this came from">
+    <Link href={`/e/${engagementId}/experts/transcripts?t=${tr.id}`} title="Transcript">
       {locator}
     </Link>
   );

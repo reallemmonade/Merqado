@@ -1,0 +1,12 @@
+.sections { display: flex; flex-direction: column; gap: 2px; }
+
+@media (max-width: 640px) {
+  /* Phone: the settings menu spans the screen, sections sit in one row. */
+  :global(.shell) > .nav { flex: 1 1 100%; padding: 12px 16px; gap: 8px; }
+  .nav :global(.case-name) { display: none; }
+  .sections { flex-direction: row; overflow-x: auto; scrollbar-width: none; }
+  .sections > :global(.nav-item) { flex: 0 0 auto; min-height: 36px; }
+  .nav :global(.nav-foot) { flex-direction: row; align-items: center; margin: 0; background: none; box-shadow: none; -webkit-backdrop-filter: none; backdrop-filter: none; }
+  .nav :global(.nav-foot) > :global(.nav-user) { flex: 1; min-width: 0; padding: 0; }
+  .nav :global(.nav-signout) { width: auto; padding: 6px 14px; }
+}
