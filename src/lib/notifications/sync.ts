@@ -1,6 +1,6 @@
 import { and, asc, desc, eq, gt, inArray, lte, ne, notInArray, or, sql } from "drizzle-orm";
 import type { DB } from "@/db/client";
-import { firmMembers, firmRoles, notifications, type Archetype } from "@/db/schema";
+import { firmMembers, firmRoles, notifications, users, type Archetype } from "@/db/schema";
 import { myCases } from "@/lib/mobile/data";
 import { deriveInbox, type InboxCase, type Person } from "./derive";
 
@@ -82,11 +82,12 @@ export async function syncAllNotifications(db: DB): Promise<number> {
 
 async function firmPeople(db: DB, where?: ReturnType<typeof and>): Promise<Person[]> {
   return db
-    .select({ id: firmMembers.userId, firmId: firmMembers.firmId, archetype: firmRoles.archetype })
+    .select({ id: firmMembers.userId, firmId: firmMembers.firmId, archetype: firmRoles.archetype, timeZone: users.timeZone })
     .from(firmMembers)
     .innerJoin(firmRoles, eq(firmRoles.id, firmMembers.firmRoleId))
+    .innerJoin(users, eq(users.id, firmMembers.userId))
     .where(where)
-    .orderBy(asc(firmMembers.userId)) as Promise<{ id: string; firmId: string; archetype: Archetype }[]>;
+    .orderBy(asc(firmMembers.userId)) as Promise<{ id: string; firmId: string; archetype: Archetype; timeZone: string | null }[]>;
 }
 
 export type InboxEntry = {
@@ -104,6 +105,8 @@ export type InboxEntry = {
   threadId?: string;
   taskId?: string;
   todoId?: string;
+  flag?: "overdue" | "idle";
+  days?: number;
   snoozeUntil?: string;
   doneBy?: "system" | "user";
 };
@@ -140,7 +143,7 @@ export async function readInbox(db: DB, user: Person, cases: InboxCase[], now = 
     .orderBy(view === "snoozed" ? asc(notifications.snoozeUntil) : view === "done" ? desc(notifications.updatedAt) : desc(notifications.occurredAt))
     .limit(limit);
   return rows.map((r) => ({
-    ...(parseData(r.data) as Pick<InboxEntry, "roomId" | "messageId" | "threadId" | "taskId" | "todoId">),
+    ...(parseData(r.data) as Pick<InboxEntry, "roomId" | "messageId" | "threadId" | "taskId" | "todoId" | "flag" | "days">),
     id: r.key,
     kind: r.kind,
     status: r.status,

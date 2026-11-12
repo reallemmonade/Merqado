@@ -1,14 +1,16 @@
 import { and, desc, eq, gt, inArray, isNotNull, like, ne, or } from "drizzle-orm";
 import { alias } from "drizzle-orm/sqlite-core";
 import type { DB } from "@/db/client";
-import { chatMessages, chatRooms, todos, users, workplanModules, workplanTasks, type Archetype, type NotificationKind } from "@/db/schema";
+import { chatMessages, chatRooms, todos, users, workplanMilestones, workplanModules, workplanTasks, type Archetype, type NotificationKind } from "@/db/schema";
+import { localTime } from "@/lib/cron/time-zone";
+import { taskFlag, type TaskFlag } from "@/lib/inbox/flags";
 import { reviewerOf } from "@/lib/case/tasks";
 import { canSeeChat } from "@/lib/case/rooms";
 import { canSeeTodo } from "@/lib/todos/data";
 
 export const INBOX_WINDOW_MS = 14 * 24 * 60 * 60 * 1000;
 
-export type Person = { id: string; firmId: string; archetype: Archetype };
+export type Person = { id: string; firmId: string; archetype: Archetype; timeZone?: string | null };
 export type InboxCase = { id: string; codeName: string; role: Archetype };
 
 /** One thing that needs a person, worked out from chats, to-dos and tasks. */
@@ -20,7 +22,7 @@ export type DerivedItem = {
   body: string;
   at: Date;
   link: string;
-  data: { roomId?: string; messageId?: string; threadId?: string; taskId?: string; todoId?: string };
+  data: { roomId?: string; messageId?: string; threadId?: string; taskId?: string; todoId?: string } & Partial<TaskFlag>;
 };
 
 const roomLink = (caseId: string, roomId: string, threadId?: string | null) =>
@@ -35,6 +37,7 @@ export async function deriveInbox(db: DB, user: Person, cases: InboxCase[], now 
   const caseIds = cases.map((c) => c.id);
   const caseOf = new Map(cases.map((c) => [c.id, c]));
   const since = new Date(now.getTime() - INBOX_WINDOW_MS);
+  const today = localTime(now, user.timeZone).date;
   const items: DerivedItem[] = [];
 
   const mentions = await db
@@ -106,14 +109,19 @@ export async function deriveInbox(db: DB, user: Person, cases: InboxCase[], now 
       moduleLead: workplanModules.leadId,
       module: workplanModules.name,
       at: workplanTasks.createdAt,
+      updatedAt: workplanTasks.updatedAt,
+      dueDate: workplanTasks.dueDate,
+      milestoneDate: workplanMilestones.date,
     })
     .from(workplanTasks)
     .innerJoin(workplanModules, eq(workplanModules.id, workplanTasks.moduleId))
+    .leftJoin(workplanMilestones, eq(workplanMilestones.id, workplanTasks.milestoneId))
     .where(
       and(
         inArray(workplanTasks.engagementId, caseIds),
         or(
-          and(eq(workplanTasks.assigneeId, user.id), gt(workplanTasks.createdAt, since), ne(workplanTasks.status, "done")),
+          // Older open tasks are checked for overdue or idle below.
+          and(eq(workplanTasks.assigneeId, user.id), ne(workplanTasks.status, "done")),
           and(eq(workplanTasks.status, "almost_done"), or(eq(workplanTasks.reviewerId, user.id), eq(workplanTasks.createdBy, user.id), eq(workplanModules.leadId, user.id))),
         ),
       ),
@@ -123,7 +131,10 @@ export async function deriveInbox(db: DB, user: Person, cases: InboxCase[], now 
     const review = t.status === "almost_done" && reviewerOf(t, t.moduleLead) === user.id && t.assigneeId !== user.id;
     const mineToDo = t.assigneeId === user.id && t.status !== "done";
     if (!review && !mineToDo) continue;
-    items.push({ key: `t-${t.id}`, kind: review ? "review" : "task", caseId: t.caseId, title: t.title, body: t.module, at: t.at, link: "/tasks", data: { taskId: t.id } });
+    // A review waits on the reviewer, so only a quiet task counts; its due date is the assignee's.
+    const flag = taskFlag({ due: review ? null : (t.dueDate ?? t.milestoneDate), changedAt: t.updatedAt ?? t.at }, now, today);
+    if (!review && !flag && t.at <= since) continue;
+    items.push({ key: `t-${t.id}`, kind: review ? "review" : "task", caseId: t.caseId, title: t.title, body: t.module, at: t.at, link: "/tasks", data: { taskId: t.id, ...flag } });
   }
 
   return items;

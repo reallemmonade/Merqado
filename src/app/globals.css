@@ -968,6 +968,9 @@ html:root:root .storage-card.on { border-color: var(--accent); box-shadow: inset
 .inbox-dot { width: 8px; height: 8px; border-radius: 99px; flex: none; }
 .inbox-row.unread .inbox-dot { background: var(--accent); }
 .inbox-icon { width: 30px; height: 30px; border-radius: 8px; display: grid; place-items: center; flex: none; background: var(--accent-soft); color: var(--accent); }
+.inbox-icon.flag-idle, .inbox-flag.flag-idle { background: color-mix(in srgb, var(--warn) 16%, transparent); color: var(--warn); }
+.inbox-icon.flag-overdue, .inbox-flag.flag-overdue { background: color-mix(in srgb, var(--bad) 14%, transparent); color: var(--bad); }
+.inbox-flag { flex: none; font-size: 11px; font-weight: 600; border-radius: 99px; padding: 2px 8px; white-space: nowrap; }
 .inbox-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; color: var(--ink); text-decoration: none; }
 .inbox-text:hover .inbox-title { text-decoration: underline; }
 .inbox-title { font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -987,6 +990,7 @@ html:root:root .storage-card.on { border-color: var(--accent); box-shadow: inset
   .shell > .nav[aria-label="Main"] .nav-user-name { display: none; }
   .inbox-row { padding: 10px 12px; gap: 10px; }
   .inbox-btn-label { display: none; }
+  .inbox-flag { display: none; }
   .inbox-actions button { padding: 0 9px; }
 }
 .rail .rail-inbox { position: relative; }

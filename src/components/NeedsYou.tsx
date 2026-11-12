@@ -18,6 +18,8 @@ export type NeedsYouItem = {
   when: string;
   href: string;
   canReopen: boolean;
+  flag?: "overdue" | "idle";
+  flagText?: string;
 };
 
 export type NeedsYouGroup = { caseId: string; name: string; items: NeedsYouItem[] };
@@ -56,13 +58,14 @@ export function NeedsYouList({ groups, view }: { groups: NeedsYouGroup[]; view: 
           {g.items.map((i) => (
             <div className={`inbox-row${i.unread ? " unread" : ""}`} key={i.key}>
               <span className="inbox-dot" aria-hidden="true" />
-              <span className={`inbox-icon kind-${i.kind}`} aria-hidden="true">
-                <Icon name={KIND_ICON[i.kind]} size={16} />
+              <span className={`inbox-icon${i.flag ? ` flag-${i.flag}` : ""}`} aria-hidden="true">
+                <Icon name={i.flag ? "clock" : KIND_ICON[i.kind]} size={16} />
               </span>
               <Link href={i.href} className="inbox-text" onClick={() => i.unread && void send(i.key, { action: "read" })}>
                 <span className="inbox-title">{i.title}</span>
                 {i.sub && <span className="inbox-sub">{i.sub}</span>}
               </Link>
+              {i.flagText && <span className={`inbox-flag flag-${i.flag}`}>{i.flagText}</span>}
               <span className="inbox-when">{i.when}</span>
               <div className="inbox-actions">
                 {view === "open" && <SnoozeMenu onPick={(until) => act(i.key, { action: "snooze", until })} />}
