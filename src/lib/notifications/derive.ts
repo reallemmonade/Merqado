@@ -1,10 +1,12 @@
 import { and, desc, eq, gt, inArray, isNotNull, like, ne, or } from "drizzle-orm";
 import { alias } from "drizzle-orm/sqlite-core";
 import type { DB } from "@/db/client";
-import { chatMessages, chatRooms, todos, users, workplanMilestones, workplanModules, workplanTasks, type Archetype, type NotificationKind } from "@/db/schema";
+import { chatMessages, chatRooms, engagementMembers, experts, firmMembers, firmRoles, todos, users, workplanMilestones, workplanModules, workplanTasks, type Archetype, type NotificationKind } from "@/db/schema";
 import { localTime } from "@/lib/cron/time-zone";
 import { taskFlag, type TaskFlag } from "@/lib/inbox/flags";
 import { reviewerOf } from "@/lib/case/tasks";
+import { signoffFor, type Signer } from "@/lib/experts/approval";
+import { anonymizeTitle } from "@/lib/experts/calc";
 import { canSeeChat } from "@/lib/case/rooms";
 import { canSeeTodo } from "@/lib/todos/data";
 
@@ -22,7 +24,7 @@ export type DerivedItem = {
   body: string;
   at: Date;
   link: string;
-  data: { roomId?: string; messageId?: string; threadId?: string; taskId?: string; todoId?: string } & Partial<TaskFlag>;
+  data: { roomId?: string; messageId?: string; threadId?: string; taskId?: string; todoId?: string; expertId?: string } & Partial<TaskFlag>;
 };
 
 const roomLink = (caseId: string, roomId: string, threadId?: string | null) =>
@@ -137,5 +139,42 @@ export async function deriveInbox(db: DB, user: Person, cases: InboxCase[], now 
     items.push({ key: `t-${t.id}`, kind: review ? "review" : "task", caseId: t.caseId, title: t.title, body: t.module, at: t.at, link: "/tasks", data: { taskId: t.id, ...flag } });
   }
 
+  // Proposed experts waiting on my sign-off.
+  const proposed = await db
+    .select({ id: experts.id, caseId: experts.engagementId, company: experts.company, title: experts.title, anonTitle: experts.anonTitle, isFormer: experts.isFormer, requestedBy: experts.requestedBy, approvals: experts.approvals, at: experts.createdAt })
+    .from(experts)
+    .where(and(inArray(experts.engagementId, caseIds), eq(experts.status, "proposed")));
+  if (proposed.length) {
+    const signers = await caseSigners(db, [...new Set(proposed.map((e) => e.caseId))], user.firmId);
+    for (const e of proposed) {
+      const state = { requestedBy: e.requestedBy, approvals: parseIds(e.approvals) };
+      if (!signoffFor(state, user.id, signers.get(e.caseId) ?? [])) continue;
+      const who = e.anonTitle ?? anonymizeTitle(e.company, e.title, e.isFormer);
+      items.push({ key: `x-${e.id}`, kind: "approval", caseId: e.caseId, title: who, body: "", at: e.at, link: "/experts", data: { expertId: e.id } });
+    }
+  }
+
   return items;
+}
+
+/** Everyone on these cases with their role there, for expert sign-offs. */
+async function caseSigners(db: DB, caseIds: string[], firmId: string): Promise<Map<string, Signer[]>> {
+  const rows = await db
+    .select({ caseId: engagementMembers.engagementId, id: engagementMembers.userId, caseRole: engagementMembers.caseRole, archetype: firmRoles.archetype })
+    .from(engagementMembers)
+    .innerJoin(firmMembers, and(eq(firmMembers.userId, engagementMembers.userId), eq(firmMembers.firmId, firmId)))
+    .innerJoin(firmRoles, eq(firmRoles.id, firmMembers.firmRoleId))
+    .where(inArray(engagementMembers.engagementId, caseIds));
+  const out = new Map<string, Signer[]>();
+  for (const r of rows) out.set(r.caseId, [...(out.get(r.caseId) ?? []), { id: r.id, archetype: r.caseRole ?? r.archetype }]);
+  return out;
+}
+
+function parseIds(s: string): string[] {
+  try {
+    const v = JSON.parse(s);
+    return Array.isArray(v) ? v.filter((x): x is string => typeof x === "string") : [];
+  } catch {
+    return [];
+  }
 }

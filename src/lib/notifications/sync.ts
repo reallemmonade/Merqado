@@ -2,6 +2,7 @@ import { and, asc, desc, eq, gt, inArray, lte, ne, notInArray, or, sql } from "d
 import type { DB } from "@/db/client";
 import { firmMembers, firmRoles, notifications, users, type Archetype } from "@/db/schema";
 import { myCases } from "@/lib/mobile/data";
+import { firstNudgeAt } from "@/lib/inbox/nudge-time";
 import { deriveInbox, type InboxCase, type Person } from "./derive";
 
 const CHUNK = 50;
@@ -32,6 +33,7 @@ export async function syncNotifications(db: DB, user: Person, now = new Date()):
           link: it.link,
           data: JSON.stringify(it.data),
           occurredAt: it.at,
+          nextNudgeAt: firstNudgeAt(it.kind, now),
           createdAt: now,
           updatedAt: now,
         })),
@@ -46,6 +48,7 @@ export async function syncNotifications(db: DB, user: Person, now = new Date()):
           link: sql`excluded.link`,
           data: sql`excluded.data`,
           occurredAt: sql`excluded.occurred_at`,
+          nextNudgeAt: sql`coalesce(${notifications.nextNudgeAt}, excluded.next_nudge_at)`,
           status: sql`case when ${reopen} then 'unread' else ${notifications.status} end`,
           doneBy: sql`case when ${reopen} then null else ${notifications.doneBy} end`,
           updatedAt: now,
@@ -80,6 +83,11 @@ export async function syncAllNotifications(db: DB): Promise<number> {
   return people.length;
 }
 
+/** These people, once per firm they belong to. */
+export function peopleByIds(db: DB, ids: string[]): Promise<Person[]> {
+  return ids.length ? firmPeople(db, inArray(firmMembers.userId, ids)) : Promise.resolve([]);
+}
+
 async function firmPeople(db: DB, where?: ReturnType<typeof and>): Promise<Person[]> {
   return db
     .select({ id: firmMembers.userId, firmId: firmMembers.firmId, archetype: firmRoles.archetype, timeZone: users.timeZone })
@@ -105,6 +113,7 @@ export type InboxEntry = {
   threadId?: string;
   taskId?: string;
   todoId?: string;
+  expertId?: string;
   flag?: "overdue" | "idle";
   days?: number;
   snoozeUntil?: string;
@@ -143,7 +152,7 @@ export async function readInbox(db: DB, user: Person, cases: InboxCase[], now = 
     .orderBy(view === "snoozed" ? asc(notifications.snoozeUntil) : view === "done" ? desc(notifications.updatedAt) : desc(notifications.occurredAt))
     .limit(limit);
   return rows.map((r) => ({
-    ...(parseData(r.data) as Pick<InboxEntry, "roomId" | "messageId" | "threadId" | "taskId" | "todoId" | "flag" | "days">),
+    ...(parseData(r.data) as Pick<InboxEntry, "roomId" | "messageId" | "threadId" | "taskId" | "todoId" | "expertId" | "flag" | "days">),
     id: r.key,
     kind: r.kind,
     status: r.status,

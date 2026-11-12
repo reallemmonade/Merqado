@@ -10,6 +10,7 @@ import * as schema from "@/db/schema";
 import type { DB } from "@/db/client";
 import type { Person } from "@/lib/notifications/derive";
 import { readInbox, syncNotifications, type InboxView } from "@/lib/notifications/sync";
+import { nudgeMessage, runNudges } from "./nudge";
 import { inboxCounts, needsYouCount, setInboxStatus } from "./status";
 
 const dir = mkdtempSync(path.join(tmpdir(), "merqado-inbox-"));
@@ -115,5 +116,58 @@ describe("Needs-you status", () => {
     expect(byId.get(`t-${late!.id}`)).toMatchObject({ flag: "overdue" });
     expect(byId.get(`t-${quiet!.id}`)).toMatchObject({ flag: "idle", days: 20 });
     expect(byId.has(`t-${busy!.id}`)).toBe(false);
+  });
+
+  it("asks the consultant to approve a proposed expert until they do", async () => {
+    const [x] = await db.insert(schema.experts).values({ engagementId: caseId, firstName: "Person", lastName: "21", company: "OEM 16", title: "VP Supply" }).returning();
+    const key = `x-${x!.id}`;
+    const cases = await syncNotifications(db, me);
+    const item = (await readInbox(db, me, cases)).find((i) => i.id === key);
+    expect(item).toMatchObject({ kind: "approval", expertId: x!.id, title: "OEM 16, VP" });
+    await db.update(schema.experts).set({ approvals: JSON.stringify([me.id]) }).where(eq(schema.experts.id, x!.id));
+    expect(await view("open")).not.toContain(key);
+  });
+
+  it("reminds about a waiting review a day later, in local working hours only", async () => {
+    const [r] = await db.insert(schema.workplanTasks).values({ engagementId: caseId, moduleId, title: "Check deck", assigneeId: other, reviewerId: me.id, status: "almost_done", updatedAt: new Date() }).returning();
+    const key = `t-${r!.id}`;
+    const start = new Date("2030-01-07T10:00:00Z");
+    await syncNotifications(db, me, start);
+    const row = () => db.query.notifications.findFirst({ where: eq(schema.notifications.key, key) });
+    expect((await row())?.nextNudgeAt?.toISOString()).toBe("2030-01-08T10:00:00.000Z");
+    expect((await runNudges(db, new Date("2030-01-07T20:00:00Z"))).pushed).toBe(0);
+    const night = new Date("2030-01-08T23:00:00Z");
+    await runNudges(db, night);
+    expect((await row())?.nudgedAt).toBeNull();
+    const morning = new Date("2030-01-09T09:00:00Z");
+    const res = await runNudges(db, morning);
+    expect(res.pushed).toBe(1);
+    expect((await row())?.nudgedAt?.toISOString()).toBe(morning.toISOString());
+    expect((await row())?.nextNudgeAt?.toISOString()).toBe("2030-01-10T09:00:00.000Z");
+  });
+
+  it("brings a snoozed item back with a reminder when the snooze ends", async () => {
+    const t = await newTask("Write KTA summary");
+    const key = `t-${t.id}`;
+    const now = new Date("2030-02-04T09:00:00Z");
+    await view("open", now);
+    await setInboxStatus(db, me, key, { action: "snooze", until: "hour" }, now);
+    const later = new Date("2030-02-04T10:05:00Z");
+    await runNudges(db, later);
+    const row = await db.query.notifications.findFirst({ where: eq(schema.notifications.key, key) });
+    expect(row).toMatchObject({ status: "read", snoozeUntil: null, nextNudgeAt: null });
+    expect(row?.nudgedAt?.toISOString()).toBe(later.toISOString());
+  });
+});
+
+describe("nudgeMessage", () => {
+  const now = new Date("2030-01-01T10:00:00Z");
+  it("names one item or counts several", () => {
+    expect(nudgeMessage([{ key: "a", kind: "review", title: "Sizing model", snoozeUntil: null }], now)).toEqual({ title: "Review waiting on you", body: "Sizing model" });
+    expect(nudgeMessage([{ key: "a", kind: "task", title: "Draft", snoozeUntil: new Date("2030-01-01T09:00:00Z") }], now).title).toBe("Back from snooze");
+    expect(nudgeMessage([
+      { key: "a", kind: "review", title: "A", snoozeUntil: null },
+      { key: "b", kind: "approval", title: "OEM 16, VP", snoozeUntil: null },
+    ], now)).toEqual({ title: "2 items need you", body: "Review: A · Approve expert: OEM 16, VP" });
   });
 });

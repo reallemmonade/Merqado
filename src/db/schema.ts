@@ -929,7 +929,7 @@ export const jobRuns = sqliteTable(
   (t) => [uniqueIndex("job_runs_job_slot").on(t.job, t.slot), index("job_runs_started").on(t.startedAt)],
 );
 
-export const NOTIFICATION_KINDS = ["mention", "reply", "task", "review", "todo"] as const;
+export const NOTIFICATION_KINDS = ["mention", "reply", "task", "review", "todo", "approval"] as const;
 export type NotificationKind = (typeof NOTIFICATION_KINDS)[number];
 
 export const NOTIFICATION_STATUSES = ["unread", "read", "snoozed", "done"] as const;
@@ -961,6 +961,8 @@ export const notifications = sqliteTable(
     status: text("status", { enum: NOTIFICATION_STATUSES }).notNull().default("unread"),
     snoozeUntil: integer("snooze_until", { mode: "timestamp" }),
     nextNudgeAt: integer("next_nudge_at", { mode: "timestamp" }),
+    /** Last reminder sent for it (push and desktop). */
+    nudgedAt: integer("nudged_at", { mode: "timestamp" }),
     /** "system" when it was closed because the source went away; "user" when the person closed it. */
     doneBy: text("done_by", { enum: ["system", "user"] }),
     /** When the source happened (message sent, task or to-do made). */

@@ -24,7 +24,7 @@ export type NeedsYouItem = {
 
 export type NeedsYouGroup = { caseId: string; name: string; items: NeedsYouItem[] };
 
-const KIND_ICON: Record<NotificationKind, IconName> = { mention: "at", reply: "reply", task: "workplan", review: "check", todo: "check" };
+const KIND_ICON: Record<NotificationKind, IconName> = { mention: "at", reply: "reply", task: "workplan", review: "check", todo: "check", approval: "experts" };
 
 type Act = { action: "read" | "done" | "reopen" } | { action: "snooze"; until: SnoozeChoice };
 

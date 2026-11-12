@@ -1,6 +1,7 @@
 import { lt } from "drizzle-orm";
 import type { DB } from "@/db/client";
 import { jobRuns } from "@/db/schema";
+import { runNudges } from "@/lib/inbox/nudge";
 
 export type JobContext = { db: DB; now: Date; slot: string };
 
@@ -16,6 +17,11 @@ const KEEP_RUNS_DAYS = 30;
 
 /** Every scheduled job. Add new ones here. */
 export const JOBS: Job[] = [
+  {
+    name: "needs-you-nudges",
+    everyMinutes: 15,
+    run: ({ db, now }) => runNudges(db, now),
+  },
   {
     name: "prune-job-runs",
     everyMinutes: 1440,

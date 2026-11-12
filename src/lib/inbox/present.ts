@@ -1,11 +1,12 @@
 import type { InboxEntry } from "@/lib/notifications/sync";
 
 /** Where the item opens in the web and desktop app. */
-export function webLink(e: Pick<InboxEntry, "kind" | "caseId" | "roomId" | "threadId" | "taskId" | "todoId">): string {
+export function webLink(e: Pick<InboxEntry, "kind" | "caseId" | "roomId" | "threadId" | "taskId" | "todoId" | "expertId">): string {
   const base = `/e/${e.caseId}`;
   if ((e.kind === "mention" || e.kind === "reply") && e.roomId) return `${base}/channel?room=${e.roomId}${e.threadId ? `&thread=${e.threadId}` : ""}`;
   if ((e.kind === "task" || e.kind === "review") && e.taskId) return `${base}/workplan#task-${e.taskId}`;
   if (e.kind === "todo" && e.todoId) return `${base}#todo-${e.todoId}`;
+  if (e.kind === "approval" && e.expertId) return `${base}/experts?expert=${e.expertId}`;
   return base;
 }
 
@@ -18,6 +19,8 @@ export function rowText(e: Pick<InboxEntry, "kind" | "title" | "body">): { title
       return { title: `${e.title || "Someone"} replied`, sub: e.body };
     case "review":
       return { title: `Review: ${e.title}`, sub: e.body };
+    case "approval":
+      return { title: "Approve expert", sub: e.title };
     case "todo":
       return { title: e.title, sub: e.body ? `To-do · ${e.body}` : "To-do" };
     default:

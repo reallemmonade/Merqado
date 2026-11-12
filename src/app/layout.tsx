@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { htmlAttrs, THEME_SCRIPT } from "@/lib/prefs";
 import { getPrefs } from "@/lib/prefs.server";
+import { DesktopAlerts } from "@/components/DesktopAlerts";
 import { GuavaSky } from "@/components/GuavaSky";
 import "./globals.css";
 
@@ -24,6 +25,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
       </head>
       <body>
         <GuavaSky initial={prefs} />
+        <DesktopAlerts />
         {children}
       </body>
     </html>

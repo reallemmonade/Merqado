@@ -13,5 +13,7 @@ export async function GET() {
   const { db, user } = auth;
   const now = new Date();
   const cases = await syncNotifications(db, user, now);
-  return NextResponse.json({ items: await readInbox(db, user, cases, now) });
+  // The phone app learns expert approvals in its next release.
+  const items = (await readInbox(db, user, cases, now)).filter((i) => i.kind !== "approval");
+  return NextResponse.json({ items });
 }
