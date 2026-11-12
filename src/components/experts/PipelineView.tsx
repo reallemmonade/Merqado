@@ -51,8 +51,9 @@ export function PipelineView({
   const [sel, setSel] = useState<string | null>(initialExpert ?? data.experts[0]?.id ?? null);
   const [mode, setMode] = useState<"view" | "edit" | "new">(data.experts.length ? "view" : "new");
   const [tab, setTab] = useState<Tab>(initialTab ?? "overview");
-  // In Full table mode the details open as a pop-out panel over the table instead of beside it.
-  const [drawer, setDrawer] = useState(false);
+  // Whether the expert details are showing. In Simple view they sit beside the table and start open;
+  // closing them lets the table take the full width. In Full table they pop out over the table.
+  const [drawer, setDrawer] = useState(true);
   const layout = useTableLayout(
     engagementId,
     useMemo(() => data.experts.map((e) => e.id), [data.experts]),
@@ -158,10 +159,23 @@ export function PipelineView({
   }
 
   useEffect(() => {
-    if (!full || !drawer) return;
+    if (!drawer) return;
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && setDrawer(false);
     window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
+    // Simple view: clicking anywhere outside the panel closes it, except on rows and controls,
+    // so picking another expert or using the toolbar keeps it open.
+    const onDown = (e: MouseEvent) => {
+      if (full) return; // Full table uses its backdrop instead.
+      const t = e.target as Element | null;
+      if (!t || sideRef.current?.contains(t)) return;
+      if (t.closest("button, a, input, select, textarea, label, tr, [role=dialog]")) return;
+      setDrawer(false);
+    };
+    document.addEventListener("mousedown", onDown);
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      document.removeEventListener("mousedown", onDown);
+    };
   }, [full, drawer]);
 
   const setStatus = (e: ExpertRow, status: Status) =>
@@ -262,7 +276,14 @@ export function PipelineView({
             ))}
           </select>
           <div className="seg" role="group" aria-label="Columns">
-            <button type="button" aria-pressed={!full} onClick={() => setFull(false)}>
+            <button
+              type="button"
+              aria-pressed={!full}
+              onClick={() => {
+                setFull(false);
+                setDrawer(true);
+              }}
+            >
               Simple
             </button>
             <button
@@ -310,106 +331,108 @@ export function PipelineView({
         )}
         {focus && focus.ids.length === 0 && <p className="muted">No experts</p>}
 
-        {groups.filter((g) => !focus || g.rows.length > 0).map((g) => (
-          <div className="group copyable" key={g.id || "none"}>
-            <div className="group-head">
-              <h2>{g.name}</h2>
-              <span className="grow" style={{ flex: 1 }} />
-              {g.target > 0 && (
-                <div
-                  className="covbar"
-                  role="img"
-                  aria-label={`${g.cov.completed} completed, ${g.cov.scheduled} scheduled, ${g.cov.approved} approved, ${g.cov.proposed} proposed, of ${g.target}`}
-                >
-                  {(["completed", "scheduled", "approved", "proposed"] as const)
-                    .filter((st) => g.cov[st] > 0)
-                    .map((st) => (
-                      <span key={st} className={`seg-${st}`} style={{ width: pct(g.cov[st], g.target) }} />
-                    ))}
+        {groups
+          .filter((g) => !focus || g.rows.length > 0)
+          .map((g) => (
+            <div className="group copyable" key={g.id || "none"}>
+              <div className="group-head">
+                <h2>{g.name}</h2>
+                <span className="grow" style={{ flex: 1 }} />
+                {g.target > 0 && (
+                  <div
+                    className="covbar"
+                    role="img"
+                    aria-label={`${g.cov.completed} completed, ${g.cov.scheduled} scheduled, ${g.cov.approved} approved, ${g.cov.proposed} proposed, of ${g.target}`}
+                  >
+                    {(["completed", "scheduled", "approved", "proposed"] as const)
+                      .filter((st) => g.cov[st] > 0)
+                      .map((st) => (
+                        <span key={st} className={`seg-${st}`} style={{ width: pct(g.cov[st], g.target) }} />
+                      ))}
+                  </div>
+                )}
+                {g.rows.length > 0 && <CopyButton inline title={g.name} />}
+              </div>
+              {g.rows.length === 0 ? (
+                <p className="muted" style={{ padding: "12px 16px", margin: 0, fontSize: 13 }}>
+                  {query || statusFilter !== "all" ? "No matches" : "No experts"}
+                </p>
+              ) : full ? (
+                <div className="scroll-x">
+                  <FullTable
+                    rows={focus ? g.rows : layout.sortRows(g.rows)}
+                    data={data}
+                    sel={drawer ? sel : null}
+                    canEdit={canEdit}
+                    canApprove={canApprove}
+                    cols={layout.cols}
+                    onMoveColumn={layout.moveColumn}
+                    onMoveRow={layout.moveRow}
+                    onOpen={openExpert}
+                    onPatch={patch}
+                  />
+                </div>
+              ) : (
+                <div className="scroll-x">
+                  <table className="grid" style={{ minWidth: 760, tableLayout: "fixed" }}>
+                    <colgroup>
+                      <col />
+                      <col style={{ width: 120 }} />
+                      <col style={{ width: 100 }} />
+                      <col style={{ width: 120 }} />
+                      <col style={{ width: 80 }} />
+                      <col style={{ width: 110 }} />
+                    </colgroup>
+                    <thead>
+                      <tr>
+                        <th scope="col" style={{ paddingLeft: 16 }}>
+                          Expert
+                        </th>
+                        <th scope="col">Status</th>
+                        <th scope="col">Date</th>
+                        <th scope="col">Network</th>
+                        <th scope="col" className="num">
+                          Minutes
+                        </th>
+                        <th scope="col" className="num" style={{ paddingRight: 16 }}>
+                          Honorarium
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {g.rows.map((e) => {
+                        const est = e.billed ? "" : "~";
+                        return (
+                          <tr key={e.id} className={drawer && e.id === sel ? "selected" : undefined}>
+                            <td style={{ paddingLeft: 16 }}>
+                              <button type="button" className="linklike" aria-pressed={drawer && e.id === sel} onClick={() => openExpert(e.id)}>
+                                <span style={{ fontWeight: 500 }}>{e.anonTitle || e.name}</span>
+                                <span className="muted" style={{ fontSize: 12 }}>
+                                  {e.name}
+                                </span>
+                              </button>
+                            </td>
+                            <td>
+                              <span className={`pill pill-${e.status}`}>{STATUS_LABEL[e.status]}</span>
+                            </td>
+                            <td style={{ whiteSpace: "nowrap" }}>{shortDate(e.interviewDate) || <span className="muted">Not booked</span>}</td>
+                            <td>{e.network}</td>
+                            <td className={`num ${e.billed ? "" : "est"}`}>
+                              {est}
+                              {e.minutes || (e.billed ? 0 : 60)}
+                            </td>
+                            <td className={`num ${e.billed ? "" : "est"}`} style={{ paddingRight: 16, fontWeight: 500 }}>
+                              {e.status === "declined" ? "—" : est + money(e.honorarium)}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
                 </div>
               )}
-              {g.rows.length > 0 && <CopyButton inline title={g.name} />}
             </div>
-            {g.rows.length === 0 ? (
-              <p className="muted" style={{ padding: "12px 16px", margin: 0, fontSize: 13 }}>
-                {query || statusFilter !== "all" ? "No matches" : "No experts"}
-              </p>
-            ) : full ? (
-              <div className="scroll-x">
-                <FullTable
-                  rows={focus ? g.rows : layout.sortRows(g.rows)}
-                  data={data}
-                  sel={drawer ? sel : null}
-                  canEdit={canEdit}
-                  canApprove={canApprove}
-                  cols={layout.cols}
-                  onMoveColumn={layout.moveColumn}
-                  onMoveRow={layout.moveRow}
-                  onOpen={openExpert}
-                  onPatch={patch}
-                />
-              </div>
-            ) : (
-              <div className="scroll-x">
-                <table className="grid" style={{ minWidth: 760, tableLayout: "fixed" }}>
-                  <colgroup>
-                    <col />
-                    <col style={{ width: 120 }} />
-                    <col style={{ width: 100 }} />
-                    <col style={{ width: 120 }} />
-                    <col style={{ width: 80 }} />
-                    <col style={{ width: 110 }} />
-                  </colgroup>
-                  <thead>
-                    <tr>
-                      <th scope="col" style={{ paddingLeft: 16 }}>
-                        Expert
-                      </th>
-                      <th scope="col">Status</th>
-                      <th scope="col">Date</th>
-                      <th scope="col">Network</th>
-                      <th scope="col" className="num">
-                        Minutes
-                      </th>
-                      <th scope="col" className="num" style={{ paddingRight: 16 }}>
-                        Honorarium
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {g.rows.map((e) => {
-                      const est = e.billed ? "" : "~";
-                      return (
-                        <tr key={e.id} className={e.id === sel ? "selected" : undefined}>
-                          <td style={{ paddingLeft: 16 }}>
-                            <button type="button" className="linklike" aria-pressed={e.id === sel} onClick={() => openExpert(e.id)}>
-                              <span style={{ fontWeight: 500 }}>{e.anonTitle || e.name}</span>
-                              <span className="muted" style={{ fontSize: 12 }}>
-                                {e.name}
-                              </span>
-                            </button>
-                          </td>
-                          <td>
-                            <span className={`pill pill-${e.status}`}>{STATUS_LABEL[e.status]}</span>
-                          </td>
-                          <td style={{ whiteSpace: "nowrap" }}>{shortDate(e.interviewDate) || <span className="muted">Not booked</span>}</td>
-                          <td>{e.network}</td>
-                          <td className={`num ${e.billed ? "" : "est"}`}>
-                            {est}
-                            {e.minutes || (e.billed ? 0 : 60)}
-                          </td>
-                          <td className={`num ${e.billed ? "" : "est"}`} style={{ paddingRight: 16, fontWeight: 500 }}>
-                            {e.status === "declined" ? "—" : est + money(e.honorarium)}
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </div>
-        ))}
+          ))}
         {full && layout.customised && (
           <div>
             <button type="button" className="secondary small" onClick={layout.reset}>
@@ -424,15 +447,9 @@ export function PipelineView({
         )}
       </section>
 
-      {!full ? (
-        <aside ref={sideRef} className="side panel" aria-label="Expert details" style={{ scrollMarginTop: 72 }}>
-          {details}
-        </aside>
-      ) : (
-        drawer && (
-          <>
-            <div className="drawer-backdrop" onClick={() => setDrawer(false)} />
-            <aside className="drawer panel" role="dialog" aria-modal="true" aria-label="Expert details" style={{ width: "min(520px, 100vw)", maxWidth: "100vw", height: "auto" }}>
+      {!full
+        ? drawer && (
+            <aside ref={sideRef} className="side panel" aria-label="Expert details" style={{ scrollMarginTop: 72 }}>
               <div className="drawer-close">
                 <button type="button" className="secondary small" onClick={() => setDrawer(false)}>
                   Close
@@ -440,9 +457,26 @@ export function PipelineView({
               </div>
               {details}
             </aside>
-          </>
-        )
-      )}
+          )
+        : drawer && (
+            <>
+              <div className="drawer-backdrop" onClick={() => setDrawer(false)} />
+              <aside
+                className="drawer panel"
+                role="dialog"
+                aria-modal="true"
+                aria-label="Expert details"
+                style={{ width: "min(520px, 100vw)", maxWidth: "100vw", height: "auto" }}
+              >
+                <div className="drawer-close">
+                  <button type="button" className="secondary small" onClick={() => setDrawer(false)}>
+                    Close
+                  </button>
+                </div>
+                {details}
+              </aside>
+            </>
+          )}
     </div>
   );
 }
@@ -703,13 +737,13 @@ function ExpertTile({
               const h = data.hypotheses.find((x) => x.id === k.hypothesisId);
               return (
                 <div key={k.id} className={`item ${k.included ? "" : "off"}`}>
-                  <div className="kta" style={{ lineHeight: 1.5 }}>{k.body}</div>
+                  <div className="kta" style={{ lineHeight: 1.5 }}>
+                    {k.body}
+                  </div>
                   <div className="meta">
                     <span className={`tag v-${k.verdict}`}>{VERDICT_LABEL[k.verdict]}</span>
                     {h && <span>{[h.slideRef, h.statement].filter(Boolean).join(" · ")}</span>}
-                    {k.locator && (
-                      <SourceLink engagementId={engagementId} transcripts={transcripts} locator={k.locator} />
-                    )}
+                    {k.locator && <SourceLink engagementId={engagementId} transcripts={transcripts} locator={k.locator} />}
                     <span style={{ flex: 1 }} />
                     {canEdit && (
                       <label className="check" style={{ fontSize: 12 }}>
@@ -751,11 +785,19 @@ function ExpertTile({
                 </form>
                 <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
                   {transcripts.length > 0 && (
-                    <button type="button" disabled={api.busy === "kta-gen"} onClick={async () => {
+                    <button
+                      type="button"
+                      disabled={api.busy === "kta-gen"}
+                      onClick={async () => {
                         const res = await api.call("kta-gen", `${base}/experts/${expert.id}/takeaways?generate=1`);
                         if (res?.note) api.setError(res.note);
-                      }}>
-                      {api.busy === "kta-gen" ? "Reading the transcript…" : takeaways.some((k) => k.source === "ai") ? "Regenerate from transcript" : "Generate from transcript"}
+                      }}
+                    >
+                      {api.busy === "kta-gen"
+                        ? "Reading the transcript…"
+                        : takeaways.some((k) => k.source === "ai")
+                          ? "Regenerate from transcript"
+                          : "Generate from transcript"}
                     </button>
                   )}
                   <TranscriptUpload engagementId={engagementId} expertId={expert.id} api={api} />
