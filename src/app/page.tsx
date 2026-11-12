@@ -5,6 +5,7 @@ import { getDb } from "@/db/client";
 import { engagementMembers, engagements } from "@/db/schema";
 import { AppNav } from "@/components/AppNav";
 import { NewEngagement } from "@/components/NewEngagement";
+import { needsYouCount } from "@/lib/inbox/status";
 import { getSessionUser } from "@/lib/session";
 
 export const dynamic = "force-dynamic";
@@ -16,17 +17,19 @@ export default async function Home() {
   const user = await getSessionUser(db);
   if (!user) redirect("/welcome");
 
-  const rows = await db
-    .select({ id: engagements.id, clientName: engagements.clientName, title: engagements.title, status: engagements.status })
-    .from(engagements)
-    .innerJoin(engagementMembers, eq(engagementMembers.engagementId, engagements.id))
-    .where(eq(engagementMembers.userId, user.id))
-    .orderBy(desc(engagements.createdAt));
-
+  const [rows, needsYou] = await Promise.all([
+    db
+      .select({ id: engagements.id, clientName: engagements.clientName, title: engagements.title, status: engagements.status })
+      .from(engagements)
+      .innerJoin(engagementMembers, eq(engagementMembers.engagementId, engagements.id))
+      .where(eq(engagementMembers.userId, user.id))
+      .orderBy(desc(engagements.createdAt)),
+    needsYouCount(db, user.id),
+  ]);
 
   return (
     <div className="shell">
-      <AppNav engagements={rows} />
+      <AppNav engagements={rows} page="home" needsYou={needsYou} />
       <main className="main">
         <header>
           <div className="muted">

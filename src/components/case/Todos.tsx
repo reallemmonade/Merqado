@@ -109,7 +109,7 @@ export function TodoSuggestions({ engagementId, items, showAssignee, canScan }: 
       </div>
       {error && <span className="error">{error}</span>}
       {items.map((t) => (
-        <div className="row todo" key={t.id}>
+        <div className="row todo" key={t.id} id={`todo-${t.id}`}>
           <span style={{ flex: 1 }}>{t.title}</span>
           <span className="meta">
             {showAssignee && t.assignee && <span>{t.assignee}</span>}
