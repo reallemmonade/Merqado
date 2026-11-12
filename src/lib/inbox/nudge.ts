@@ -11,6 +11,8 @@ export { firstNudgeAt } from "./nudge-time";
 /** Reminders go out between these local hours only. */
 export const NUDGE_HOURS = { from: 8, to: 20 };
 const MAX_PER_PERSON = 20;
+/** Phone notification category with Done and Snooze buttons (see mobile/src/lib/push.ts). */
+export const NEEDS_CATEGORY = "NEEDS";
 
 
 export function inNudgeHours(now: Date, tz: string | null | undefined): boolean {
@@ -54,7 +56,9 @@ export async function runNudges(db: DB, now = new Date()): Promise<{ people: num
       .where(and(eq(notifications.userId, p.id), dueWhere))
       .limit(MAX_PER_PERSON);
     if (!due.length) continue;
-    await notifyUsers(db, [p.id], { ...nudgeMessage(due, now), threadId: "needs-you", data: { url: "/inbox" } });
+    // One item gets Done / Snooze buttons on the lock screen.
+    const one = due.length === 1 ? { category: NEEDS_CATEGORY, data: { url: "/activity", key: due[0]!.key } } : { data: { url: "/activity" } };
+    await notifyUsers(db, [p.id], { ...nudgeMessage(due, now), threadId: "needs-you", ...one });
     pushed++;
     for (const d of due) {
       await db

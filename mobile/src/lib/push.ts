@@ -22,6 +22,20 @@ export async function registerCategories() {
     { identifier: "read", buttonTitle: "Mark read", options: { opensAppToForeground: false } },
   ]);
   await Notifications.setNotificationCategoryAsync("TASK", [{ identifier: "open", buttonTitle: "Open", options: { opensAppToForeground: true } }]);
+  await Notifications.setNotificationCategoryAsync("NEEDS", [
+    { identifier: "done", buttonTitle: "Done", options: { opensAppToForeground: false } },
+    { identifier: "snooze", buttonTitle: "Snooze 1 hour", options: { opensAppToForeground: false } },
+  ]);
+}
+
+/** Marks a Needs-you item done, snoozed or read, and refreshes the app icon badge. */
+export async function inboxAction(key: string, action: "done" | "snooze" | "read") {
+  await api("/api/inbox", { body: { key, action, ...(action === "snooze" && { until: "hour" }) } });
+}
+
+/** Sets the app icon badge to the open Needs-you count. */
+export function setBadge(count: number) {
+  void Notifications.setBadgeCountAsync(count).catch(() => {});
 }
 
 /** Asks for permission and sends this iPhone's Apple push token to Merqado. */
@@ -39,7 +53,11 @@ export async function registerForPush(): Promise<void> {
 
 /** Opens the right screen when a notification is tapped, or sends a lock-screen reply. */
 export async function handleResponse(res: Notifications.NotificationResponse) {
-  const data = res.notification.request.content.data as { url?: string; caseId?: string; roomId?: string; parentId?: string };
+  const data = res.notification.request.content.data as { url?: string; caseId?: string; roomId?: string; parentId?: string; key?: string };
+  if ((res.actionIdentifier === "done" || res.actionIdentifier === "snooze") && data.key) {
+    await inboxAction(data.key, res.actionIdentifier).catch(() => {});
+    return;
+  }
   if (res.actionIdentifier === "reply" && res.userText && data.caseId && data.roomId) {
     const reply = { op: "message.post", roomId: data.roomId, body: res.userText, ...(data.parentId && { parentId: data.parentId }) };
     await api(`/api/engagements/${data.caseId}/channel`, { body: reply }).catch(() => {});
