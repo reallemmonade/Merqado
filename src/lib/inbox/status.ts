@@ -2,6 +2,7 @@ import { and, count, eq } from "drizzle-orm";
 import type { DB } from "@/db/client";
 import { engagementMembers, notifications } from "@/db/schema";
 import { inboxViewWhere, type InboxView } from "@/lib/notifications/sync";
+import { firstNudgeAt } from "./nudge-time";
 import { snoozeUntil, type SnoozeChoice } from "./snooze";
 
 export type InboxAction = { action: "read" } | { action: "done" } | { action: "reopen" } | { action: "snooze"; until: SnoozeChoice };
@@ -13,7 +14,7 @@ export type InboxAction = { action: "read" } | { action: "done" } | { action: "r
  */
 export async function setInboxStatus(db: DB, user: { id: string; timeZone: string | null }, key: string, a: InboxAction, now = new Date()): Promise<boolean> {
   const mine = and(eq(notifications.userId, user.id), eq(notifications.key, key));
-  const row = await db.query.notifications.findFirst({ where: mine, columns: { status: true, doneBy: true } });
+  const row = await db.query.notifications.findFirst({ where: mine, columns: { status: true, doneBy: true, kind: true } });
   if (!row) return false;
   if (a.action === "read") {
     if (row.status === "unread") await db.update(notifications).set({ status: "read", updatedAt: now }).where(mine);
@@ -22,14 +23,16 @@ export async function setInboxStatus(db: DB, user: { id: string; timeZone: strin
   if (a.action === "reopen") {
     // Something the system closed because its source is gone stays closed.
     if (row.status === "done" && row.doneBy === "system") return true;
-    await db.update(notifications).set({ status: "read", doneBy: null, snoozeUntil: null, updatedAt: now }).where(mine);
+    await db.update(notifications).set({ status: "read", doneBy: null, snoozeUntil: null, nextNudgeAt: firstNudgeAt(row.kind, now), updatedAt: now }).where(mine);
     return true;
   }
   if (row.status === "done") return true;
   if (a.action === "done") {
-    await db.update(notifications).set({ status: "done", doneBy: "user", snoozeUntil: null, updatedAt: now }).where(mine);
+    await db.update(notifications).set({ status: "done", doneBy: "user", snoozeUntil: null, nextNudgeAt: null, updatedAt: now }).where(mine);
   } else {
-    await db.update(notifications).set({ status: "snoozed", snoozeUntil: snoozeUntil(a.until, now, user.timeZone), updatedAt: now }).where(mine);
+    // The end of a snooze is itself a reminder.
+    const until = snoozeUntil(a.until, now, user.timeZone);
+    await db.update(notifications).set({ status: "snoozed", snoozeUntil: until, nextNudgeAt: until, updatedAt: now }).where(mine);
   }
   return true;
 }
