@@ -2,6 +2,7 @@ import { Suspense } from "react";
 import Link from "next/link";
 import { NavUser } from "@/components/NavUser";
 import type { CaseContext } from "@/lib/case/page";
+import { needsYouCount } from "@/lib/inbox/status";
 import { getPrefs } from "@/lib/prefs.server";
 import { GptBar } from "./GptBar";
 import { HashFocus } from "./HashFocus";
@@ -36,7 +37,7 @@ export async function CaseShell({
   hideGptBar,
   children,
 }: {
-  ctx: Pick<CaseContext, "engagement" | "gpt" | "navRows">;
+  ctx: Pick<CaseContext, "db" | "user" | "engagement" | "gpt" | "navRows">;
   section: CaseSection;
   title?: string;
   actions?: React.ReactNode;
@@ -45,7 +46,8 @@ export async function CaseShell({
 }) {
   const id = ctx.engagement.id;
   const base = `/e/${id}`;
-  const { caseMenu } = await getPrefs();
+  const [{ caseMenu }, needsYou] = await Promise.all([getPrefs(), needsYouCount(ctx.db, ctx.user.id)]);
+  const badge = needsYou > 0 && <span className="nav-badge">{needsYou > 99 ? "99+" : needsYou}</span>;
   const full = caseMenu === "full" || (caseMenu === "auto" && section === "overview");
   const items = sections(ctx.gpt);
   return (
@@ -62,6 +64,11 @@ export async function CaseShell({
           <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
             <Link href="/" style={{ fontSize: 13 }}>
               ← All cases
+            </Link>
+            <Link href="/inbox" className="nav-item">
+              <Icon name="inbox" />
+              Needs you
+              {badge}
             </Link>
             <div className="case-name">{ctx.engagement.clientName}</div>
             <div className="eyebrow" style={{ textTransform: "none", letterSpacing: 0 }}>
@@ -90,6 +97,10 @@ export async function CaseShell({
       <nav className={full ? "rail rail-phone" : "rail"} aria-label="Case sections">
         <Link href={base} className="rail-brand" aria-label={`${ctx.engagement.clientName} overview`} title={ctx.engagement.clientName}>
           m
+        </Link>
+        <Link href="/inbox" aria-label="Needs you" title="Needs you" className="rail-inbox">
+          <Icon name="inbox" size={20} />
+          {badge}
         </Link>
         {items.map((s) => (
           <Link key={s.key} href={base + s.href} aria-label={s.label} title={s.label} aria-current={s.key === section ? "page" : undefined}>

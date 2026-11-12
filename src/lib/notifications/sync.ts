@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, inArray, lte, ne, notInArray, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gt, inArray, lte, ne, notInArray, or, sql } from "drizzle-orm";
 import type { DB } from "@/db/client";
 import { firmMembers, firmRoles, notifications, type Archetype } from "@/db/schema";
 import { myCases } from "@/lib/mobile/data";
@@ -104,10 +104,27 @@ export type InboxEntry = {
   threadId?: string;
   taskId?: string;
   todoId?: string;
+  snoozeUntil?: string;
+  doneBy?: "system" | "user";
 };
 
-/** The person's open notifications, newest first: unread, read, and snoozed ones whose time is up. */
-export async function readInbox(db: DB, user: Person, cases: InboxCase[], now = new Date(), limit = 100): Promise<InboxEntry[]> {
+/** Open: needs the person now. Snoozed: set aside until later. Done: closed by them or because the source resolved. */
+export type InboxView = "open" | "snoozed" | "done";
+
+export const DONE_SHOWN_MS = 14 * 24 * 60 * 60 * 1000;
+
+/** Which stored rows each view shows. */
+export function inboxViewWhere(view: InboxView, now: Date) {
+  if (view === "snoozed") return and(eq(notifications.status, "snoozed"), gt(notifications.snoozeUntil, now));
+  if (view === "done") return and(eq(notifications.status, "done"), gt(notifications.updatedAt, new Date(now.getTime() - DONE_SHOWN_MS)));
+  return or(inArray(notifications.status, ["unread", "read"]), and(eq(notifications.status, "snoozed"), lte(notifications.snoozeUntil, now)));
+}
+
+/**
+ * The person's notifications in one view. Open (the default) is unread, read, and snoozed ones whose
+ * time is up, newest first; snoozed is soonest to wake first; done is most recently closed first.
+ */
+export async function readInbox(db: DB, user: Person, cases: InboxCase[], now = new Date(), limit = 100, view: InboxView = "open"): Promise<InboxEntry[]> {
   if (!cases.length) return [];
   const caseOf = new Map(cases.map((c) => [c.id, c]));
   const rows = await db
@@ -117,10 +134,10 @@ export async function readInbox(db: DB, user: Person, cases: InboxCase[], now = 
       and(
         eq(notifications.userId, user.id),
         inArray(notifications.engagementId, [...caseOf.keys()]),
-        or(inArray(notifications.status, ["unread", "read"]), and(eq(notifications.status, "snoozed"), lte(notifications.snoozeUntil, now))),
+        inboxViewWhere(view, now),
       ),
     )
-    .orderBy(desc(notifications.occurredAt))
+    .orderBy(view === "snoozed" ? asc(notifications.snoozeUntil) : view === "done" ? desc(notifications.updatedAt) : desc(notifications.occurredAt))
     .limit(limit);
   return rows.map((r) => ({
     ...(parseData(r.data) as Pick<InboxEntry, "roomId" | "messageId" | "threadId" | "taskId" | "todoId">),
@@ -133,6 +150,8 @@ export async function readInbox(db: DB, user: Person, cases: InboxCase[], now = 
     body: r.body,
     at: r.occurredAt.toISOString(),
     link: r.link,
+    ...(r.snoozeUntil ? { snoozeUntil: r.snoozeUntil.toISOString() } : {}),
+    ...(r.doneBy ? { doneBy: r.doneBy } : {}),
   }));
 }
 
