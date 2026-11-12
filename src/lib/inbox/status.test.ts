@@ -98,4 +98,22 @@ describe("Needs-you status", () => {
     expect(counts.open).toBeGreaterThan(0);
     expect(await setInboxStatus(db, { id: other, timeZone: null }, key, { action: "done" })).toBe(false);
   });
+
+  it("keeps old open tasks only when overdue or idle, with their flag", async () => {
+    const day = 24 * 60 * 60 * 1000;
+    const old = new Date(Date.now() - 20 * day);
+    const [late, quiet, busy] = await db
+      .insert(schema.workplanTasks)
+      .values([
+        { engagementId: caseId, moduleId, title: "Late one", assigneeId: me.id, createdBy: other, dueDate: "2020-01-01", createdAt: old, updatedAt: new Date() },
+        { engagementId: caseId, moduleId, title: "Quiet one", assigneeId: me.id, createdBy: other, status: "in_progress", createdAt: old },
+        { engagementId: caseId, moduleId, title: "Busy one", assigneeId: me.id, createdBy: other, dueDate: "2999-01-01", createdAt: old, updatedAt: new Date() },
+      ])
+      .returning();
+    const cases = await syncNotifications(db, me);
+    const byId = new Map((await readInbox(db, me, cases)).map((i) => [i.id, i]));
+    expect(byId.get(`t-${late!.id}`)).toMatchObject({ flag: "overdue" });
+    expect(byId.get(`t-${quiet!.id}`)).toMatchObject({ flag: "idle", days: 20 });
+    expect(byId.has(`t-${busy!.id}`)).toBe(false);
+  });
 });

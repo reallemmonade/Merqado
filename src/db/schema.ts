@@ -595,6 +595,8 @@ export const workplanTasks = sqliteTable(
     reviewNote: text("review_note").notNull().default(""),
     sort: integer("sort").notNull().default(0),
     createdAt: createdAt(),
+    /** Last change to the task; idle flags count from here. Null on rows from before it was tracked. */
+    updatedAt: integer("updated_at", { mode: "timestamp" }),
   },
   (t) => [index("workplan_tasks_engagement").on(t.engagementId)],
 );

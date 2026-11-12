@@ -153,6 +153,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
           ...(op.dueDate !== undefined && { dueDate: op.dueDate }),
           ...(sendBack && { reviewNote: op.note ?? "" }),
           ...(op.status === "done" && { reviewNote: "" }),
+          updatedAt: new Date(),
         })
         .where(and(eq(workplanTasks.id, op.id), eq(workplanTasks.engagementId, id)));
       notifyTaskChange(auth, task, op, reviewer, sendBack, mod?.name ?? "");
