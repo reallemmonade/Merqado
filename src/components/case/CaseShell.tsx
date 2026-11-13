@@ -9,11 +9,12 @@ import { HashFocus } from "./HashFocus";
 import { Icon, type IconName } from "./icons";
 import { Shortcuts } from "./Shortcuts";
 
-export type CaseSection = "overview" | "gpt" | "workplan" | "experts" | "deck" | "channel" | "files" | "dictionary" | "notes" | "search";
+export type CaseSection = "overview" | "desk" | "gpt" | "workplan" | "experts" | "deck" | "channel" | "files" | "dictionary" | "notes" | "search";
 
 function sections(gpt: string): { key: CaseSection; label: string; icon: IconName; href: string }[] {
   return [
     { key: "overview", label: "Overview", icon: "overview", href: "" },
+    { key: "desk", label: "Desk", icon: "desk", href: "/desk" },
     { key: "gpt", label: gpt, icon: "gpt", href: "/gpt" },
     { key: "workplan", label: "Workplan", icon: "workplan", href: "/workplan" },
     { key: "experts", label: "Experts", icon: "experts", href: "/experts" },
