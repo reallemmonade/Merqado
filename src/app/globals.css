@@ -995,3 +995,28 @@ html:root:root .storage-card.on { border-color: var(--accent); box-shadow: inset
 }
 .rail .rail-inbox { position: relative; }
 .rail .rail-inbox .nav-badge { position: absolute; top: 2px; right: 0; min-width: 16px; padding: 0 4px; font-size: 10px; line-height: 16px; }
+
+/* ---------- Desk ---------- */
+.desk { display: grid; grid-template-columns: minmax(240px, 320px) minmax(0, 1fr); gap: 16px; align-items: stretch; }
+@media (max-width: 800px) { .desk { grid-template-columns: 1fr; } }
+.desk-list { display: flex; flex-direction: column; gap: 2px; padding: 8px; }
+.desk-ws { display: flex; align-items: center; gap: 10px; padding: 10px; border-radius: 8px; color: inherit; text-decoration: none; }
+.desk-ws:hover { background: var(--selected); }
+.desk-ws[aria-current="page"] { background: var(--selected); box-shadow: inset 3px 0 0 var(--accent); }
+.desk-ws-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px; }
+.desk-ws-name { display: flex; align-items: center; font-size: 14px; font-weight: 500; }
+.desk-bar { display: flex; height: 6px; border-radius: 99px; background: var(--track); overflow: hidden; }
+.desk-bar > .ts-done { background: var(--ts-done); }
+.desk-bar > .ts-in_progress { background: var(--ts-in_progress-ink); opacity: 0.5; }
+.desk-focus { display: grid; grid-template-columns: minmax(0, 2fr) minmax(200px, 1fr); gap: 16px; align-items: stretch; }
+@media (max-width: 1100px) { .desk-focus { grid-template-columns: 1fr; } }
+.desk-tasks, .desk-team { display: flex; flex-direction: column; gap: 12px; }
+.desk-head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
+.desk-head h2, .desk-team h3 { margin: 0; }
+.desk-task-list, .desk-team ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.desk-task-list li { display: flex; align-items: center; gap: 10px; padding: 7px 8px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); font-size: 13px; }
+.desk-task-list li.mine { border-color: var(--ts-almost_done-ink); }
+.desk-task-title { flex: 1; min-width: 0; }
+.desk-team li { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+.desk-team li > span:nth-child(2) { flex: 1; }
+.desk-more { margin-top: auto; align-self: flex-start; font-size: 13px; }
