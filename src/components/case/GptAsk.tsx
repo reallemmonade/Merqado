@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { Icon } from "./icons";
+import { Dictate } from "./Dictate";
 import { SOURCE_KINDS, type SourceKind } from "@/lib/case/gptSources";
 
 /** Closes a popover on an outside click or Escape. */
@@ -58,46 +59,6 @@ function SourceFilter({ kinds, onChange }: { kinds: SourceKind[]; onChange: (k: 
   );
 }
 
-type Recognition = { lang: string; interimResults: boolean; continuous: boolean; start(): void; stop(): void; onresult: ((e: { results: ArrayLike<ArrayLike<{ transcript: string }>> }) => void) | null; onend: (() => void) | null };
-
-function speechApi(): (new () => Recognition) | null {
-  if (typeof window === "undefined") return null;
-  const w = window as unknown as { SpeechRecognition?: new () => Recognition; webkitSpeechRecognition?: new () => Recognition };
-  return w.SpeechRecognition ?? w.webkitSpeechRecognition ?? null;
-}
-
-/** Dictation into the ask box, where the browser supports it. */
-function Mic({ value, onText }: { value: string; onText: (t: string) => void }) {
-  const supported = useSyncExternalStore(
-    () => () => {},
-    () => speechApi() !== null,
-    () => false,
-  );
-  const [live, setLive] = useState(false);
-  const rec = useRef<Recognition | null>(null);
-  if (!supported) return null;
-  function toggle() {
-    if (live) return rec.current?.stop();
-    const Api = speechApi();
-    if (!Api) return;
-    const r = new Api();
-    const start = value ? value.replace(/\s*$/, " ") : "";
-    r.lang = navigator.language || "en-US";
-    r.interimResults = true;
-    r.continuous = true;
-    r.onresult = (e) => onText(start + Array.from(e.results, (x) => x[0]?.transcript ?? "").join(""));
-    r.onend = () => setLive(false);
-    rec.current = r;
-    r.start();
-    setLive(true);
-  }
-  return (
-    <button type="button" className="ask-tool ask-mic" aria-label="Dictate" aria-pressed={live} onClick={toggle}>
-      <Icon name="mic" size={18} />
-    </button>
-  );
-}
-
 /** The case GPT's ask box: question, source filter, dictation and send. */
 export function GptAsk({
   name,
@@ -120,8 +81,13 @@ export function GptAsk({
   autoFocus?: boolean;
   rows?: number;
 }) {
+  useEffect(() => {
+    // Opened by the "Hey <name>" wake phrase (#ask): put the cursor in the box.
+    if (window.location.hash === "#ask") document.getElementById("gpt-input")?.focus();
+  }, []);
   return (
     <form
+      id="ask"
       className="ask-box"
       onSubmit={(e) => {
         e.preventDefault();
@@ -148,7 +114,7 @@ export function GptAsk({
       <div className="ask-row">
         <SourceFilter kinds={kinds} onChange={onKinds} />
         <span style={{ flex: 1 }} />
-        <Mic value={value} onText={onChange} />
+        <Dictate value={value} onText={onChange} />
         <button type="submit" className="ask-send" aria-label={`Ask ${name}`} disabled={disabled || !value.trim()}>
           <Icon name="up" size={18} />
         </button>
