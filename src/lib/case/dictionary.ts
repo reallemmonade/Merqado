@@ -60,7 +60,7 @@ function mentionsBlocked(text: string, blocked: string[]): boolean {
 
 export function buildTermPrompt(existing: string[]): string {
   return (
-    "You keep a case dictionary for a consulting team. From the document, pick the technical terms, industry jargon and acronyms a new team member would need explained, " +
+    "You keep a case dictionary for a consulting team. From the document(s), pick the technical terms, industry jargon and acronyms a new team member would need explained, " +
     "that are not already in the dictionary. Skip everyday words, names of people, names of companies and clients, and project code names. " +
     `Define each in one plain sentence. Reply with JSON only: {"terms":[{"term":"","category":"${TERM_CATEGORIES.join("|")}","definition":""}]}. ` +
     'Write an acronym as "Full Name (ACRONYM)". Reply {"terms":[]} if nothing new.\n\n' +
@@ -122,23 +122,94 @@ export async function scanFileForTerms(db: DB, sourceId: string, complete?: Comp
   if (!engagement) return { added: 0 };
 
   try {
-    const existing = (await db.select({ term: glossaryTerms.term }).from(glossaryTerms).where(eq(glossaryTerms.engagementId, engagement.id))).map((r) => r.term);
-    const run = complete ?? caseCompleter(db, engagement, src.uploadedBy);
-    const reply = await run({
-      system: buildTermPrompt(existing),
-      messages: [{ role: "user", content: src.textBody.slice(0, FILE_TEXT_LIMIT) }],
-      maxTokens: 2500,
-    });
-    // Read the list again: another file may have added terms while the model was working.
-    const now = (await db.select({ term: glossaryTerms.term }).from(glossaryTerms).where(eq(glossaryTerms.engagementId, engagement.id))).map((r) => r.term);
-    const fresh = pickNewTerms(extractJson(reply), now, blockedNames(engagement));
-    if (fresh.length) await db.insert(glossaryTerms).values(fresh.map((t) => ({ engagementId: engagement.id, ...t, status: "active" as const })));
-    return { added: fresh.length };
+    return { added: await addTermsFrom(db, engagement, src.textBody.slice(0, FILE_TEXT_LIMIT), complete ?? caseCompleter(db, engagement, src.uploadedBy)) };
   } catch (err) {
     // Let the scheduler try again later.
     await db.update(sources).set({ termsScannedAt: null }).where(eq(sources.id, sourceId));
     throw err;
   }
+}
+
+type CaseRow = { id: string; firmId: string; clientName: string; aiProviderId: string | null };
+
+/** Asks the model for terms in this text and adds the new ones. */
+async function addTermsFrom(db: DB, engagement: CaseRow, text: string, run: Complete, serial: Serial = (fn) => fn()): Promise<number> {
+  const existing = (await db.select({ term: glossaryTerms.term }).from(glossaryTerms).where(eq(glossaryTerms.engagementId, engagement.id))).map((r) => r.term);
+  const reply = await run({ system: buildTermPrompt(existing), messages: [{ role: "user", content: text }], maxTokens: 2500 });
+  // Read the list again: another file may have added terms while the model was working.
+  return serial(async () => {
+    const now = (await db.select({ term: glossaryTerms.term }).from(glossaryTerms).where(eq(glossaryTerms.engagementId, engagement.id))).map((r) => r.term);
+    const fresh = pickNewTerms(extractJson(reply), now, blockedNames(engagement));
+    if (fresh.length) await db.insert(glossaryTerms).values(fresh.map((t) => ({ engagementId: engagement.id, ...t, status: "active" as const })));
+    return fresh.length;
+  });
+}
+
+type Serial = (fn: () => Promise<number>) => Promise<number>;
+
+/** Runs the given steps one at a time, so parallel parts never add the same term twice. */
+function oneAtATime(): Serial {
+  let tail: Promise<unknown> = Promise.resolve();
+  return (fn) => {
+    const run = tail.then(fn, fn);
+    tail = run.catch(() => undefined);
+    return run;
+  };
+}
+
+/** Per file, when re-reading a whole case. */
+export const RESCAN_FILE_CHARS = 12_000;
+/** Text sent per model call when re-reading a whole case. */
+export const RESCAN_CALL_CHARS = 40_000;
+/** Model calls running at once when re-reading a whole case. */
+const RESCAN_PARALLEL = 4;
+
+/** Groups file texts into model-sized parts, a file never split across parts. */
+export function packTexts(files: { name: string; text: string }[], perFile = RESCAN_FILE_CHARS, perCall = RESCAN_CALL_CHARS): string[] {
+  const parts: string[] = [];
+  let cur = "";
+  for (const f of files) {
+    const piece = `### ${f.name}\n${f.text.trim().slice(0, perFile)}\n\n`;
+    if (cur && cur.length + piece.length > perCall) {
+      parts.push(cur);
+      cur = "";
+    }
+    cur += piece;
+  }
+  if (cur) parts.push(cur);
+  return parts;
+}
+
+/**
+ * Re-reads every file in the case (skipping private chat files) and adds the terms the
+ * dictionary doesn't have yet. Used by the dictionary's Scan files button.
+ */
+export async function rescanCaseFiles(db: DB, engagement: CaseRow, run: Complete): Promise<{ files: number; added: number }> {
+  const rows = await db
+    .select({ id: sources.id, name: sources.filename, text: sources.textBody })
+    .from(sources)
+    .where(and(eq(sources.engagementId, engagement.id), isNull(sources.roomId), isNotNull(sources.textBody)))
+    .orderBy(desc(sources.createdAt));
+  const files = rows.filter((r) => r.text?.trim()).map((r) => ({ name: r.name, text: r.text! }));
+  const parts = packTexts(files);
+  const serial = oneAtATime();
+  let added = 0;
+  let failed: unknown = null;
+  let next = 0;
+  const worker = async () => {
+    while (next < parts.length) {
+      const part = parts[next++]!;
+      try {
+        added += await addTermsFrom(db, engagement, part, run, serial);
+      } catch (err) {
+        failed ??= err;
+      }
+    }
+  };
+  await Promise.all(Array.from({ length: Math.min(RESCAN_PARALLEL, parts.length) }, worker));
+  if (failed && added === 0) throw failed;
+  if (rows.length) await db.update(sources).set({ termsScannedAt: new Date() }).where(and(eq(sources.engagementId, engagement.id), isNull(sources.termsScannedAt)));
+  return { files: files.length, added };
 }
 
 /** Scheduler sweep: reads recent files no one has scanned yet, newest first, a few per tick. */
