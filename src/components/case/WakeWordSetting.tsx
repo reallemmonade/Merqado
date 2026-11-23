@@ -1,9 +1,10 @@
 "use client";
 
-import { useState, useSyncExternalStore } from "react";
+import { useSyncExternalStore } from "react";
+import { speechApi } from "./Dictate";
 import { setWakeWord, wakeWordOn } from "./WakeWord";
 
-/** Settings switch for the "Hey AtlasGPT" wake phrase. Off by default. */
+/** Settings switch for the "Hey <case GPT>" wake phrase. Off by default. */
 export function WakeWordSetting() {
   const on = useSyncExternalStore(
     (cb) => {
@@ -13,12 +14,16 @@ export function WakeWordSetting() {
     () => wakeWordOn(),
     () => false,
   );
-  const [supported] = useState(() => typeof window !== "undefined" && ("webkitSpeechRecognition" in window || "SpeechRecognition" in window));
+  const supported = useSyncExternalStore(
+    () => () => {},
+    () => speechApi() !== null,
+    () => false,
+  );
   if (!supported) return null;
   return (
     <label style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
-      <strong>Hey AtlasGPT</strong>
-      <input type="checkbox" role="switch" aria-label="Hey AtlasGPT" checked={on} onChange={(e) => setWakeWord(e.target.checked)} />
+      <strong>Wake phrase</strong>
+      <input type="checkbox" role="switch" aria-label="Wake phrase" checked={on} onChange={(e) => setWakeWord(e.target.checked)} />
     </label>
   );
 }
