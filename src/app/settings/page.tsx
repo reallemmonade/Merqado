@@ -3,7 +3,6 @@ import { redirect } from "next/navigation";
 import { getDb } from "@/db/client";
 import { NavTitleSwitch } from "@/components/NavTitleSwitch";
 import { SettingsShell } from "@/components/SettingsShell";
-import { WakeWordSetting } from "@/components/case/WakeWordSetting";
 import { gmailStatus } from "@/lib/mail/gmail";
 import { initials } from "@/lib/prefs";
 import { getSessionUser } from "@/lib/session";
@@ -34,9 +33,6 @@ export default async function SettingsProfilePage({ searchParams }: { searchPara
           </div>
         </div>
         <NavTitleSwitch />
-      </section>
-      <section className="card">
-        <WakeWordSetting />
       </section>
       <section className="card">
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
