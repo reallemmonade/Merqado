@@ -8,7 +8,7 @@ import { eq } from "drizzle-orm";
 import { beforeEach, describe, expect, it } from "vitest";
 import * as schema from "@/db/schema";
 import type { DB } from "@/db/client";
-import { blockedNames, packTexts, pickNewTerms, rescanCaseFiles, scanFileForTerms, termKeys, type Complete } from "./dictionary";
+import { blockedNames, packTexts, pickNewTerms, readTermsReply, rescanCaseFiles, scanFileForTerms, termKeys, type Complete } from "./dictionary";
 
 describe("term matching", () => {
   it("matches a term by its full name or its acronym", () => {
@@ -34,6 +34,15 @@ describe("term matching", () => {
     ]);
     expect(pickNewTerms("nonsense", [], [])).toEqual([]);
     expect(blockedNames({ clientName: "Client" })).toEqual([]);
+  });
+});
+
+describe("readTermsReply", () => {
+  it("keeps the complete entries of a reply that was cut off", () => {
+    const cut = '```json\n{"terms":[{"term":"MSA","category":"Legal","definition":"Umbrella contract."},{"term":"SOW","category":"Le';
+    expect(readTermsReply(cut)).toEqual({ terms: [{ term: "MSA", category: "Legal", definition: "Umbrella contract." }] });
+    expect(readTermsReply('{"terms":[]}')).toEqual({ terms: [] });
+    expect(() => readTermsReply("Sorry, no.")).toThrow();
   });
 });
 
