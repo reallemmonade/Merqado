@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { Icon } from "./case/icons";
 
 const MAX_BYTES = 4 * 1024 * 1024;
@@ -10,14 +11,19 @@ export function FeedbackButton() {
   const [open, setOpen] = useState(false);
   const [note, setNote] = useState("");
   const [photo, setPhoto] = useState<string | null>(null);
-  const [state, setState] = useState<"idle" | "sending" | "sent" | "error">("idle");
+  const [state, setState] = useState<"idle" | "sending" | "sent" | "error">(
+    "idle",
+  );
   const wrap = useRef<HTMLDivElement>(null);
+  const pop = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && setOpen(false);
     const onDown = (e: MouseEvent) => {
-      if (wrap.current && !wrap.current.contains(e.target as Node)) setOpen(false);
+      const t = e.target as Node;
+      if (!wrap.current?.contains(t) && !pop.current?.contains(t))
+        setOpen(false);
     };
     document.addEventListener("keydown", onKey);
     document.addEventListener("mousedown", onDown);
@@ -28,9 +34,11 @@ export function FeedbackButton() {
   }, [open]);
 
   function readImage(file: File | undefined | null) {
-    if (!file || !file.type.startsWith("image/") || file.size > MAX_BYTES) return;
+    if (!file || !file.type.startsWith("image/") || file.size > MAX_BYTES)
+      return;
     const reader = new FileReader();
-    reader.onload = () => setPhoto(typeof reader.result === "string" ? reader.result : null);
+    reader.onload = () =>
+      setPhoto(typeof reader.result === "string" ? reader.result : null);
     reader.readAsDataURL(file);
   }
 
@@ -68,57 +76,84 @@ export function FeedbackButton() {
       >
         <Icon name="message" />
       </button>
-      {open && (
-        <div className="fb-pop" role="dialog" aria-label="Feedback">
-          {state === "sent" ? (
-            <div className="fb-sent">Sent</div>
-          ) : (
-            <>
-              <div className="fb-head">
-                <span>Feedback</span>
-                <button type="button" className="fb-close" aria-label="Close" onClick={() => setOpen(false)}>
-                  ✕
+      {open &&
+        createPortal(
+          <div className="fb-pop" role="dialog" aria-label="Feedback" ref={pop}>
+            {state === "sent" ? (
+              <div className="fb-sent">Sent</div>
+            ) : (
+              <>
+                <div className="fb-head">
+                  <span>Feedback</span>
+                  <button
+                    type="button"
+                    className="fb-close"
+                    aria-label="Close"
+                    onClick={() => setOpen(false)}
+                  >
+                    ✕
+                  </button>
+                </div>
+                <label
+                  className="fb-drop"
+                  onDragOver={(e) => e.preventDefault()}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    readImage(e.dataTransfer.files[0]);
+                  }}
+                >
+                  {photo ? (
+                    <>
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={photo} alt="" />
+                      <span
+                        className="fb-x"
+                        role="button"
+                        aria-label="Remove photo"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          setPhoto(null);
+                        }}
+                      >
+                        ✕
+                      </span>
+                    </>
+                  ) : (
+                    <span>Add photo</span>
+                  )}
+                  <input
+                    type="file"
+                    accept="image/*"
+                    hidden
+                    onChange={(e) => readImage(e.target.files?.[0])}
+                  />
+                </label>
+                <textarea
+                  aria-label="Note"
+                  placeholder="Note"
+                  value={note}
+                  onChange={(e) => setNote(e.target.value)}
+                  onPaste={(e) => {
+                    const item = [...e.clipboardData.items].find((i) =>
+                      i.type.startsWith("image/"),
+                    );
+                    if (item) readImage(item.getAsFile());
+                  }}
+                />
+                <button
+                  type="button"
+                  className="fb-send"
+                  disabled={!note.trim() || state === "sending"}
+                  onClick={send}
+                >
+                  Send
                 </button>
-              </div>
-              <label
-                className="fb-drop"
-                onDragOver={(e) => e.preventDefault()}
-                onDrop={(e) => {
-                  e.preventDefault();
-                  readImage(e.dataTransfer.files[0]);
-                }}
-              >
-                {photo ? (
-                  <>
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={photo} alt="" />
-                    <span className="fb-x" role="button" aria-label="Remove photo" onClick={(e) => { e.preventDefault(); setPhoto(null); }}>
-                      ✕
-                    </span>
-                  </>
-                ) : (
-                  <span>Add photo</span>
-                )}
-                <input type="file" accept="image/*" hidden onChange={(e) => readImage(e.target.files?.[0])} />
-              </label>
-              <textarea
-                aria-label="Note"
-                placeholder="Note"
-                value={note}
-                onChange={(e) => setNote(e.target.value)}
-                onPaste={(e) => {
-                  const item = [...e.clipboardData.items].find((i) => i.type.startsWith("image/"));
-                  if (item) readImage(item.getAsFile());
-                }}
-              />
-              <button type="button" className="fb-send" disabled={!note.trim() || state === "sending"} onClick={send}>
-                Send
-              </button>
-              {state === "error" && <div className="fb-err">Try again</div>}
-            </>
-          )}
-        </div>
-      )}
+                {state === "error" && <div className="fb-err">Try again</div>}
+              </>
+            )}
+          </div>,
+          document.body,
+        )}
     </div>
   );
 }
