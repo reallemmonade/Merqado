@@ -148,6 +148,13 @@
       "when": 1795454932604,
       "tag": "0020_dictionary_scan",
       "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "6",
+      "when": 1795455692362,
+      "tag": "0021_web_searches",
+      "breakpoints": true
     }
   ]
 }

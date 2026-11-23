@@ -1,0 +1,1 @@
+ALTER TABLE `usage_events` ADD `web_searches` integer DEFAULT 0 NOT NULL;

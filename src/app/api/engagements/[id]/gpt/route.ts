@@ -2,7 +2,8 @@ import { NextResponse } from "next/server";
 import { and, asc, eq } from "drizzle-orm";
 import { z } from "zod";
 import { caseNotes, gptChats, gptMessages } from "@/db/schema";
-import { aiError, notFoundJson, ok, parseOp, runAi } from "@/lib/case/api";
+import { aiError, notFoundJson, ok, parseOp, runAiResult } from "@/lib/case/api";
+import { hostOf } from "@/lib/ai/web";
 import type { Authorized } from "@/lib/experts/api";
 import { loadCorpus } from "@/lib/case/corpus";
 import { gptName } from "@/lib/case/names";
@@ -87,7 +88,7 @@ function titleFrom(q: string) {
   return t.length > 70 ? t.slice(0, 67).trimEnd() + "…" : t;
 }
 
-/** Answers the chat's latest question from the case's own material, citing it. */
+/** Answers the chat's latest question from the case's own material and, when allowed, the public web, citing both. */
 async function answer(auth: Authorized, chatId: string, only: SourceKind[] = []) {
   const { db, user, engagement } = auth;
   const msgs = await db.select().from(gptMessages).where(eq(gptMessages.chatId, chatId)).orderBy(asc(gptMessages.createdAt));
@@ -96,6 +97,7 @@ async function answer(auth: Authorized, chatId: string, only: SourceKind[] = [])
 
   const all = await loadCorpus(db, engagement.id, user);
   const corpus = only.length ? all.filter((s) => only.includes(s.kind)) : all;
+  const web = only.length === 0 || only.includes("web");
   const pieces: Snippet[] = corpus.flatMap((s) => (s.kind === "transcript" || s.kind === "file" ? chunk(s.text).map((text) => ({ ...s, text })) : [s]));
   const priorQuestion = [...msgs].reverse().find((m) => m.role === "user" && m.id !== last.id)?.body ?? "";
   const picked = topSnippets(pieces, `${last.body} ${priorQuestion}`, 30, 40000);
@@ -104,9 +106,16 @@ async function answer(auth: Authorized, chatId: string, only: SourceKind[] = [])
 
   const system = [
     `You are ${name}, the research assistant for the consulting case ${engagement.clientName} (${engagement.title}).`,
-    "Answer only from the numbered case extracts below. Cite every claim with its extract number in square brackets, like [3].",
+    "Answer from the numbered case extracts below. Cite every claim from them with its extract number in square brackets, like [3].",
+    ...(web
+      ? [
+          "You can also search the public web for facts the extracts do not cover, such as market data, company news, regulation or technology. Prefer the case extracts; search only when they fall short or the question is about the outside world.",
+          "Web results are cited for you, so do not add bracket numbers for them. When a point comes from the web, say so in the sentence (for example \"Public sources report…\") so it is never mistaken for case material.",
+          "Never put the client's name, the project name, expert names or any non-public case detail in a search query. Search only for public topics.",
+        ]
+      : []),
     "Quote experts word for word in quotation marks when a quote helps. Refer to experts by their role, never by name.",
-    "Be brief: lead with the answer, then a few short bullet points. If the extracts do not answer the question, say so in one sentence and name what is missing.",
+    `Be brief: lead with the answer, then a few short bullet points. If the ${web ? "extracts and the web do" : "extracts do"} not answer the question, say so in one sentence and name what is missing.`,
     "",
     "Case extracts:",
     ...numbered.map((s) => `[${s.n}] (${s.label})\n${s.text}`),
@@ -115,16 +124,23 @@ async function answer(auth: Authorized, chatId: string, only: SourceKind[] = [])
   const recent = msgs.slice(-7);
   while (recent[0]?.role === "assistant") recent.shift();
   const history = recent.map((m) => ({ role: m.role, content: m.body.replace(/\s*\[\d{1,3}\]/g, "") }));
-  let text: string;
+  let result;
   try {
-    text = await runAi(auth, "case_gpt", { system, messages: history, maxTokens: 1500 });
+    result = await runAiResult(auth, "case_gpt", {
+      system,
+      messages: history,
+      maxTokens: 1500,
+      ...(web ? { webSearch: { citeFrom: numbered.length + 1, maxUses: 3 } } : {}),
+    });
   } catch (err) {
     return aiError(err);
   }
+  const { text } = result;
+  const webPages = (result.webSources ?? []).map((w) => ({ n: w.n, label: `Web · ${hostOf(w.url)}`, href: w.url, text: [w.title, w.text].filter(Boolean).join(" — "), web: true }));
   const cited = new Set([...text.matchAll(/\[(\d{1,3})\]/g)].map((m) => Number(m[1])));
-  const sources = numbered.filter((s) => cited.has(s.n)).map((s) => ({ ...s, text: s.text.slice(0, 600) }));
+  const sources = [...numbered, ...webPages].filter((s) => cited.has(s.n)).map((s) => ({ ...s, text: s.text.slice(0, 600) }));
   // Check each citing sentence against the full passage it cites before the answer is shown.
-  const flags = checkAnswer(text, new Map(numbered.map((s) => [s.n, s.text])));
+  const flags = checkAnswer(text, new Map([...numbered, ...webPages].map((s) => [s.n, s.text])));
   await db.insert(gptMessages).values({ chatId, role: "assistant", body: text, sources: JSON.stringify(sources), flags: JSON.stringify(flags) });
   await db.update(gptChats).set({ updatedAt: new Date() }).where(eq(gptChats.id, chatId));
   return ok();

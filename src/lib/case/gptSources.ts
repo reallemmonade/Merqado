@@ -1,6 +1,7 @@
 import type { Snippet } from "./search";
 
-export type SourceKind = Snippet["kind"];
+/** Case material kinds, plus "web" for public pages found by web search. */
+export type SourceKind = Snippet["kind"] | "web";
 
 /** The kinds of case material the GPT can answer from, as named in the source filter. */
 export const SOURCE_KINDS: { kind: SourceKind; label: string }[] = [
@@ -13,6 +14,7 @@ export const SOURCE_KINDS: { kind: SourceKind; label: string }[] = [
   { kind: "file", label: "Files" },
   { kind: "term", label: "Dictionary" },
   { kind: "task", label: "Workplan" },
+  { kind: "web", label: "Web" },
 ];
 
 const ALL = new Set<string>(SOURCE_KINDS.map((s) => s.kind));

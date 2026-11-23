@@ -89,7 +89,7 @@ export type Message = {
 };
 export type Member = { id: string; name: string; title: string };
 export type GptChat = { id: string; title: string; shared: boolean; pinned: boolean; updatedAt: string; owner: string; mine: boolean };
-export type GptSource = { n: number; label: string; href: string; text: string };
+export type GptSource = { n: number; label: string; href: string; text: string; web?: boolean };
 export type GptMessage = { id: string; role: "user" | "assistant"; body: string; sources: GptSource[]; at: string };
 export type TaskStatus = "not_yet" | "in_progress" | "almost_done" | "done";
 export type Task = {

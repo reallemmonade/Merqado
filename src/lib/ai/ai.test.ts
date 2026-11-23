@@ -85,6 +85,11 @@ describe("monthly spend cap", () => {
     expect(await monthlySpendUsd(db, firmId)).toBeCloseTo(4);
   });
 
+  it("adds web searches at $10 per 1,000", async () => {
+    await db.insert(schema.usageEvents).values({ firmId, billingMode: "managed", providerKind: "anthropic", model: "claude-sonnet-5-5", inputTokens: 0, outputTokens: 0, webSearches: 100, feature: "case_gpt" });
+    expect(await monthlySpendUsd(db, firmId)).toBeCloseTo(5);
+  });
+
   it("allows calls with no cap, blocks at the firm cap", async () => {
     await expect(assertUnderSpendCap(db, firmId)).resolves.toBeUndefined();
     await db.update(schema.firms).set({ aiMonthlyCapUsd: 3 }).where(eq(schema.firms.id, firmId));

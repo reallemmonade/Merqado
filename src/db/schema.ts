@@ -269,6 +269,7 @@ export const usageEvents = sqliteTable(
     model: text("model").notNull(),
     inputTokens: integer("input_tokens").notNull(),
     outputTokens: integer("output_tokens").notNull(),
+    webSearches: integer("web_searches").notNull().default(0),
     feature: text("feature").notNull(),
     createdAt: createdAt(),
   },
