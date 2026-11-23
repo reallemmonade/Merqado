@@ -1023,7 +1023,7 @@ html:root:root .storage-card.on { border-color: var(--accent); box-shadow: inset
 
 /* Sidebar feedback: note + optional screenshot */
 .fb-wrap { position: relative; display: inline-flex; }
-.fb-pop { position: fixed; left: 16px; bottom: 72px; width: 300px; max-width: calc(100vw - 32px); max-height: calc(100vh - 88px); overflow-y: auto; box-sizing: border-box; z-index: 1000; display: grid; gap: 10px; padding: 14px; background: var(--surface); color: var(--ink); border: 1px solid var(--line); border-radius: 12px; box-shadow: 0 12px 32px rgba(0, 0, 0, 0.18); }
+.fb-pop { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 340px; max-width: calc(100vw - 32px); max-height: calc(100dvh - 32px); overflow-y: auto; box-sizing: border-box; z-index: 1000; display: grid; gap: 10px; padding: 14px; background: var(--surface); color: var(--ink); border: 1px solid var(--line); border-radius: 12px; box-shadow: 0 12px 32px rgba(0, 0, 0, 0.18); }
 .fb-head { display: flex; align-items: center; justify-content: space-between; font-weight: 600; }
 .fb-close, .fb-x { border: 0; background: transparent; color: var(--muted); cursor: pointer; font: inherit; padding: 2px 6px; min-height: 0; }
 .fb-x { position: absolute; top: 6px; right: 6px; background: rgba(0, 0, 0, 0.55); color: #fff; border-radius: 50%; padding: 0; width: 22px; height: 22px; display: grid; place-items: center; }
