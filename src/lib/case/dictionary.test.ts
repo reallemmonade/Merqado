@@ -8,7 +8,7 @@ import { eq } from "drizzle-orm";
 import { beforeEach, describe, expect, it } from "vitest";
 import * as schema from "@/db/schema";
 import type { DB } from "@/db/client";
-import { blockedNames, pickNewTerms, scanFileForTerms, termKeys, type Complete } from "./dictionary";
+import { blockedNames, packTexts, pickNewTerms, rescanCaseFiles, scanFileForTerms, termKeys, type Complete } from "./dictionary";
 
 describe("term matching", () => {
   it("matches a term by its full name or its acronym", () => {
@@ -34,6 +34,24 @@ describe("term matching", () => {
     ]);
     expect(pickNewTerms("nonsense", [], [])).toEqual([]);
     expect(blockedNames({ clientName: "Client" })).toEqual([]);
+  });
+});
+
+describe("packTexts", () => {
+  it("fills parts without splitting a file, and trims long files", () => {
+    const parts = packTexts(
+      [
+        { name: "a", text: "x".repeat(50) },
+        { name: "b", text: "y".repeat(50) },
+        { name: "c", text: "z".repeat(500) },
+      ],
+      100,
+      140,
+    );
+    expect(parts).toHaveLength(2);
+    expect(parts[0]).toContain("### a");
+    expect(parts[0]).toContain("### b");
+    expect(parts[1]).toBe(`### c\n${"z".repeat(100)}\n\n`);
   });
 });
 
@@ -102,5 +120,23 @@ describe("scanFileForTerms", () => {
     const [row] = await db.select().from(schema.sources).where(eq(schema.sources.id, id));
     expect(row!.termsScannedAt).toBeNull();
     expect(await scanFileForTerms(db, id, model([{ term: "MSA", definition: "Contract." }]))).toEqual({ added: 1 });
+  });
+
+  it("re-reads every case file on Scan files, already-scanned ones too", async () => {
+    const id = await addFile({ termsScannedAt: new Date() });
+    await addFile({ filename: "Plan.docx", textBody: "Uses a TAM build." });
+    const [room] = await db.insert(schema.chatRooms).values({ engagementId, name: "Core" }).returning();
+    await addFile({ roomId: room!.id, textBody: "Secret word." });
+    const seen: string[] = [];
+    const ai: Complete = async (req) => {
+      seen.push(req.messages[0]!.content);
+      return JSON.stringify({ terms: [{ term: "Total Addressable Market (TAM)", category: "Finance", definition: "All possible demand." }, { term: "CDMO", definition: "Again." }] });
+    };
+    const eng = (await db.query.engagements.findFirst({ where: eq(schema.engagements.id, engagementId) }))!;
+    expect(await rescanCaseFiles(db, eng, ai)).toEqual({ files: 2, added: 1 });
+    expect(seen).toHaveLength(1);
+    expect(seen[0]).toContain("SOW.docx");
+    expect(seen[0]).not.toContain("Secret word");
+    expect(await scanFileForTerms(db, id, ai)).toEqual({ added: 0 });
   });
 });
