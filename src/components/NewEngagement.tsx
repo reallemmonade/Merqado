@@ -38,7 +38,7 @@ export function NewEngagement() {
         const data = await res.json().catch(() => ({}));
         setBusy(false);
         if (!res.ok) return setError(data.error ?? "Something went wrong.");
-        router.push(`/e/${data.id}/experts`);
+        router.push(`/e/${data.id}/onboarding`);
       }}
       style={{ display: "flex", flexDirection: "column", gap: 10 }}
     >
