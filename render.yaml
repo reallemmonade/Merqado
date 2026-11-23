@@ -42,6 +42,10 @@ services:
       # The Scheduler workflow signs in with GitHub's OIDC token and doesn't need it.
       - key: CRON_SECRET
         sync: false
+      # Temporary practice sign-in ("xxxx" in the email box, own firm, no other data).
+      # Set to "false" to turn it off. See src/lib/auth/practice.ts.
+      - key: PRACTICE_LOGIN_ENABLED
+        sync: false
       # Set when using a custom domain; SSO redirects use it.
       - key: APP_URL
         sync: false
