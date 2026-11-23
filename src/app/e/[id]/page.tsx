@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { and, asc, eq } from "drizzle-orm";
+import { and, asc, eq, isNull } from "drizzle-orm";
 import { CaseShell } from "@/components/case/CaseShell";
 import { DecisionAdd } from "@/components/case/Notes";
 import { SampleButton } from "@/components/case/SampleButton";
@@ -39,7 +39,7 @@ export default async function OverviewPage({
     db.select().from(expertTypes).where(eq(expertTypes.engagementId, id)).orderBy(asc(expertTypes.sort)),
     db.query.caseBudgets.findFirst({ where: eq(caseBudgets.engagementId, id) }),
     db.select({ id: chatRooms.id }).from(chatRooms).where(eq(chatRooms.engagementId, id)),
-    db.select({ id: sources.id }).from(sources).where(eq(sources.engagementId, id)),
+    db.select({ id: sources.id }).from(sources).where(and(eq(sources.engagementId, id), isNull(sources.deletedAt))),
   ]);
 
   const base = `/e/${id}`;

@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { desc, eq, inArray } from "drizzle-orm";
 import { CaseShell } from "@/components/case/CaseShell";
-import { DeleteFolder, FilesWorkspace, MoveFile, NewFolder, ReviewTable, type PendingFile } from "@/components/case/Files";
+import { DeleteFile, DeleteFolder, FilesWorkspace, MoveFile, NewFolder, RestoreFile, ReviewTable, type PendingFile } from "@/components/case/Files";
 import { experts, expertTranscripts, sources, users } from "@/db/schema";
 import { loadCase } from "@/lib/case/page";
 import { shortDate } from "@/lib/case/progress";
@@ -17,6 +17,7 @@ export const dynamic = "force-dynamic";
 const TRANSCRIPTS = "__transcripts";
 const REVIEW = "__review";
 const UNFILED = "__unfiled";
+const DELETED = "__deleted";
 
 function size(bytes: number | null) {
   if (!bytes) return "";
@@ -40,7 +41,7 @@ export default async function FilesPage({ params, searchParams }: { params: Prom
   const { db, user } = ctx;
   const canUpload = allows(ctx.membership, "upload");
   await removeWaitingDuplicates(db, id).catch((err) => console.warn("duplicate cleanup failed", err));
-  const [all, transcripts, people, folders, visible] = await Promise.all([
+  const [everything, transcripts, people, folders, visible] = await Promise.all([
     db.select(sourceMeta).from(sources).where(eq(sources.engagementId, id)).orderBy(desc(sources.createdAt)),
     db
       .select({ id: expertTranscripts.id, filename: expertTranscripts.filename, kind: expertTranscripts.kind, expertId: expertTranscripts.expertId, sourceId: expertTranscripts.sourceId, createdAt: expertTranscripts.createdAt })
@@ -51,7 +52,16 @@ export default async function FilesPage({ params, searchParams }: { params: Prom
     loadCaseFolders(db, id),
     sourceVisibility(db, id, user),
   ]);
+  const all = everything.filter((f) => !f.deletedAt);
   const files = all.filter(visible);
+  // Deleted stacks, newest version of each, until they're purged.
+  const deletedNewest = new Map<string, (typeof everything)[number]>();
+  for (const f of everything.filter((x) => x.deletedAt && x.filing === "filed" && visible(x))) {
+    const k = f.versionOf ?? f.id;
+    const cur = deletedNewest.get(k);
+    if (!cur || f.version > cur.version) deletedNewest.set(k, f);
+  }
+  const deleted = [...deletedNewest.values()].sort((a, b) => (b.deletedAt?.getTime() ?? 0) - (a.deletedAt?.getTime() ?? 0));
   const uploaderIds = [...new Set(files.map((f) => f.uploadedBy).filter((x): x is string => !!x))];
   const uploaders = uploaderIds.length ? await db.select({ id: users.id, name: users.name }).from(users).where(inArray(users.id, uploaderIds)) : [];
   const nameOf = new Map(uploaders.map((u) => [u.id, u.name]));
@@ -104,7 +114,7 @@ export default async function FilesPage({ params, searchParams }: { params: Prom
   const current = sp.folder ?? "";
   const inFolder = (f: { folder: string }, path: string) => f.folder === path || f.folder.startsWith(path + "/");
   const shown =
-    current === UNFILED ? latest.filter((f) => !f.folder) : current && current !== TRANSCRIPTS && current !== REVIEW ? latest.filter((f) => inFolder(f, current)) : latest;
+    current === UNFILED ? latest.filter((f) => !f.folder) : current && current !== TRANSCRIPTS && current !== REVIEW && current !== DELETED ? latest.filter((f) => inFolder(f, current)) : latest;
   const base = `/e/${id}/files`;
   const iso = (d: Date | null) => (d ? d.toISOString().slice(0, 10) : "");
   const href = (key: string) => (key ? `${base}?folder=${encodeURIComponent(key)}` : base);
@@ -163,14 +173,22 @@ export default async function FilesPage({ params, searchParams }: { params: Prom
                 <span className="muted mono">{transcripts.length}</span>
               </span>
             </Link>
-            {canUpload && current !== TRANSCRIPTS && current !== REVIEW && current !== UNFILED && <NewFolder engagementId={id} parent={current} />}
+            {deleted.length > 0 && (
+              <Link href={href(DELETED)} aria-current={current === DELETED ? "page" : undefined}>
+                <span className="row-between">
+                  <span>Deleted</span>
+                  <span className="muted mono">{deleted.length}</span>
+                </span>
+              </Link>
+            )}
+            {canUpload && current !== TRANSCRIPTS && current !== REVIEW && current !== UNFILED && current !== DELETED && <NewFolder engagementId={id} parent={current} />}
           </nav>
           <section className="group" style={{ flex: 1, minWidth: 0 }}>
             {current === REVIEW ? (
               <ReviewTable engagementId={id} folders={folders} rows={pending} />
             ) : (
               <>
-                {current && current !== TRANSCRIPTS && current !== UNFILED && (
+                {current && current !== TRANSCRIPTS && current !== UNFILED && current !== DELETED && (
                   <div className="group-head">
                     <h2 className="crumbs">
                       {current.split("/").map((part, i, arr) => (
@@ -180,16 +198,41 @@ export default async function FilesPage({ params, searchParams }: { params: Prom
                         </span>
                       ))}
                     </h2>
-                    {canUpload && folders.includes(current) && !all.some((f) => inFolder(f, current)) && (
+                    {canUpload && folders.includes(current) && (
                       <>
                         <span className="grow" />
-                        <DeleteFolder engagementId={id} path={current} parent={href(current.split("/").slice(0, -1).join("/"))} />
+                        <DeleteFolder engagementId={id} path={current} parent={href(current.split("/").slice(0, -1).join("/"))} files={shown.length} />
                       </>
                     )}
                   </div>
                 )}
                 <div className="scroll-x">
-                  {current === TRANSCRIPTS ? (
+                  {current === DELETED ? (
+                    <table className="grid">
+                      <thead>
+                        <tr>
+                          <th>Name</th>
+                          <th>Folder</th>
+                          <th>Deleted</th>
+                          <th />
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {deleted.map((f) => (
+                          <tr key={f.id}>
+                            <td>
+                              <a href={`/api/engagements/${id}/sources/${f.id}`} target="_blank" rel="noreferrer">
+                                {f.filename}
+                              </a>
+                            </td>
+                            <td>{f.folder}</td>
+                            <td className="mono">{shortDate(iso(f.deletedAt))}</td>
+                            <td className="row-end">{canUpload && <RestoreFile engagementId={id} sourceId={f.id} />}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  ) : current === TRANSCRIPTS ? (
                     <table className="grid">
                       <thead>
                         <tr>
@@ -223,6 +266,7 @@ export default async function FilesPage({ params, searchParams }: { params: Prom
                           <th>Added</th>
                           <th>Size</th>
                           <th>Ver.</th>
+                          {canUpload && <th aria-label="Delete" />}
                         </tr>
                       </thead>
                       <tbody>
@@ -263,6 +307,11 @@ export default async function FilesPage({ params, searchParams }: { params: Prom
                                   `v${f.version}`
                                 )}
                               </td>
+                              {canUpload && (
+                                <td className="row-end">
+                                  <DeleteFile engagementId={id} sourceId={f.id} filename={f.filename} />
+                                </td>
+                              )}
                             </tr>
                           );
                         })}
@@ -270,7 +319,7 @@ export default async function FilesPage({ params, searchParams }: { params: Prom
                     </table>
                   )}
                 </div>
-                {(current === TRANSCRIPTS ? transcripts.length : shown.length) === 0 && <p className="muted" style={{ padding: 16 }}>No files</p>}
+                {(current === TRANSCRIPTS ? transcripts.length : current === DELETED ? deleted.length : shown.length) === 0 && <p className="muted" style={{ padding: 16 }}>No files</p>}
               </>
             )}
           </section>

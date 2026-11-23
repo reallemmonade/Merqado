@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { and, desc, eq, inArray, like, max, or } from "drizzle-orm";
+import { and, desc, eq, inArray, isNull, like, max, or } from "drizzle-orm";
 import type { Authorized } from "@/lib/experts/api";
 import { runAi } from "@/lib/case/api";
 import { experts, sources } from "@/db/schema";
@@ -92,7 +92,7 @@ async function findVersionCandidate(auth: Authorized, filename: string): Promise
   const rows = await auth.db
     .select(sourceMeta)
     .from(sources)
-    .where(and(eq(sources.engagementId, auth.engagement.id), eq(sources.filing, "filed"), filename.includes(".") ? like(sources.filename, `%.${ext}`) : undefined))
+    .where(and(eq(sources.engagementId, auth.engagement.id), eq(sources.filing, "filed"), isNull(sources.deletedAt), filename.includes(".") ? like(sources.filename, `%.${ext}`) : undefined))
     .orderBy(desc(sources.createdAt));
   return rows.find((r) => r.filename.toLowerCase().split(".").pop() === ext && versionStem(r.filename) === stem) ?? null;
 }
@@ -178,7 +178,7 @@ export async function fileSources(
     let versionOf: string | null = src.versionOf;
     let version = src.version;
     if (item.asVersion && src.versionCandidate) {
-      const [prev] = await db.select(sourceMeta).from(sources).where(and(eq(sources.id, src.versionCandidate), eq(sources.engagementId, engagement.id)));
+      const [prev] = await db.select(sourceMeta).from(sources).where(and(eq(sources.id, src.versionCandidate), eq(sources.engagementId, engagement.id), isNull(sources.deletedAt)));
       if (prev) {
         versionOf = prev.versionOf ?? prev.id;
         const [m] = await db

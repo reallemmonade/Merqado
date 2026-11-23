@@ -137,6 +137,15 @@ export class GDriveStorage implements StorageProvider {
     });
   }
 
+  /** Takes a file back out of the Drive trash. */
+  async restore(key: string): Promise<void> {
+    await this.call(`${API}/files/${encodeURIComponent(key)}?${ALL}&fields=id`, {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ trashed: false }),
+    });
+  }
+
   async list(prefix = ""): Promise<StoredObject[]> {
     const parent = await this.folderId(prefix.split("/"));
     const res = await this.call<{ files: { id: string; size?: string }[] }>(
