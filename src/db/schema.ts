@@ -978,3 +978,20 @@ export const notifications = sqliteTable(
     index("notifications_nudge").on(t.nextNudgeAt),
   ],
 );
+
+/** In-app feedback: a note and an optional screenshot, sent from the sidebar. */
+export const feedback = sqliteTable(
+  "feedback",
+  {
+    id: id(),
+    firmId: text("firm_id")
+      .notNull()
+      .references(() => firms.id, { onDelete: "cascade" }),
+    userId: text("user_id").references(() => users.id, { onDelete: "set null" }),
+    note: text("note").notNull(),
+    /** Screenshot as a data URL, or null. */
+    photo: text("photo"),
+    createdAt: createdAt(),
+  },
+  (t) => [index("feedback_firm").on(t.firmId, t.createdAt)],
+);
