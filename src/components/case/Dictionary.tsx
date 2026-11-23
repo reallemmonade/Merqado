@@ -40,6 +40,11 @@ export function Dictionary({ engagementId, terms, categories, canEdit }: { engag
         <span className="grow" />
         <input type="text" enterKeyHint="search" aria-label="Filter" placeholder="Filter" value={q} onChange={(e) => setQ(e.target.value)} style={{ width: 180, minWidth: 0 }} />
         {canEdit && (
+          <button type="button" className="secondary small" disabled={busy !== null} onClick={() => call("scan", url, { json: { op: "scan" } })}>
+            {busy === "scan" ? "Scanning…" : "Scan files"}
+          </button>
+        )}
+        {canEdit && (
           <button type="button" className="secondary small" disabled={busy !== null} onClick={() => call("suggest", url, { json: { op: "suggest" } })}>
             {busy === "suggest" ? "Suggesting…" : "Suggest terms"}
           </button>
