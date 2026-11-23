@@ -8,6 +8,7 @@ import { GptBar } from "./GptBar";
 import { HashFocus } from "./HashFocus";
 import { Icon, type IconName } from "./icons";
 import { Shortcuts } from "./Shortcuts";
+import { WakeWord } from "./WakeWord";
 
 export type CaseSection = "overview" | "tiles" | "desk" | "gpt" | "workplan" | "experts" | "deck" | "channel" | "files" | "dictionary" | "notes" | "search";
 
@@ -55,6 +56,7 @@ export async function CaseShell({
   return (
     <div className="shell">
       <Shortcuts engagementId={id} />
+      <WakeWord engagementId={id} name="AtlasGPT" />
       <Suspense>
         <HashFocus />
       </Suspense>

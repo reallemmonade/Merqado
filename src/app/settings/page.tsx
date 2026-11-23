@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { getDb } from "@/db/client";
 import { NavTitleSwitch } from "@/components/NavTitleSwitch";
 import { SettingsShell } from "@/components/SettingsShell";
+import { WakeWordSetting } from "@/components/case/WakeWordSetting";
 import { initials } from "@/lib/prefs";
 import { getSessionUser } from "@/lib/session";
 
@@ -30,6 +31,9 @@ export default async function SettingsProfilePage({ searchParams }: { searchPara
           </div>
         </div>
         <NavTitleSwitch />
+      </section>
+      <section className="card">
+        <WakeWordSetting />
       </section>
       {!hideDesktopApp && (
         <section className="card">

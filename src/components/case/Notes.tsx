@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useState } from "react";
 import type { NoteKind } from "@/db/schema";
 import { useApi } from "@/components/experts/useApi";
+import { Dictate } from "./Dictate";
 
 export const NOTE_KIND_LABEL: Record<NoteKind, string> = { note: "Note", decision: "Decision", open: "Open item" };
 
@@ -45,6 +46,7 @@ export function NoteForm({ engagementId, modules }: { engagementId: string; modu
           Private
         </label>
         <span className="grow" />
+        <Dictate value={body} onText={setBody} />
         <button type="submit" disabled={busy !== null || !body.trim()}>
           Add
         </button>
