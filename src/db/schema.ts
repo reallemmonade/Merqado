@@ -188,6 +188,8 @@ export const sources = sqliteTable(
     messageId: text("message_id"),
     /** Files dropped together share a batch, so they're confirmed together. */
     batchId: text("batch_id"),
+    /** When the file was read for new dictionary terms; null until then. */
+    termsScannedAt: integer("terms_scanned_at", { mode: "timestamp" }),
     createdAt: createdAt(),
   },
   (t) => [index("sources_engagement").on(t.engagementId), index("sources_hash").on(t.engagementId, t.contentHash)],

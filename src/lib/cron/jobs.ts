@@ -1,6 +1,7 @@
 import { lt } from "drizzle-orm";
 import type { DB } from "@/db/client";
 import { jobRuns } from "@/db/schema";
+import { sweepNewFiles } from "@/lib/case/dictionary";
 import { runNudges } from "@/lib/inbox/nudge";
 
 export type JobContext = { db: DB; now: Date; slot: string };
@@ -21,6 +22,11 @@ export const JOBS: Job[] = [
     name: "needs-you-nudges",
     everyMinutes: 15,
     run: ({ db, now }) => runNudges(db, now),
+  },
+  {
+    name: "dictionary-from-files",
+    everyMinutes: 15,
+    run: ({ db, now }) => sweepNewFiles(db, now),
   },
   {
     name: "prune-job-runs",

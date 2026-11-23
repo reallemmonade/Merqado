@@ -1,6 +1,7 @@
-import { NextResponse } from "next/server";
+import { after, NextResponse } from "next/server";
 import { and, eq } from "drizzle-orm";
 import { chatRooms } from "@/db/schema";
+import { scanFileForTerms } from "@/lib/case/dictionary";
 import { canSeeChat } from "@/lib/case/rooms";
 import { authorize } from "@/lib/experts/api";
 import { intakeFile } from "@/lib/files/intake";
@@ -33,6 +34,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   try {
     const res = await intakeFile(auth, { file, relPath: str("relPath"), batchId: str("batchId"), roomId: roomId || null });
     const s = res.source;
+    // New terms in the file go into the case dictionary; the scheduler retries if this fails.
+    if (!res.duplicate && !roomId) after(() => scanFileForTerms(auth.db, s.id).catch((err) => console.warn("dictionary scan failed", s.id, err instanceof Error ? err.message : err)));
     return NextResponse.json(
       { duplicate: res.duplicate, source: { id: s.id, filename: s.filename, folder: s.folder, filing: s.filing, suggestions: JSON.parse(s.suggestions) } },
       { status: res.duplicate ? 200 : 201 },

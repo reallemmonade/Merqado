@@ -4,6 +4,7 @@ import { z } from "zod";
 import { glossaryTerms } from "@/db/schema";
 import { aiError, extractJson, notFoundJson, ok, parseOp, runAi } from "@/lib/case/api";
 import { loadCorpus } from "@/lib/case/corpus";
+import { blockedNames, termKeys } from "@/lib/case/dictionary";
 import { topSnippets } from "@/lib/case/search";
 
 const ref = z.string().min(1).max(64);
@@ -64,14 +65,14 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
         30000,
       );
       if (material.length === 0) return NextResponse.json({ error: "Add transcripts or slides first." }, { status: 400 });
-      const have = new Set(existing.map((e) => e.term.toLowerCase()));
+      const have = new Set(existing.flatMap((e) => termKeys(e.term)));
       let parsed: z.infer<typeof Suggested>;
       try {
         const text = await runAi(auth, "dictionary_suggest", {
           system:
             "You build a case dictionary for a consulting team. From the case material, pick up to 12 industry terms, acronyms or company-specific words a new team member would need explained. " +
             'Skip the terms already listed. Reply with JSON only: {"terms":[{"term":"","category":"Industry|Acronym|Company|Product|Finance","definition":"one plain sentence"}]}.\n\n' +
-            `Already listed: ${[...have].join(", ") || "none"}`,
+            `Already listed: ${existing.map((e) => e.term).join(", ") || "none"}`,
           messages: [{ role: "user", content: material.map((s) => `(${s.label})\n${s.text}`).join("\n\n").slice(0, 30000) }],
           maxTokens: 1500,
         });
@@ -79,7 +80,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       } catch (err) {
         return aiError(err);
       }
-      const fresh = parsed.terms.filter((t) => !have.has(t.term.trim().toLowerCase()));
+      const blocked = blockedNames(auth.engagement);
+      const fresh = parsed.terms.filter((t) => !termKeys(t.term).some((k) => have.has(k)) && !blocked.some((b) => `${t.term} ${t.definition}`.toLowerCase().includes(b)));
       if (fresh.length)
         await db.insert(glossaryTerms).values(fresh.map((t) => ({ engagementId: id, term: t.term.trim(), category: t.category || "Industry", definition: t.definition, status: "suggested" as const })));
       return ok({ added: fresh.length });

@@ -1,0 +1,1 @@
+ALTER TABLE `sources` ADD `terms_scanned_at` integer;
