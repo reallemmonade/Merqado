@@ -16,6 +16,9 @@ export const SWEEP_DAYS = 30;
 /** Files scanned per scheduler tick, to keep each tick short. */
 export const SWEEP_LIMIT = 10;
 
+/** Most terms taken from one model reply. */
+export const MAX_TERMS = 30;
+
 const Reply = z.object({
   terms: z
     .array(
@@ -25,7 +28,7 @@ const Reply = z.object({
         definition: z.string().optional().default(""),
       }),
     )
-    .max(40),
+    .transform((terms) => terms.slice(0, MAX_TERMS)),
 });
 
 export type NewTerm = { term: string; category: string; definition: string };
@@ -63,13 +66,34 @@ export function buildTermPrompt(existing: string[]): string {
   return (
     "You keep a case dictionary for a consulting team. From the document(s), pick the technical terms, industry jargon and acronyms a new team member would need explained, " +
     "that are not already in the dictionary. Skip everyday words, names of people, names of companies and clients, and project code names. " +
-    `Define each in one plain sentence. Reply with JSON only: {"terms":[{"term":"","category":"${TERM_CATEGORIES.join("|")}","definition":""}]}. ` +
+    `List at most ${MAX_TERMS}, most useful first. Define each in one short plain sentence. Reply with JSON only: {"terms":[{"term":"","category":"${TERM_CATEGORIES.join("|")}","definition":""}]}. ` +
     'Write an acronym as "Full Name (ACRONYM)". Reply {"terms":[]} if nothing new.\n\n' +
     `Already in the dictionary: ${existing.join(", ") || "none"}`
   );
 }
 
 /** Keeps only well-formed terms that aren't already in the dictionary and don't name the client. */
+/**
+ * The model's JSON reply. A long reply can be cut off mid-list, so when the whole reply
+ * doesn't parse, the complete term entries before the cut are kept.
+ */
+export function readTermsReply(text: string): unknown {
+  try {
+    return extractJson(text);
+  } catch {
+    const terms: unknown[] = [];
+    for (const m of text.matchAll(/\{[^{}]*"term"\s*:[^{}]*\}/g)) {
+      try {
+        terms.push(JSON.parse(m[0]));
+      } catch {
+        // A half-written entry; skip it.
+      }
+    }
+    if (!terms.length) throw new Error("The model did not return any terms.");
+    return { terms };
+  }
+}
+
 export function pickNewTerms(reply: unknown, existing: string[], blocked: string[]): NewTerm[] {
   const parsed = Reply.safeParse(reply);
   if (!parsed.success) return [];
@@ -136,11 +160,11 @@ type CaseRow = { id: string; firmId: string; clientName: string; aiProviderId: s
 /** Asks the model for terms in this text and adds the new ones. */
 async function addTermsFrom(db: DB, engagement: CaseRow, text: string, run: Complete, serial: Serial = (fn) => fn()): Promise<number> {
   const existing = (await db.select({ term: glossaryTerms.term }).from(glossaryTerms).where(eq(glossaryTerms.engagementId, engagement.id))).map((r) => r.term);
-  const reply = await run({ system: buildTermPrompt(existing), messages: [{ role: "user", content: text }], maxTokens: 2500 });
+  const reply = await run({ system: buildTermPrompt(existing), messages: [{ role: "user", content: text }], maxTokens: 4000 });
   // Read the list again: another file may have added terms while the model was working.
   return serial(async () => {
     const now = (await db.select({ term: glossaryTerms.term }).from(glossaryTerms).where(eq(glossaryTerms.engagementId, engagement.id))).map((r) => r.term);
-    const fresh = pickNewTerms(extractJson(reply), now, blockedNames(engagement));
+    const fresh = pickNewTerms(readTermsReply(reply), now, blockedNames(engagement));
     if (fresh.length) {
       await db.insert(glossaryTerms).values(fresh.map((t) => ({ engagementId: engagement.id, ...t, status: "active" as const })));
       publishCaseChange(engagement.id);
@@ -198,6 +222,7 @@ export async function rescanCaseFiles(db: DB, engagement: CaseRow, run: Complete
   const parts = packTexts(files);
   const serial = oneAtATime();
   let added = 0;
+  let worked = 0;
   let failed: unknown = null;
   let next = 0;
   const worker = async () => {
@@ -205,13 +230,16 @@ export async function rescanCaseFiles(db: DB, engagement: CaseRow, run: Complete
       const part = parts[next++]!;
       try {
         added += await addTermsFrom(db, engagement, part, run, serial);
+        worked++;
       } catch (err) {
+        console.warn("dictionary rescan: part failed", err instanceof Error ? err.message : err);
         failed ??= err;
       }
     }
   };
   await Promise.all(Array.from({ length: Math.min(RESCAN_PARALLEL, parts.length) }, worker));
-  if (failed && added === 0) throw failed;
+  // Only fail when no part could be read; a part that found nothing new is still a success.
+  if (failed && worked === 0) throw failed;
   if (rows.length) await db.update(sources).set({ termsScannedAt: new Date() }).where(and(eq(sources.engagementId, engagement.id), isNull(sources.termsScannedAt)));
   return { files: files.length, added };
 }
