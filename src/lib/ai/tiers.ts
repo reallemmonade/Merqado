@@ -8,6 +8,7 @@ export const FEATURE_TIERS: Record<string, AITier> = {
   file_filing: "fast",
   todo_scan: "fast",
   dictionary_suggest: "fast",
+  dictionary_scan: "fast",
   ask: "standard",
   case_gpt: "standard",
   transcript_clean: "standard",
