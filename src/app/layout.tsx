@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { htmlAttrs, THEME_SCRIPT } from "@/lib/prefs";
+import { TILE_SCRIPT } from "@/lib/case/tileEmbed";
 import { getPrefs } from "@/lib/prefs.server";
 import { DesktopAlerts } from "@/components/DesktopAlerts";
 import { GuavaSky } from "@/components/GuavaSky";
@@ -17,6 +18,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
     <html lang="en" {...htmlAttrs(prefs)} suppressHydrationWarning>
       <head>
         <script dangerouslySetInnerHTML={{ __html: THEME_SCRIPT }} />
+        <script dangerouslySetInnerHTML={{ __html: TILE_SCRIPT }} />
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link
           rel="stylesheet"

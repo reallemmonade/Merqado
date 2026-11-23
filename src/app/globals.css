@@ -1034,3 +1034,39 @@ html:root:root .storage-card.on { border-color: var(--accent); box-shadow: inset
 .fb-send:disabled { opacity: 0.5; cursor: default; }
 .fb-sent { color: var(--accent); font-weight: 500; text-align: center; padding: 30px 0; }
 .fb-err { color: var(--bad); font-size: 12px; }
+
+/* Tiles: a case page inside a tile keeps only its content (see lib/case/tileEmbed.ts). */
+html[data-tile] .shell > .nav, html[data-tile] .shell > .rail, html[data-tile] .gpt-bar, html[data-tile] .case-head > div:first-child { display: none !important; }
+html[data-tile] .case-main { padding: 12px 14px; gap: 12px; }
+html[data-tile] .case-head { justify-content: flex-end; }
+html[data-tile] .case-head:not(:has(.toolbar)) { display: none; }
+html[data-tile] body { background: var(--surface); }
+
+/* Tiles page: case pages side by side on a 12 x 12 grid that fills the window (sizing as in Celaya's board). */
+.case-main:has(> .tiles-page) { height: 100dvh; padding-bottom: 16px; }
+.tiles-page { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 14px; }
+.tiles-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; }
+.tiles-head h1 { font-size: 28px; }
+.tiles-board { position: relative; flex: 1; min-height: 360px; margin: -5px; border-radius: 12px; outline: 2px dashed transparent; outline-offset: -2px; transition: outline-color 0.15s, background 0.15s; }
+.tiles-board.is-dropping { outline-color: var(--brand-accent); background: color-mix(in srgb, var(--brand-accent) 6%, transparent); }
+.tiles-board.is-dropping .tile-frame, .tiles-board.is-dragging .tile-frame { pointer-events: none; }
+.tiles-board.is-dragging { user-select: none; }
+.tiles-empty { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; color: var(--muted); }
+.tile { position: absolute; padding: 5px; box-sizing: border-box; transition: left 0.22s cubic-bezier(.2,.7,.2,1), top 0.22s cubic-bezier(.2,.7,.2,1), width 0.22s cubic-bezier(.2,.7,.2,1), height 0.22s cubic-bezier(.2,.7,.2,1); }
+.tile.is-active { transition: none; z-index: 2; }
+.tile-card { position: relative; height: 100%; display: flex; flex-direction: column; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; overflow: hidden; box-shadow: 0 1px 2px rgba(17, 28, 38, 0.06); }
+.tile-head { display: flex; align-items: center; gap: 8px; padding: 6px 6px 6px 12px; border-bottom: 1px solid var(--line); cursor: grab; touch-action: none; color: var(--muted); }
+.tiles-board.is-dragging .tile-head { cursor: grabbing; }
+.tile-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; font-weight: 600; color: var(--ink); }
+.tile-btn { display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; min-height: 0; padding: 0; border: 0; border-radius: 6px; background: transparent; color: var(--muted); cursor: pointer; }
+.tile-btn:hover { background: var(--soft); color: var(--ink); }
+.tile-btn[aria-pressed="true"] { color: var(--brand-accent); }
+a.tile-btn svg { transform: rotate(45deg); }
+.tile-frame { flex: 1; width: 100%; border: 0; background: var(--surface); }
+.tile-size { position: absolute; right: 0; bottom: 0; width: 16px; height: 16px; cursor: nwse-resize; touch-action: none; background: linear-gradient(135deg, transparent 50%, var(--line) 50%); }
+.tile-ghost { position: absolute; border-radius: 12px; border: 2px dashed var(--brand-accent); background: color-mix(in srgb, var(--brand-accent) 8%, transparent); pointer-events: none; }
+.tiles-stack { display: flex; flex-direction: column; gap: 0; margin: 0; flex: none; min-height: 0; }
+.tiles-stack .tile { position: relative; height: 72dvh; padding: 0 0 12px; }
+.tiles-stack .tiles-empty { position: static; padding: 40px 0; }
+@media (max-width: 640px) { .case-main:has(> .tiles-page) { height: auto; } }
+.tiles-add { display: inline-flex; align-items: center; gap: 6px; }

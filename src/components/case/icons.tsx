@@ -1,5 +1,6 @@
 export const ICONS = {
   overview: "M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z",
+  tiles: "M3 3h8v8H3zM13 3h8v8h-8zM3 13h8v8H3zM17 13v8M13 17h8",
   desk: "M4 5h6v14H4zM13 5h7v6h-7zM13 14h7v5h-7z",
   gpt: "M12 3l1.8 4.7 4.7 1.8-4.7 1.8L12 16l-1.8-4.7-4.7-1.8 4.7-1.8zM18 15l.9 2.1 2.1.9-2.1.9-.9 2.1-.9-2.1-2.1-.9 2.1-.9z",
   workplan: "M3 4h18v16H3zM3 9h18M9 4v16M15 4v16",

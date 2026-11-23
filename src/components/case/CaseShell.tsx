@@ -9,11 +9,12 @@ import { HashFocus } from "./HashFocus";
 import { Icon, type IconName } from "./icons";
 import { Shortcuts } from "./Shortcuts";
 
-export type CaseSection = "overview" | "desk" | "gpt" | "workplan" | "experts" | "deck" | "channel" | "files" | "dictionary" | "notes" | "search";
+export type CaseSection = "overview" | "tiles" | "desk" | "gpt" | "workplan" | "experts" | "deck" | "channel" | "files" | "dictionary" | "notes" | "search";
 
-function sections(gpt: string): { key: CaseSection; label: string; icon: IconName; href: string }[] {
+export function caseSections(gpt: string): { key: CaseSection; label: string; icon: IconName; href: string }[] {
   return [
     { key: "overview", label: "Overview", icon: "overview", href: "" },
+    { key: "tiles", label: "Tiles", icon: "tiles", href: "/tiles" },
     { key: "desk", label: "Desk", icon: "desk", href: "/desk" },
     { key: "gpt", label: gpt, icon: "gpt", href: "/gpt" },
     { key: "workplan", label: "Workplan", icon: "workplan", href: "/workplan" },
@@ -50,7 +51,7 @@ export async function CaseShell({
   const [{ caseMenu }, needsYou] = await Promise.all([getPrefs(), needsYouCount(ctx.db, ctx.user.id)]);
   const badge = needsYou > 0 && <span className="nav-badge">{needsYou > 99 ? "99+" : needsYou}</span>;
   const full = caseMenu === "full" || (caseMenu === "auto" && section === "overview");
-  const items = sections(ctx.gpt);
+  const items = caseSections(ctx.gpt);
   return (
     <div className="shell">
       <Shortcuts engagementId={id} />
