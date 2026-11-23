@@ -81,13 +81,8 @@ export function GptAsk({
   autoFocus?: boolean;
   rows?: number;
 }) {
-  useEffect(() => {
-    // Opened by the "Hey <name>" wake phrase (#ask): put the cursor in the box.
-    if (window.location.hash === "#ask") document.getElementById("gpt-input")?.focus();
-  }, []);
   return (
     <form
-      id="ask"
       className="ask-box"
       onSubmit={(e) => {
         e.preventDefault();
