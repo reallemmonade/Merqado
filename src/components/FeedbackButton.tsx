@@ -68,7 +68,7 @@ export function FeedbackButton() {
     <div className="fb-wrap" ref={wrap}>
       <button
         type="button"
-        className="nav-gear fb-open"
+        className="fb-open"
         aria-label="Feedback"
         title="Feedback"
         aria-expanded={open}
