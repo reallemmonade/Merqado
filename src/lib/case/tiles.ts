@@ -4,7 +4,7 @@
  * every row fills the full width, and the rows share the full height, so the board never has gaps.
  */
 
-export const TILE_SECTIONS = ["overview", "desk", "gpt", "workplan", "experts", "deck", "channel", "files", "dictionary", "notes", "search"] as const;
+export const TILE_SECTIONS = ["overview", "desk", "gpt", "workplan", "experts", "meetings", "deck", "channel", "files", "dictionary", "notes", "search"] as const;
 export type TileSection = (typeof TILE_SECTIONS)[number];
 export type TileMode = "grid" | "focus";
 export type TileRect = { x: number; y: number; w: number; h: number }; // fractions of the board, 0..1
