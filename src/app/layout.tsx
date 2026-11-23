@@ -3,6 +3,7 @@ import { htmlAttrs, THEME_SCRIPT } from "@/lib/prefs";
 import { TILE_SCRIPT } from "@/lib/case/tileEmbed";
 import { getPrefs } from "@/lib/prefs.server";
 import { DesktopAlerts } from "@/components/DesktopAlerts";
+import { Feedback } from "@/components/Feedback";
 import { GuavaSky } from "@/components/GuavaSky";
 import { SessionSync } from "@/components/live/SessionSync";
 import "./globals.css";
@@ -31,6 +32,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         <DesktopAlerts />
         <SessionSync />
         {children}
+        <Feedback />
       </body>
     </html>
   );
