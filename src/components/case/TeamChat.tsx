@@ -190,23 +190,24 @@ function Body({ text, names, meNames }: { text: string; names: string[]; meNames
 function useLive(engagementId: string, roomId: string | null, newest: string) {
   const router = useRouter();
   const url = `/api/engagements/${engagementId}/channel`;
+  // New messages arrive through the case's live updates (LiveSync). Presence pings and read
+  // marks are quiet, so they don't make every other open tab reload.
+  const quiet = useMemo(
+    () => (json: unknown) =>
+      fetch(url, { method: "POST", headers: { "content-type": "application/json", "x-mq-quiet": "1" }, body: JSON.stringify(json) }).catch(() => null),
+    [url],
+  );
   useEffect(() => {
-    const post = (json: unknown) => fetch(url, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(json) }).catch(() => null);
-    const refresh = setInterval(() => {
-      if (document.visibilityState === "visible") router.refresh();
-    }, 5000);
     const ping = setInterval(() => {
-      if (document.visibilityState === "visible") post({ op: "ping" });
+      if (document.visibilityState !== "visible") return;
+      void quiet({ op: "ping" });
+      router.refresh(); // who's online
     }, 60000);
-    return () => {
-      clearInterval(refresh);
-      clearInterval(ping);
-    };
-  }, [router, url]);
+    return () => clearInterval(ping);
+  }, [quiet, router]);
   useEffect(() => {
-    if (!roomId) return;
-    fetch(url, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ op: "read", roomId }) }).catch(() => null);
-  }, [url, roomId, newest]);
+    if (roomId) void quiet({ op: "read", roomId });
+  }, [quiet, roomId, newest]);
 }
 
 // ---------------------------------------------------------------------------

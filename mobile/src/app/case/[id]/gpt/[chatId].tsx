@@ -4,6 +4,7 @@ import { router, useLocalSearchParams } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { api, type GptMessage } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
+import { useCaseLive } from "@/lib/useCaseLive";
 import { C, F } from "@/lib/theme";
 import { Answer } from "@/components/Answer";
 import { Composer } from "@/components/Composer";
@@ -26,6 +27,8 @@ export default function GptChat() {
     const d = await api<Payload>(path).catch(() => null);
     if (d) setData(d);
   }, [path]);
+
+  useCaseLive(id, () => void load());
 
   const run = useCallback(
     async (op: { op: "answer" } | { op: "ask"; question: string }) => {

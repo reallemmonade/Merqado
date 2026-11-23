@@ -3,6 +3,7 @@ import { htmlAttrs, THEME_SCRIPT } from "@/lib/prefs";
 import { getPrefs } from "@/lib/prefs.server";
 import { DesktopAlerts } from "@/components/DesktopAlerts";
 import { GuavaSky } from "@/components/GuavaSky";
+import { SessionSync } from "@/components/live/SessionSync";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -26,6 +27,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
       <body>
         <GuavaSky initial={prefs} />
         <DesktopAlerts />
+        <SessionSync />
         {children}
       </body>
     </html>

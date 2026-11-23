@@ -15,7 +15,7 @@ export function AskBox({ engagementId }: { engagementId: string }) {
     try {
       const res = await fetch(`/api/engagements/${engagementId}/ask`, {
         method: "POST",
-        headers: { "content-type": "application/json" },
+        headers: { "content-type": "application/json", "x-mq-quiet": "1" }, // a question changes nothing others see
         body: JSON.stringify({ question }),
       });
       const data = await res.json();

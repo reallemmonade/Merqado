@@ -5,6 +5,7 @@ import * as Haptics from "expo-haptics";
 import { api, type Task, type TaskStatus, type CaseTodo as Todo } from "@/lib/api";
 import { useCase } from "@/lib/auth";
 import { useApi } from "@/lib/useApi";
+import { useCaseLive } from "@/lib/useCaseLive";
 import { C, F } from "@/lib/theme";
 import { CaseSwitch } from "@/components/CaseSwitch";
 import { Icon } from "@/components/Icon";
@@ -170,6 +171,7 @@ export default function Tasks() {
 /** The case's to-dos: tick to finish, tap for more, accept or dismiss AI suggestions. */
 function TodoList({ caseId }: { caseId: string | null }) {
   const { data, error, loading, refreshing, refresh, reload, setData } = useApi<Todos>(caseId ? `/api/mobile/cases/${caseId}/todos` : null);
+  useCaseLive(caseId, () => void reload());
   const sections = useMemo(() => {
     const open = data?.todos ?? [];
     return [

@@ -4,6 +4,7 @@ import type { DB } from "@/db/client";
 import { engagements, glossaryTerms, sources } from "@/db/schema";
 import { completeAndMeter, resolveProvider } from "@/lib/ai";
 import { extractJson } from "@/lib/experts/api";
+import { publishCaseChange } from "@/lib/live/hub";
 
 export type Complete = (req: { system: string; messages: { role: "user"; content: string }[]; maxTokens: number }) => Promise<string>;
 
@@ -132,7 +133,10 @@ export async function scanFileForTerms(db: DB, sourceId: string, complete?: Comp
     // Read the list again: another file may have added terms while the model was working.
     const now = (await db.select({ term: glossaryTerms.term }).from(glossaryTerms).where(eq(glossaryTerms.engagementId, engagement.id))).map((r) => r.term);
     const fresh = pickNewTerms(extractJson(reply), now, blockedNames(engagement));
-    if (fresh.length) await db.insert(glossaryTerms).values(fresh.map((t) => ({ engagementId: engagement.id, ...t, status: "active" as const })));
+    if (fresh.length) {
+      await db.insert(glossaryTerms).values(fresh.map((t) => ({ engagementId: engagement.id, ...t, status: "active" as const })));
+      publishCaseChange(engagement.id);
+    }
     return { added: fresh.length };
   } catch (err) {
     // Let the scheduler try again later.
