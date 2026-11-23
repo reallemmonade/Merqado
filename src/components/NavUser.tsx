@@ -2,6 +2,7 @@ import { getDb } from "@/db/client";
 import { initials } from "@/lib/prefs";
 import { getSessionUser } from "@/lib/session";
 import { Icon } from "./case/icons";
+import { FeedbackButton } from "./FeedbackButton";
 import { SettingsLink } from "./SettingsLink";
 import { TimeZoneSync } from "./TimeZoneSync";
 
@@ -25,6 +26,7 @@ export async function NavUser({ compact = false }: { compact?: boolean }) {
         {initials(user.name)}
       </span>
       <span className="nav-user-name">{user.name}</span>
+      <FeedbackButton />
       <SettingsLink className="nav-gear" aria-label="Settings" title="Settings">
         <Icon name="settings" />
       </SettingsLink>
