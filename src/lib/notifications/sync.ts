@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, gt, inArray, lte, ne, notInArray, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gt, inArray, isNull, lte, ne, notInArray, or, sql } from "drizzle-orm";
 import type { DB } from "@/db/client";
 import { firmMembers, firmRoles, notifications, users, type Archetype } from "@/db/schema";
 import { myCases } from "@/lib/mobile/data";
@@ -60,7 +60,8 @@ export async function syncNotifications(db: DB, user: Person, now = new Date()):
   await db
     .update(notifications)
     .set({ status: "done", doneBy: "system", updatedAt: now })
-    .where(and(eq(notifications.userId, user.id), ne(notifications.status, "done"), ...(keys.length ? [notInArray(notifications.key, keys)] : [])));
+    // Email alerts have their own source (src/lib/mail) and close there.
+    .where(and(eq(notifications.userId, user.id), ne(notifications.status, "done"), ne(notifications.kind, "email"), ...(keys.length ? [notInArray(notifications.key, keys)] : [])));
   return cases;
 }
 
@@ -137,15 +138,15 @@ export function inboxViewWhere(view: InboxView, now: Date) {
  * time is up, newest first; snoozed is soonest to wake first; done is most recently closed first.
  */
 export async function readInbox(db: DB, user: Person, cases: InboxCase[], now = new Date(), limit = 100, view: InboxView = "open"): Promise<InboxEntry[]> {
-  if (!cases.length) return [];
   const caseOf = new Map(cases.map((c) => [c.id, c]));
+  const onMyCases = caseOf.size ? or(isNull(notifications.engagementId), inArray(notifications.engagementId, [...caseOf.keys()])) : isNull(notifications.engagementId);
   const rows = await db
     .select()
     .from(notifications)
     .where(
       and(
         eq(notifications.userId, user.id),
-        inArray(notifications.engagementId, [...caseOf.keys()]),
+        onMyCases,
         inboxViewWhere(view, now),
       ),
     )
@@ -156,8 +157,8 @@ export async function readInbox(db: DB, user: Person, cases: InboxCase[], now = 
     id: r.key,
     kind: r.kind,
     status: r.status,
-    caseId: r.engagementId,
-    caseName: caseOf.get(r.engagementId)?.codeName ?? "",
+    caseId: r.engagementId ?? "",
+    caseName: r.engagementId ? (caseOf.get(r.engagementId)?.codeName ?? "") : "",
     title: r.title,
     body: r.body,
     at: r.occurredAt.toISOString(),

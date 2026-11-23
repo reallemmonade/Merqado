@@ -48,7 +48,7 @@ export default async function NeedsYouPage({ searchParams }: { searchParams: Pro
   for (const it of items) {
     let g = byCase.get(it.caseId);
     if (!g) {
-      g = { caseId: it.caseId, name: caseName.get(it.caseId) ?? it.caseName, items: [] };
+      g = { caseId: it.caseId || "email", name: it.caseId ? (caseName.get(it.caseId) ?? it.caseName) : "Email", items: [] };
       byCase.set(it.caseId, g);
       groups.push(g);
     }

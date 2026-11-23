@@ -28,7 +28,7 @@ export async function GET(req: Request) {
     .limit(5);
   const alerts = rows.map((r) => {
     const data = JSON.parse(r.data || "{}") as Record<string, string>;
-    const e = { kind: r.kind, title: r.title, body: r.body, caseId: r.engagementId, ...data };
+    const e = { kind: r.kind, title: r.title, body: r.body, caseId: r.engagementId ?? "", ...data, link: r.link };
     const { title, sub } = rowText(e);
     return { key: r.key, title, body: sub, href: webLink(e) };
   });

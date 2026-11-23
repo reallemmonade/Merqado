@@ -4,6 +4,7 @@ import { engagements, jobRuns } from "@/db/schema";
 import { sweepNewFiles } from "@/lib/case/dictionary";
 import { purgeDeleted } from "@/lib/files/trash";
 import { runNudges } from "@/lib/inbox/nudge";
+import { runGmailCheck } from "@/lib/mail/check";
 import { runMeetingSync } from "@/lib/meetings/sync";
 
 export type JobContext = { db: DB; now: Date; slot: string };
@@ -34,6 +35,11 @@ export const JOBS: Job[] = [
     name: "meetings-from-microsoft",
     everyMinutes: 15,
     run: ({ db, now }) => runMeetingSync(db, now),
+  },
+  {
+    name: "gmail-new-mail",
+    everyMinutes: 15,
+    run: ({ db, now }) => runGmailCheck(db, now),
   },
   {
     name: "purge-deleted-files",

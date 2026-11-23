@@ -949,7 +949,7 @@ export const jobRuns = sqliteTable(
   (t) => [uniqueIndex("job_runs_job_slot").on(t.job, t.slot), index("job_runs_started").on(t.startedAt)],
 );
 
-export const NOTIFICATION_KINDS = ["mention", "reply", "task", "review", "todo", "approval"] as const;
+export const NOTIFICATION_KINDS = ["mention", "reply", "task", "review", "todo", "approval", "email"] as const;
 export type NotificationKind = (typeof NOTIFICATION_KINDS)[number];
 
 export const NOTIFICATION_STATUSES = ["unread", "read", "snoozed", "done"] as const;
@@ -966,9 +966,8 @@ export const notifications = sqliteTable(
     userId: text("user_id")
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
-    engagementId: text("engagement_id")
-      .notNull()
-      .references(() => engagements.id, { onDelete: "cascade" }),
+    /** Null for items that belong to no case, like new email. */
+    engagementId: text("engagement_id").references(() => engagements.id, { onDelete: "cascade" }),
     kind: text("kind", { enum: NOTIFICATION_KINDS }).notNull(),
     /** Stable id of the source item (e.g. "m-<message id>", "t-<task id>"), one row per person. */
     key: text("key").notNull(),
@@ -1017,6 +1016,24 @@ export const feedback = sqliteTable(
 );
 
 /** A person's own Microsoft account, linked so Merqado can read their calendar and Teams meetings. */
+/** A person's linked Gmail, checked every 15 minutes for new inbox mail (sender and subject only). */
+export const gmailLinks = sqliteTable("gmail_links", {
+  userId: text("user_id")
+    .primaryKey()
+    .references(() => users.id, { onDelete: "cascade" }),
+  firmId: text("firm_id")
+    .notNull()
+    .references(() => firms.id, { onDelete: "cascade" }),
+  account: text("account").notNull().default(""),
+  /** Encrypted { refreshToken } (see lib/crypto). */
+  encryptedToken: text("encrypted_token").notNull(),
+  /** Gmail history id of the last check; mail after it is new. */
+  historyId: text("history_id"),
+  checkedAt: integer("checked_at", { mode: "timestamp" }),
+  lastError: text("last_error"),
+  createdAt: createdAt(),
+});
+
 export const microsoftLinks = sqliteTable("microsoft_links", {
   userId: text("user_id")
     .primaryKey()

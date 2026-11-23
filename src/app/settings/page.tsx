@@ -4,6 +4,7 @@ import { getDb } from "@/db/client";
 import { NavTitleSwitch } from "@/components/NavTitleSwitch";
 import { SettingsShell } from "@/components/SettingsShell";
 import { WakeWordSetting } from "@/components/case/WakeWordSetting";
+import { gmailStatus } from "@/lib/mail/gmail";
 import { initials } from "@/lib/prefs";
 import { getSessionUser } from "@/lib/session";
 
@@ -13,8 +14,10 @@ export const dynamic = "force-dynamic";
 
 export default async function SettingsProfilePage({ searchParams }: { searchParams: Promise<{ from?: string | string[] }> }) {
   const { from } = await searchParams;
-  const user = await getSessionUser(getDb());
+  const db = getDb();
+  const user = await getSessionUser(db);
   if (!user) redirect("/welcome");
+  const gmail = await gmailStatus(db, user.id);
   const hideDesktopApp = /Electron\/|iPhone|iPad|Android/.test((await headers()).get("user-agent") ?? "");
 
   return (
@@ -34,6 +37,28 @@ export default async function SettingsProfilePage({ searchParams }: { searchPara
       </section>
       <section className="card">
         <WakeWordSetting />
+      </section>
+      <section className="card">
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: 2, minWidth: 0 }}>
+            <strong>Email alerts</strong>
+            {gmail && <span className="muted">{gmail.account}</span>}
+          </div>
+          <div style={{ display: "flex", gap: 8 }}>
+            {(!gmail || gmail.broken) && (
+              <a className="button" href="/api/mail/google/start?returnTo=/settings" style={{ display: "inline-flex", alignItems: "center", textDecoration: "none", color: "var(--btn-ink, #fff)" }}>
+                {gmail ? "Reconnect Gmail" : "Connect Gmail"}
+              </a>
+            )}
+            {gmail && (
+              <form method="post" action="/api/mail/google/disconnect">
+                <button type="submit" className="secondary">
+                  Disconnect
+                </button>
+              </form>
+            )}
+          </div>
+        </div>
       </section>
       {!hideDesktopApp && (
         <section className="card">
