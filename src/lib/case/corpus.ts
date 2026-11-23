@@ -1,4 +1,4 @@
-import { and, asc, eq, inArray, sql } from "drizzle-orm";
+import { and, asc, eq, inArray, isNull, sql } from "drizzle-orm";
 import type { DB } from "@/db/client";
 import type { Archetype } from "@/db/schema";
 import { deckSlides, experts, expertTranscripts, glossaryTerms, hypotheses, keyTakeaways, sources, workplanTasks, chatMessages } from "@/db/schema";
@@ -39,6 +39,7 @@ export async function loadCorpus(
       .where(
         and(
           eq(sources.engagementId, engagementId),
+          isNull(sources.deletedAt),
           phrase ? sql`instr(lower(${sources.filename} || char(10) || coalesce(${sources.textBody}, '')), ${phrase}) > 0` : undefined,
         ),
       ),

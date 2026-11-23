@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { useApi } from "@/components/experts/useApi";
 import { isJunk } from "@/lib/files/junk";
 
@@ -196,6 +197,7 @@ export function FilesWorkspace({
         </div>
       )}
       {children}
+      <UndoToast engagementId={engagementId} />
       {over && (
         <div className="drop-overlay" aria-hidden="true">
           <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.6}>
@@ -315,7 +317,11 @@ export function ReviewTable({
               const f = folderOf(r);
               return (
                 <tr key={r.id}>
-                  <td title={r.relPath ?? undefined}>{r.filename}</td>
+                  <td title={r.relPath ?? undefined}>
+                    <a href={`/api/engagements/${engagementId}/sources/${r.id}`} target="_blank" rel="noreferrer">
+                      {r.filename}
+                    </a>
+                  </td>
                   <td>
                     {typing[r.id] ? (
                       <input
@@ -484,23 +490,157 @@ export function NewFolder({ engagementId, parent }: { engagementId: string; pare
   );
 }
 
-/** Removes a folder (and its subfolders) that holds no files. */
-export function DeleteFolder({ engagementId, path, parent }: { engagementId: string; path: string; parent: string }) {
+const DELETED_EVENT = "merqado:files-deleted";
+interface DeletedDetail {
+  ids: string[];
+  folders: string[];
+}
+
+/** A small centred confirm box; Escape or a click outside cancels. */
+function Confirm({ title, detail, busy, error, onCancel, onConfirm }: { title: string; detail?: string; busy: boolean; error: string | null; onCancel: () => void; onConfirm: () => void }) {
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onCancel();
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onCancel]);
+  // On the body, so a scrolling table or a glass card can't clip it.
+  return createPortal(
+    <div className="confirm-backdrop" onClick={(e) => e.target === e.currentTarget && onCancel()}>
+      <div className="confirm" role="alertdialog" aria-modal="true" aria-label={title}>
+        <h3>{title}</h3>
+        {detail && <p className="muted mono">{detail}</p>}
+        {error && <p className="error">{error}</p>}
+        <div className="confirm-actions">
+          <button type="button" className="secondary small" onClick={onCancel} disabled={busy}>
+            Cancel
+          </button>
+          <button type="button" className="danger small" onClick={onConfirm} disabled={busy} autoFocus>
+            {busy ? "Deleting…" : "Delete"}
+          </button>
+        </div>
+      </div>
+    </div>,
+    document.body,
+  );
+}
+
+const announce = (detail: DeletedDetail) => window.dispatchEvent(new CustomEvent<DeletedDetail>(DELETED_EVENT, { detail }));
+
+/** Trash button on a file row; asks first, then offers Undo. */
+export function DeleteFile({ engagementId, sourceId, filename }: { engagementId: string; sourceId: string; filename: string }) {
+  const { call, busy, error, setError } = useApi();
+  const [open, setOpen] = useState(false);
+  const close = useCallback(() => {
+    setOpen(false);
+    setError(null);
+  }, [setError]);
+  return (
+    <>
+      <button type="button" className="icon-btn" aria-label={`Delete ${filename}`} title="Delete" onClick={() => setOpen(true)}>
+        <TrashIcon />
+      </button>
+      {open && (
+        <Confirm
+          title={`Delete “${filename}”?`}
+          busy={busy !== null}
+          error={error}
+          onCancel={close}
+          onConfirm={async () => {
+            const data = await call("del", `/api/engagements/${engagementId}/files`, { json: { op: "delete", sourceIds: [sourceId] } });
+            if (!data) return;
+            setOpen(false);
+            announce({ ids: data.deleted ?? [], folders: [] });
+          }}
+        />
+      )}
+    </>
+  );
+}
+
+/** Deletes a folder, its subfolders and every file in them, after asking. */
+export function DeleteFolder({ engagementId, path, parent, files }: { engagementId: string; path: string; parent: string; files: number }) {
   const router = useRouter();
+  const { call, busy, error, setError } = useApi();
+  const [open, setOpen] = useState(false);
+  const close = useCallback(() => {
+    setOpen(false);
+    setError(null);
+  }, [setError]);
+  return (
+    <>
+      <button type="button" className="secondary small" onClick={() => setOpen(true)}>
+        Delete folder
+      </button>
+      {open && (
+        <Confirm
+          title={`Delete “${path.split("/").pop()}”?`}
+          detail={files ? `${plural(files, "file")}` : undefined}
+          busy={busy !== null}
+          error={error}
+          onCancel={close}
+          onConfirm={async () => {
+            const data = await call("del", `/api/engagements/${engagementId}/files`, { json: { op: "folder.delete", path } });
+            if (!data) return;
+            setOpen(false);
+            announce({ ids: data.deleted ?? [], folders: data.folders ?? [path] });
+            router.push(parent);
+          }}
+        />
+      )}
+    </>
+  );
+}
+
+/** Puts a deleted file back where it was. */
+export function RestoreFile({ engagementId, sourceId }: { engagementId: string; sourceId: string }) {
   const { call, busy, error } = useApi();
   return (
     <>
+      <button type="button" className="secondary small" disabled={busy !== null} onClick={() => call("restore", `/api/engagements/${engagementId}/files`, { json: { op: "restore", sourceIds: [sourceId] } })}>
+        Restore
+      </button>
       {error && <span className="error">{error}</span>}
+    </>
+  );
+}
+
+/** "Deleted · Undo" for a few seconds after a delete. */
+function UndoToast({ engagementId }: { engagementId: string }) {
+  const { call, busy } = useApi();
+  const [last, setLast] = useState<DeletedDetail | null>(null);
+  useEffect(() => {
+    const on = (e: Event) => setLast((e as CustomEvent<DeletedDetail>).detail);
+    window.addEventListener(DELETED_EVENT, on);
+    return () => window.removeEventListener(DELETED_EVENT, on);
+  }, []);
+  useEffect(() => {
+    if (!last) return;
+    const t = setTimeout(() => setLast(null), 10_000);
+    return () => clearTimeout(t);
+  }, [last]);
+  if (!last) return null;
+  return createPortal(
+    <div className="toast" role="status">
+      <span>Deleted</span>
       <button
         type="button"
-        className="secondary small"
+        className="linkbtn"
         disabled={busy !== null}
         onClick={async () => {
-          if (await call("del", `/api/engagements/${engagementId}/files`, { json: { op: "folder.delete", path } })) router.push(parent);
+          if (await call("undo", `/api/engagements/${engagementId}/files`, { json: { op: "restore", sourceIds: last.ids, folders: last.folders } })) setLast(null);
         }}
       >
-        Delete folder
+        Undo
       </button>
-    </>
+    </div>,
+    document.body,
+  );
+}
+
+function TrashIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3" />
+    </svg>
   );
 }

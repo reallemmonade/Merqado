@@ -205,6 +205,8 @@ export const sources = sqliteTable(
     batchId: text("batch_id"),
     /** When the file was read for new dictionary terms; null until then. */
     termsScannedAt: integer("terms_scanned_at", { mode: "timestamp" }),
+    /** Set when someone deletes the file; it can be restored until it's purged. */
+    deletedAt: integer("deleted_at", { mode: "timestamp" }),
     createdAt: createdAt(),
   },
   (t) => [index("sources_engagement").on(t.engagementId), index("sources_hash").on(t.engagementId, t.contentHash)],

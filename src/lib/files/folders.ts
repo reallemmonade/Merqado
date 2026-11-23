@@ -1,4 +1,4 @@
-import { asc, eq } from "drizzle-orm";
+import { and, asc, eq, isNull } from "drizzle-orm";
 import type { DB } from "@/db/client";
 import { caseFolders, sources } from "@/db/schema";
 
@@ -63,7 +63,7 @@ export async function loadCaseFolders(db: DB, engagementId: string): Promise<str
       .onConflictDoNothing();
     rows = DEFAULT_FOLDERS.map((path) => ({ path }));
   }
-  const used = await db.selectDistinct({ folder: sources.folder }).from(sources).where(eq(sources.engagementId, engagementId));
+  const used = await db.selectDistinct({ folder: sources.folder }).from(sources).where(and(eq(sources.engagementId, engagementId), isNull(sources.deletedAt)));
   return sortFolders([...rows.map((r) => r.path), ...used.flatMap((u) => (u.folder ? withParents(u.folder) : []))]);
 }
 

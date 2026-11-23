@@ -1,4 +1,4 @@
-import { and, eq, inArray } from "drizzle-orm";
+import { and, eq, inArray, isNull } from "drizzle-orm";
 import type { DB } from "@/db/client";
 import { caseOnboarding, engagementMembers, engagements, expertTypes, firms, sources, users } from "@/db/schema";
 import { ROLE_LABEL } from "@/lib/roles";
@@ -90,5 +90,5 @@ export async function docTexts(db: DB, engagementId: string, ids: string[]) {
   return db
     .select({ id: sources.id, filename: sources.filename, text: sources.textBody, roomId: sources.roomId })
     .from(sources)
-    .where(and(eq(sources.engagementId, engagementId), inArray(sources.id, ids)));
+    .where(and(eq(sources.engagementId, engagementId), inArray(sources.id, ids), isNull(sources.deletedAt)));
 }

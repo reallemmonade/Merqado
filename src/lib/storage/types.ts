@@ -8,6 +8,8 @@ export interface StorageProvider {
   put(key: string, body: Uint8Array, contentType?: string): Promise<StoredObject>;
   get(key: string): Promise<Uint8Array>;
   delete(key: string): Promise<void>;
+  /** Brings back a file delete() put in a trash (Google Drive). Stores without a trash keep bytes until purge. */
+  restore?(key: string): Promise<void>;
   list(prefix?: string): Promise<StoredObject[]>;
   /**
    * Moves a stored file to a new path and returns its (possibly new) key. Only stores that

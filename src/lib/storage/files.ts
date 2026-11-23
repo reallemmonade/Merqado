@@ -114,6 +114,20 @@ export async function deleteSourceBytes(db: DB, firmId: string, source: Stored):
   await storage.delete(source.objectKey);
 }
 
+/** On delete, moves bytes to the store's own trash where it has one (Drive); others keep them until purge. */
+export async function trashSourceBytes(db: DB, firmId: string, source: Stored): Promise<void> {
+  if (source.objectKey.startsWith(DB_PREFIX)) return;
+  const { storage } = await resolveStorage(db, firmId, source.storageConnectionId);
+  if (storage.restore) await storage.delete(source.objectKey);
+}
+
+/** Moves a deleted file's bytes back out of the store's trash, where it has one. */
+export async function restoreSourceBytes(db: DB, firmId: string, source: Stored): Promise<void> {
+  if (source.objectKey.startsWith(DB_PREFIX)) return;
+  const { storage } = await resolveStorage(db, firmId, source.storageConnectionId);
+  await storage.restore?.(source.objectKey);
+}
+
 /** A source in this engagement, or undefined. */
 export async function findSource(db: DB, engagementId: string, sourceId: string) {
   return db.query.sources.findFirst({ where: and(eq(sources.id, sourceId), eq(sources.engagementId, engagementId)) });
@@ -154,6 +168,9 @@ export function guessType(filename: string): string | undefined {
 /** Types a browser can show safely in a new tab; everything else downloads. */
 const VIEWABLE = /^(text\/plain|application\/pdf|image\/(png|jpeg|gif|webp))\b/;
 
+/** Types shown without a sandbox policy: PDFs and raster pictures (not SVG, which can hold script). */
+const NO_POLICY = /^(application\/pdf|image\/(png|jpeg|gif|webp))\b/;
+
 /** The response that opens (or downloads) a file under its original name. */
 export function fileResponse(bytes: Uint8Array, filename: string, mimeType?: string | null): Response {
   const type = guessType(filename) ?? mimeType ?? "application/octet-stream";
@@ -167,8 +184,9 @@ export function fileResponse(bytes: Uint8Array, filename: string, mimeType?: str
       "content-length": String(bytes.byteLength),
       "content-disposition": `${inline ? "inline" : "attachment"}; filename="${ascii}"; filename*=UTF-8''${encodeURIComponent(filename)}`,
       "x-content-type-options": "nosniff",
-      // Chrome won't show PDFs under a sandbox policy; everything else gets one as a backstop.
-      ...(safeType === "application/pdf" ? {} : { "content-security-policy": "sandbox; default-src 'none'" }),
+      // Chrome won't show PDFs under a sandbox policy, and Safari won't show a picture under
+      // default-src 'none'. Neither can run code, so only other types get the backstop.
+      ...(NO_POLICY.test(safeType) ? {} : { "content-security-policy": "sandbox; default-src 'none'" }),
       "cache-control": "private, no-store",
     },
   });

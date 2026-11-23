@@ -1,11 +1,12 @@
 import { NextResponse } from "next/server";
-import { and, eq, inArray, or, sql } from "drizzle-orm";
+import { and, eq, inArray, isNull, or, sql } from "drizzle-orm";
 import { z } from "zod";
 import { caseFolders, sources } from "@/db/schema";
 import { notFoundJson, ok, parseOp } from "@/lib/case/api";
 import { sourceVisibility } from "@/lib/files/access";
 import { addCaseFolders, cleanPath, insideFolder } from "@/lib/files/folders";
 import { caseFolderName, fileSources } from "@/lib/files/intake";
+import { deleteFiles, filesInFolder, restoreFiles } from "@/lib/files/trash";
 import { deleteSourceBytes, placeSourceFile, sourceMeta } from "@/lib/storage/files";
 
 const ref = z.string().min(1).max(64);
@@ -17,6 +18,8 @@ const Op = z.discriminatedUnion("op", [
   z.object({ op: z.literal("discard"), sourceIds: z.array(ref).min(1).max(500) }),
   z.object({ op: z.literal("folder.add"), path: folder.min(1, "Name the folder.") }),
   z.object({ op: z.literal("folder.delete"), path: folder.min(1) }),
+  z.object({ op: z.literal("delete"), sourceIds: z.array(ref).min(1).max(500) }),
+  z.object({ op: z.literal("restore"), sourceIds: z.array(ref).max(5000), folders: z.array(folder).max(500).optional() }),
 ]);
 
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -40,7 +43,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       }
     }
     case "move": {
-      const src = await db.query.sources.findFirst({ where: and(eq(sources.id, op.sourceId), eq(sources.engagementId, id)) });
+      const src = await db.query.sources.findFirst({ where: and(eq(sources.id, op.sourceId), eq(sources.engagementId, id), isNull(sources.deletedAt)) });
       if (!src || !canSee(src)) return notFoundJson();
       const path = cleanPath(op.folder);
       await addCaseFolders(db, id, [path]);
@@ -75,12 +78,24 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     }
     case "folder.delete": {
       const path = cleanPath(op.path);
-      const inUse = await db.query.sources.findFirst({
-        where: and(eq(sources.engagementId, id), or(eq(sources.folder, path), sql`${sources.folder} like ${insideFolder(path)} escape '\\'`)),
-      });
-      if (inUse) return NextResponse.json({ error: "Move its files out first." }, { status: 400 });
-      await db.delete(caseFolders).where(and(eq(caseFolders.engagementId, id), or(eq(caseFolders.path, path), sql`${caseFolders.path} like ${insideFolder(path)} escape '\\'`)));
-      return ok();
+      if (!path) return notFoundJson();
+      const inside = await filesInFolder(db, id, path);
+      // Files this person can't let go of (another chat's, a transcript's) keep the folder.
+      const deleted = await deleteFiles(db, { firmId: user.firmId, engagementId: id, ids: inside.map((s) => s.id), canSee, allOrNothing: true });
+      if (!deleted) return NextResponse.json({ error: "Some files here can't be deleted." }, { status: 409 });
+      const removed = await db
+        .delete(caseFolders)
+        .where(and(eq(caseFolders.engagementId, id), or(eq(caseFolders.path, path), sql`${caseFolders.path} like ${insideFolder(path)} escape '\\'`)))
+        .returning({ path: caseFolders.path });
+      return ok({ deleted, folders: [path, ...removed.map((f) => f.path)] });
+    }
+    case "delete": {
+      const deleted = await deleteFiles(db, { firmId: user.firmId, engagementId: id, ids: op.sourceIds, canSee });
+      if (!deleted?.length) return notFoundJson();
+      return ok({ deleted });
+    }
+    case "restore": {
+      return ok({ restored: await restoreFiles(db, { firmId: user.firmId, engagementId: id, ids: op.sourceIds, canSee, folders: op.folders?.map(cleanPath) }) });
     }
   }
 }
