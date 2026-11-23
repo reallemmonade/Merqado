@@ -1,7 +1,8 @@
 import type { InboxEntry } from "@/lib/notifications/sync";
 
 /** Where the item opens in the web and desktop app. */
-export function webLink(e: Pick<InboxEntry, "kind" | "caseId" | "roomId" | "threadId" | "taskId" | "todoId" | "expertId">): string {
+export function webLink(e: Pick<InboxEntry, "kind" | "caseId" | "roomId" | "threadId" | "taskId" | "todoId" | "expertId"> & { link?: string }): string {
+  if (e.kind === "email" && e.link) return e.link;
   const base = `/e/${e.caseId}`;
   if ((e.kind === "mention" || e.kind === "reply") && e.roomId) return `${base}/channel?room=${e.roomId}${e.threadId ? `&thread=${e.threadId}` : ""}`;
   if ((e.kind === "task" || e.kind === "review") && e.taskId) return `${base}/workplan#task-${e.taskId}`;

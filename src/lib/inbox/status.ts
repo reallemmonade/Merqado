@@ -1,4 +1,4 @@
-import { and, count, eq } from "drizzle-orm";
+import { and, count, eq, isNotNull, isNull, or } from "drizzle-orm";
 import type { DB } from "@/db/client";
 import { engagementMembers, notifications } from "@/db/schema";
 import { inboxViewWhere, type InboxView } from "@/lib/notifications/sync";
@@ -42,8 +42,8 @@ export async function countView(db: DB, userId: string, view: InboxView, now = n
   const [r] = await db
     .select({ n: count() })
     .from(notifications)
-    .innerJoin(engagementMembers, and(eq(engagementMembers.engagementId, notifications.engagementId), eq(engagementMembers.userId, notifications.userId)))
-    .where(and(eq(notifications.userId, userId), inboxViewWhere(view, now)));
+    .leftJoin(engagementMembers, and(eq(engagementMembers.engagementId, notifications.engagementId), eq(engagementMembers.userId, notifications.userId)))
+    .where(and(eq(notifications.userId, userId), inboxViewWhere(view, now), or(isNull(notifications.engagementId), isNotNull(engagementMembers.userId))));
   return r?.n ?? 0;
 }
 

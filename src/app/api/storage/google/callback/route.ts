@@ -3,19 +3,31 @@ import { cookies } from "next/headers";
 import { getDb } from "@/db/client";
 import { appBaseUrl } from "@/lib/auth/url";
 import { getSessionUser } from "@/lib/session";
+import { finishGmailLink, GMAIL_COOKIE, isGmailState } from "@/lib/mail/gmail";
 import { firmStorage, setFirmStorage } from "@/lib/storage/connections";
 import { createRootFolder, DRIVE_CALLBACK, DRIVE_STATE_COOKIE, googleOAuthClient } from "@/lib/storage/providers/gdrive";
 
-/** Google sends the admin back here; we keep a refresh token and a "Merqado" folder for cases. */
+/**
+ * Google sends the admin back here; we keep a refresh token and a "Merqado" folder for cases.
+ * Gmail links (state "mail.…") come back here too, so the Google app needs no new address.
+ */
 export async function GET(req: Request) {
   const base = appBaseUrl(req);
   const back = (q: string) => NextResponse.redirect(`${base}/settings/storage${q}`, 303);
   const db = getDb();
   const user = await getSessionUser(db);
-  if (!user?.isAdmin) return back("?error=admin");
-
   const params = new URL(req.url).searchParams;
   const jar = await cookies();
+
+  if (isGmailState(params.get("state"))) {
+    const cookie = jar.get(GMAIL_COOKIE)?.value;
+    jar.delete({ name: GMAIL_COOKIE, path: "/api/storage" });
+    const r = await finishGmailLink(db, { cookie, params, base, user });
+    return NextResponse.redirect(`${base}${r.returnTo}${r.error ? `?gmail=${r.error}` : ""}`, 303);
+  }
+
+  if (!user?.isAdmin) return back("?error=admin");
+
   const expected = jar.get(DRIVE_STATE_COOKIE)?.value;
   jar.delete({ name: DRIVE_STATE_COOKIE, path: "/api/storage" });
   if (params.get("error")) return back("?error=denied");

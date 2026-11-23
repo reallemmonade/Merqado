@@ -24,7 +24,7 @@ export type NeedsYouItem = {
 
 export type NeedsYouGroup = { caseId: string; name: string; items: NeedsYouItem[] };
 
-const KIND_ICON: Record<NotificationKind, IconName> = { mention: "at", reply: "reply", task: "workplan", review: "check", todo: "check", approval: "experts" };
+const KIND_ICON: Record<NotificationKind, IconName> = { mention: "at", reply: "reply", task: "workplan", review: "check", todo: "check", approval: "experts", email: "inbox" };
 
 type Act = { action: "read" | "done" | "reopen" } | { action: "snooze"; until: SnoozeChoice };
 
@@ -61,7 +61,12 @@ export function NeedsYouList({ groups, view }: { groups: NeedsYouGroup[]; view: 
               <span className={`inbox-icon${i.flag ? ` flag-${i.flag}` : ""}`} aria-hidden="true">
                 <Icon name={i.flag ? "clock" : KIND_ICON[i.kind]} size={16} />
               </span>
-              <Link href={i.href} className="inbox-text" onClick={() => i.unread && void send(i.key, { action: "read" })}>
+              <Link
+                href={i.href}
+                className="inbox-text"
+                {...(/^https?:/.test(i.href) && { target: "_blank", rel: "noopener noreferrer" })}
+                onClick={() => i.unread && void send(i.key, { action: "read" })}
+              >
                 <span className="inbox-title">{i.title}</span>
                 {i.sub && <span className="inbox-sub">{i.sub}</span>}
               </Link>
