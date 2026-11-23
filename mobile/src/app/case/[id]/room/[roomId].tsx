@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useState } from "react";
 import { ActionSheetIOS, Alert, FlatList, KeyboardAvoidingView, Platform, Pressable, Text, View } from "react-native";
-import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
+import { router, useLocalSearchParams } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import * as Haptics from "expo-haptics";
 import { api, ApiError, QUICK_REACTIONS, type Member, type Message } from "@/lib/api";
+import { useCaseLive } from "@/lib/useCaseLive";
 import { C, F, shortTime } from "@/lib/theme";
 import { Icon } from "@/components/Icon";
 import { Composer } from "@/components/Composer";
@@ -36,13 +37,7 @@ export default function RoomScreen() {
     void load();
   }, [load]);
 
-  useFocusEffect(
-    useCallback(() => {
-      if (gone) return;
-      const t = setInterval(load, 4000);
-      return () => clearInterval(t);
-    }, [load, gone]),
-  );
+  useCaseLive(gone ? null : id, () => void load());
 
   const channel = (body: Record<string, unknown>) => api(`/api/engagements/${id}/channel`, { body });
 
