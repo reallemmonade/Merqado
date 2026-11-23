@@ -9,10 +9,10 @@ import {
   type SignInTarget,
 } from "@/lib/auth/oidc";
 import { isPlatformProvider, platformCredentials } from "@/lib/auth/platform";
-import { cookieOptions, safeReturnTo } from "@/lib/auth/session";
+import { ensurePracticeUser, isPracticeCode } from "@/lib/auth/practice";
+import { cookieOptions, createSession, safeReturnTo, SESSION_COOKIE, SESSION_TTL_SECONDS } from "@/lib/auth/session";
 import { appBaseUrl, CALLBACK_PATH } from "@/lib/auth/url";
 import { bypassEmail } from "@/lib/auth/bypass";
-import { createSession, SESSION_COOKIE, SESSION_TTL_SECONDS } from "@/lib/auth/session";
 import { firmMembers, users } from "@/db/schema";
 import { eq } from "drizzle-orm";
 
@@ -31,6 +31,14 @@ export async function POST(req: Request) {
       `${base}/login?error=${error}&email=${encodeURIComponent(email)}${returnTo === "/" ? "" : `&returnTo=${encodeURIComponent(returnTo)}`}`,
       303,
     );
+
+  if (!isPlatformProvider(provider) && isPracticeCode(email)) {
+    const db = getDb();
+    const token = await createSession(db, await ensurePracticeUser(db));
+    const res = NextResponse.redirect(`${base}${returnTo}`, 303);
+    res.cookies.set(SESSION_COOKIE, token, cookieOptions(SESSION_TTL_SECONDS));
+    return res;
+  }
 
   // Temporary bypass (test copies only, see lib/auth/bypass.ts): the code in the email box signs in as the one named user.
   const as = bypassEmail(String(form?.get("email") ?? ""));
