@@ -46,6 +46,12 @@ services:
       # Set to "false" to turn it off. See src/lib/auth/practice.ts.
       - key: PRACTICE_LOGIN_ENABLED
         sync: false
+      # Feedback button emails (Resend). Unset = feedback is only saved in the app.
+      - key: RESEND_API_KEY
+        sync: false
+      # Optional: where feedback goes (default maxam@guava.ventures) and the sender.
+      - key: FEEDBACK_EMAIL_TO
+        sync: false
       # Set when using a custom domain; SSO redirects use it.
       - key: APP_URL
         sync: false

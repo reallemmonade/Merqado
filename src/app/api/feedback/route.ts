@@ -1,6 +1,8 @@
-import { NextResponse } from "next/server";
+import { after, NextResponse } from "next/server";
+import { eq } from "drizzle-orm";
 import { z } from "zod";
 import { getDb, schema } from "@/db/client";
+import { sendFeedbackEmail } from "@/lib/feedback/email";
 import { getSessionUser } from "@/lib/session";
 
 /** A screenshot as a data URL, up to about 4 MB. */
@@ -12,9 +14,10 @@ const Body = z.object({
     .max(5_600_000)
     .nullable()
     .optional(),
+  page: z.string().max(300).nullable().optional(),
 });
 
-/** Saves one feedback note (with an optional screenshot) for the signed-in person's firm. */
+/** Saves one feedback note (with an optional screenshot) and emails it to the team. */
 export async function POST(req: Request) {
   const db = getDb();
   const user = await getSessionUser(db);
@@ -27,5 +30,16 @@ export async function POST(req: Request) {
     note: parsed.data.note,
     photo: parsed.data.photo ?? null,
   });
+  const firm = await db.query.firms.findFirst({ where: eq(schema.firms.id, user.firmId), columns: { name: true } });
+  after(() =>
+    sendFeedbackEmail({
+      note: parsed.data.note,
+      photo: parsed.data.photo ?? null,
+      from: { name: user.name, email: user.email },
+      firm: firm?.name ?? "",
+      page: parsed.data.page ?? null,
+      at: new Date(),
+    }),
+  );
   return NextResponse.json({ ok: true });
 }
