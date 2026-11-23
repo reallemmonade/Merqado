@@ -14,6 +14,8 @@ export interface GptSource {
   label: string;
   href: string;
   text: string;
+  /** A public web page rather than case material. */
+  web?: boolean;
 }
 /** A citing sentence the cited passage doesn't back; `at` is the offset just after its last citation. */
 export interface GptFlag {
@@ -64,9 +66,15 @@ function Answer({ m }: { m: GptLine }) {
             <li key={s.n} id={`src-${m.id}-${s.n}`}>
               <span className="cite">{s.n}</span>
               <div style={{ minWidth: 0 }}>
-                <Link href={s.href} style={{ fontWeight: 600, fontSize: 12 }}>
-                  {s.label}
-                </Link>
+                {s.web ? (
+                  <a href={s.href} target="_blank" rel="noopener noreferrer" style={{ fontWeight: 600, fontSize: 12 }}>
+                    {s.label}
+                  </a>
+                ) : (
+                  <Link href={s.href} style={{ fontWeight: 600, fontSize: 12 }}>
+                    {s.label}
+                  </Link>
+                )}
                 <div className="clamp muted">{s.text}</div>
               </div>
             </li>

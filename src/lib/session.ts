@@ -3,6 +3,7 @@ import { cookies, headers } from "next/headers";
 import type { DB } from "@/db/client";
 import { findSession, SESSION_COOKIE } from "@/lib/auth/session";
 import { findTestAccount } from "@/lib/auth/test-accounts";
+import { noteCaseWrite } from "@/lib/live/writes";
 import { engagementMembers, engagements, firmMembers, firmRoles, users, type AccessLevel, type Archetype } from "@/db/schema";
 
 export interface SessionUser {
@@ -70,7 +71,9 @@ export async function getEngagementAccess(
     )
     .where(and(eq(engagements.id, engagementId), eq(engagements.firmId, user.firmId)))
     .limit(1);
-  return row ? { engagement: row.engagement, access: row.access, role: row.caseRole ?? user.archetype } : null;
+  if (!row) return null;
+  await noteCaseWrite(engagementId);
+  return { engagement: row.engagement, access: row.access, role: row.caseRole ?? user.archetype };
 }
 
 /**

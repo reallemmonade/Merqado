@@ -5,6 +5,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { api, type GptChat } from "@/lib/api";
 import { useCase } from "@/lib/auth";
 import { useApi } from "@/lib/useApi";
+import { useCaseLive } from "@/lib/useCaseLive";
 import { C, F, shortTime } from "@/lib/theme";
 import { CaseSwitch } from "@/components/CaseSwitch";
 import { Composer } from "@/components/Composer";
@@ -14,6 +15,7 @@ import { LargeTitle, ListState, Pill } from "@/components/ui";
 export default function Gpt() {
   const c = useCase();
   const { data, error, loading, refreshing, refresh, reload } = useApi<{ name: string; chats: GptChat[] }>(c ? `/api/mobile/cases/${c.id}/gpt` : null);
+  useCaseLive(c?.id, () => void reload());
   const [scope, setScope] = useState<"mine" | "team">("mine");
   const chats = useMemo(() => (data?.chats ?? []).filter((x) => (scope === "mine" ? x.mine : x.shared)), [data, scope]);
   const name = c?.gptName ?? "GPT";

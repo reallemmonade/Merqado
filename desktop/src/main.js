@@ -1,4 +1,5 @@
-// Merqado for Mac and Windows: the full merqado.ai app in its own window.
+// Merqado for Mac and Windows: the full merqado.ai app, in as many windows as you like (File >
+// New Window, or Cmd/Ctrl-click a link). Every window on a case stays live with the others.
 // Google and Microsoft don't allow sign-in inside embedded windows, so sign-in runs in the
 // default browser and comes back through merqado://auth (the same one-time code + PKCE
 // handoff the iPhone app uses).
@@ -12,8 +13,9 @@ const APP_ORIGIN = new URL(APP_URL).origin;
 const SCHEME = "merqado";
 const SESSION_COOKIE = "mq_session";
 
-let win = null;
-let pending = null; // { verifier, returnTo } while a browser sign-in is in flight
+const windows = new Set();
+let lastFocused = null;
+let pending = null; // { verifier, returnTo, win } while a browser sign-in is in flight
 let queuedUrl = null; // deep link that arrived before the window was ready
 
 if (!app.requestSingleInstanceLock()) {
@@ -26,7 +28,7 @@ if (!app.requestSingleInstanceLock()) {
   });
   app.on("open-url", (e, url) => {
     e.preventDefault();
-    if (app.isReady() && win) handleDeepLink(url);
+    if (app.isReady() && windows.size) handleDeepLink(url);
     else queuedUrl = url;
   });
   if (process.defaultApp && process.argv.length >= 2) {
@@ -39,7 +41,7 @@ if (!app.requestSingleInstanceLock()) {
     if (process.platform !== "darwin") app.quit();
   });
   app.on("activate", () => {
-    if (!win) createWindow();
+    if (!windows.size) createWindow();
   });
 }
 
@@ -79,13 +81,23 @@ function savedBounds() {
   }
 }
 
-function createWindow() {
+/** The window to act on: the focused one, else the one used last. */
+function current() {
+  const w = BrowserWindow.getFocusedWindow();
+  if (w && windows.has(w)) return w;
+  if (lastFocused && windows.has(lastFocused)) return lastFocused;
+  return [...windows].pop() || null;
+}
+
+function createWindow(url = APP_URL) {
   const b = savedBounds();
-  win = new BrowserWindow({
-    width: b.width,
-    height: b.height,
-    x: b.x,
-    y: b.y,
+  const from = current();
+  // A second window opens a little down and right of the one it came from.
+  const pos = from ? (({ x, y }) => ({ x: x + 32, y: y + 32 }))(from.getBounds()) : { x: b.x, y: b.y };
+  const win = new BrowserWindow({
+    width: from ? from.getBounds().width : b.width,
+    height: from ? from.getBounds().height : b.height,
+    ...pos,
     minWidth: 900,
     minHeight: 600,
     title: "Merqado",
@@ -98,54 +110,74 @@ function createWindow() {
       spellcheck: true,
     },
   });
-  if (b.maximized) win.maximize();
+  windows.add(win);
+  if (!from && b.maximized) win.maximize();
   win.once("ready-to-show", () => win.show());
+  win.on("focus", () => {
+    lastFocused = win;
+  });
   win.on("close", () => {
+    // The last window open remembers its size and place for next launch.
+    if (windows.size > 1) return;
     try {
       fs.writeFileSync(boundsFile(), JSON.stringify({ ...win.getNormalBounds(), maximized: win.isMaximized() }));
     } catch {}
   });
   win.on("closed", () => {
-    win = null;
+    windows.delete(win);
+    if (lastFocused === win) lastFocused = null;
   });
 
   const wc = win.webContents;
-  wc.setWindowOpenHandler(({ url }) => {
-    if (isAppUrl(url)) return { action: "allow" };
-    openExternal(url);
+  wc.setWindowOpenHandler(({ url: target }) => {
+    // App links opened in a new tab or window (Cmd/Ctrl-click, target=_blank) get their own window.
+    if (isAppUrl(target)) createWindow(target);
+    else openExternal(target);
     return { action: "deny" };
   });
-  wc.on("will-navigate", (e, url) => {
-    if (!isAppUrl(url)) {
+  wc.on("will-navigate", (e, target) => {
+    if (!isAppUrl(target)) {
       e.preventDefault();
-      openExternal(url);
+      openExternal(target);
       return;
     }
     // Sign-in buttons post to /api/auth/start; run that in the default browser instead.
-    if (new URL(url).pathname === "/api/auth/start") {
+    if (new URL(target).pathname === "/api/auth/start") {
       e.preventDefault();
-      beginBrowserSignIn();
+      beginBrowserSignIn(win);
     }
   });
-  wc.on("will-redirect", (e, url) => {
-    if (!isAppUrl(url)) {
+  wc.on("will-redirect", (e, target) => {
+    if (!isAppUrl(target)) {
       e.preventDefault();
-      openExternal(url);
+      openExternal(target);
     }
   });
-  wc.on("did-fail-load", (_e, code, _desc, url, isMainFrame) => {
+  wc.on("did-fail-load", (_e, code, _desc, failed, isMainFrame) => {
     if (!isMainFrame || code === -3 /* aborted */) return;
-    win.loadFile(path.join(__dirname, "offline.html"), { query: { retry: url || APP_URL } });
+    win.loadFile(path.join(__dirname, "offline.html"), { query: { retry: failed || APP_URL } });
   });
 
-  win.loadURL(APP_URL);
+  win.loadURL(isAppUrl(url) ? url : APP_URL);
+  return win;
+}
+
+/** File > New Window: the same page as the current window, to put on another screen. */
+function newWindow() {
+  const from = current();
+  let url = APP_URL;
+  try {
+    if (from && isAppUrl(from.webContents.getURL())) url = from.webContents.getURL();
+  } catch {}
+  createWindow(url).focus();
 }
 
 function focus() {
-  if (!win) createWindow();
+  const win = current() || createWindow();
   if (win.isMinimized()) win.restore();
   win.show();
   win.focus();
+  return win;
 }
 
 function openExternal(url) {
@@ -154,7 +186,7 @@ function openExternal(url) {
 
 // ---------- sign-in ----------
 
-function currentReturnTo() {
+function currentReturnTo(win) {
   try {
     const u = new URL(win.webContents.getURL());
     if (u.origin !== APP_ORIGIN) return "/";
@@ -165,10 +197,10 @@ function currentReturnTo() {
   }
 }
 
-function beginBrowserSignIn() {
+function beginBrowserSignIn(win) {
   const verifier = randomBytes(48).toString("base64url");
   const challenge = createHash("sha256").update(verifier).digest("base64url");
-  pending = { verifier, returnTo: currentReturnTo() };
+  pending = { verifier, returnTo: currentReturnTo(win), win };
   shell.openExternal(`${APP_URL}/api/mobile/auth/finish?challenge=${challenge}`);
 }
 
@@ -179,11 +211,12 @@ async function handleDeepLink(link) {
   } catch {
     return;
   }
-  focus();
+  const front = focus();
   if (u.host !== "auth") return;
   const code = u.searchParams.get("code");
   if (!code || !pending) return;
   const { verifier, returnTo } = pending;
+  const win = pending.win && windows.has(pending.win) ? pending.win : front;
   pending = null;
   try {
     const res = await fetch(`${APP_URL}/api/mobile/auth/token`, {
@@ -205,6 +238,13 @@ async function handleDeepLink(link) {
     });
     const target = returnTo.startsWith("/") && !returnTo.startsWith("//") ? returnTo : "/";
     win.loadURL(APP_URL + target);
+    // Other windows left on the sign-in page follow along.
+    for (const other of windows) {
+      if (other === win) continue;
+      try {
+        if (new URL(other.webContents.getURL()).pathname === "/login") other.webContents.reload();
+      } catch {}
+    }
   } catch (err) {
     console.error("Desktop sign-in failed", err);
     win.loadURL(`${APP_URL}/login`);
@@ -215,10 +255,16 @@ async function handleDeepLink(link) {
 
 function buildMenu() {
   const mac = process.platform === "darwin";
-  const nav = (fn) => () => win && fn(win.webContents);
+  const nav = (fn) => () => {
+    const win = current();
+    if (win) fn(win.webContents);
+  };
   return Menu.buildFromTemplate([
     ...(mac ? [{ role: "appMenu" }] : []),
-    { role: "fileMenu" },
+    {
+      label: "File",
+      submenu: [{ label: "New Window", accelerator: "CmdOrCtrl+N", click: newWindow }, { type: "separator" }, mac ? { role: "close" } : { role: "quit" }],
+    },
     { role: "editMenu" },
     {
       label: "View",

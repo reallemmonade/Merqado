@@ -13,7 +13,7 @@ export * from "./types";
 export { aiProviderConfigSchema, type AIProviderConfig } from "./config";
 export { AI_TIERS, FEATURE_TIERS, modelForTier, tierForFeature, type AITier } from "./tiers";
 export { SpendCapError, assertUnderSpendCap, monthlySpendUsd } from "./spend";
-export { costUsd } from "./pricing";
+export { costUsd, WEB_SEARCH_USD } from "./pricing";
 
 export function createProvider(config: AIProviderConfig): AIProvider {
   switch (config.kind) {
@@ -92,6 +92,7 @@ export async function completeAndMeter(
     model: result.model,
     inputTokens: result.usage.inputTokens,
     outputTokens: result.usage.outputTokens,
+    webSearches: result.usage.webSearches ?? 0,
     feature: ctx.feature,
   });
   return result;

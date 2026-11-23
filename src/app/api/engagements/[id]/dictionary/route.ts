@@ -4,8 +4,10 @@ import { z } from "zod";
 import { glossaryTerms } from "@/db/schema";
 import { aiError, extractJson, notFoundJson, ok, parseOp, runAi } from "@/lib/case/api";
 import { loadCorpus } from "@/lib/case/corpus";
-import { blockedNames, termKeys } from "@/lib/case/dictionary";
+import { blockedNames, caseCompleter, rescanCaseFiles, termKeys } from "@/lib/case/dictionary";
 import { topSnippets } from "@/lib/case/search";
+
+export const maxDuration = 300;
 
 const ref = z.string().min(1).max(64);
 const term = z.string().trim().min(1, "Add a term.").max(120);
@@ -18,6 +20,7 @@ const Op = z.discriminatedUnion("op", [
   z.object({ op: z.literal("accept"), id: ref }),
   z.object({ op: z.literal("delete"), id: ref }),
   z.object({ op: z.literal("suggest") }),
+  z.object({ op: z.literal("scan") }),
 ]);
 
 const Suggested = z.object({
@@ -56,6 +59,13 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     case "delete":
       await db.delete(glossaryTerms).where(where(op.id));
       return ok();
+    case "scan": {
+      try {
+        return ok(await rescanCaseFiles(db, auth.engagement, caseCompleter(db, auth.engagement, user.id)));
+      } catch (err) {
+        return aiError(err);
+      }
+    }
     case "suggest": {
       const [existing, corpus] = await Promise.all([db.select({ term: glossaryTerms.term }).from(glossaryTerms).where(eq(glossaryTerms.engagementId, id)), loadCorpus(db, id, user)]);
       const material = topSnippets(

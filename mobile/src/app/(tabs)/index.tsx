@@ -5,6 +5,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import type { Chat, ChatList } from "@/lib/api";
 import { useCase } from "@/lib/auth";
 import { useApi } from "@/lib/useApi";
+import { useCaseLive } from "@/lib/useCaseLive";
 import { C, colorFor, F, initials, shortTime } from "@/lib/theme";
 import { CaseSwitch } from "@/components/CaseSwitch";
 import { Icon } from "@/components/Icon";
@@ -12,7 +13,8 @@ import { Badge, LargeTitle, ListState, SectionLabel } from "@/components/ui";
 
 export default function Chats() {
   const c = useCase();
-  const { data, error, loading, refreshing, refresh, reload } = useApi<ChatList>(c ? `/api/mobile/cases/${c.id}/rooms` : null, 15000);
+  const { data, error, loading, refreshing, refresh, reload } = useApi<ChatList>(c ? `/api/mobile/cases/${c.id}/rooms` : null);
+  useCaseLive(c?.id, () => void reload());
   const [q, setQ] = useState("");
   const sections = useMemo(() => {
     const all = (data?.chats ?? []).filter((r) => r.name.toLowerCase().includes(q.trim().toLowerCase()));
