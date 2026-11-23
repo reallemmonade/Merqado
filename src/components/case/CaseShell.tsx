@@ -10,11 +10,12 @@ import { Icon, type IconName } from "./icons";
 import { Shortcuts } from "./Shortcuts";
 import { WakeWord } from "./WakeWord";
 
-export type CaseSection = "overview" | "tiles" | "desk" | "gpt" | "workplan" | "experts" | "deck" | "channel" | "files" | "dictionary" | "notes" | "search";
+export type CaseSection = "overview" | "onboarding" | "tiles" | "desk" | "gpt" | "workplan" | "experts" | "deck" | "channel" | "files" | "dictionary" | "notes" | "search";
 
 export function caseSections(gpt: string): { key: CaseSection; label: string; icon: IconName; href: string }[] {
   return [
     { key: "overview", label: "Overview", icon: "overview", href: "" },
+    { key: "onboarding", label: "Onboarding", icon: "onboarding", href: "/onboarding" },
     { key: "tiles", label: "Tiles", icon: "tiles", href: "/tiles" },
     { key: "desk", label: "Desk", icon: "desk", href: "/desk" },
     { key: "gpt", label: gpt, icon: "gpt", href: "/gpt" },

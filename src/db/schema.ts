@@ -34,6 +34,8 @@ export const firms = sqliteTable("firms", {
   aiBillingMode: text("ai_billing_mode", { enum: BILLING_MODES }).notNull().default("managed"),
   /** Monthly AI spend cap in USD, checked before each model call. Null: no firm cap. */
   aiMonthlyCapUsd: real("ai_monthly_cap_usd"),
+  /** Case onboarding text that is the same on every case (do-not-contact, blinding, networks), as JSON. */
+  onboardingStandard: text("onboarding_standard"),
   createdAt: createdAt(),
 });
 
@@ -104,6 +106,19 @@ export const engagements = sqliteTable(
   },
   (t) => [index("engagements_firm").on(t.firmId)],
 );
+
+/** A case's onboarding form (JSON, see src/lib/onboarding/model.ts); feeds the expert network email. */
+export const caseOnboarding = sqliteTable("case_onboarding", {
+  engagementId: text("engagement_id")
+    .primaryKey()
+    .references(() => engagements.id, { onDelete: "cascade" }),
+  caseCode: text("case_code").notNull().default(""),
+  data: text("data").notNull().default("{}"),
+  updatedBy: text("updated_by"),
+  updatedAt: integer("updated_at", { mode: "timestamp_ms" })
+    .notNull()
+    .$defaultFn(() => new Date()),
+});
 
 export const engagementMembers = sqliteTable(
   "engagement_members",

@@ -14,6 +14,7 @@ export const FEATURE_TIERS: Record<string, AITier> = {
   transcript_clean: "standard",
   expert_guide: "standard",
   expert_takeaways: "standard",
+  onboarding_fill: "standard",
   deck_qc: "standard",
   deck_contradictions: "standard",
   deck_generate: "deep",
