@@ -4,6 +4,8 @@ import { getDb } from "@/db/client";
 import { completeSignIn, FLOW_COOKIE, SignInError } from "@/lib/auth/oidc";
 import { cookieOptions, createSession, SESSION_COOKIE, SESSION_TTL_SECONDS } from "@/lib/auth/session";
 import { appBaseUrl, CALLBACK_PATH } from "@/lib/auth/url";
+import { finishLink, isLinkState, LINK_COOKIE } from "@/lib/meetings/link";
+import { getSessionUser } from "@/lib/session";
 
 /** Step 2: the identity provider sends the person back here with a one-time code. */
 export async function GET(req: Request) {
@@ -19,6 +21,15 @@ export async function GET(req: Request) {
     res.cookies.delete({ name: FLOW_COOKIE, path: "/api/auth" });
     return res;
   };
+
+  // Linking Microsoft for meetings (not a sign-in) comes back to this same address.
+  if (isLinkState(incoming.searchParams.get("state"))) {
+    if (incoming.searchParams.get("state") === "link.admin") return NextResponse.redirect(`${base}/`, 303);
+    const result = await finishLink(db, { cookie: jar.get(LINK_COOKIE)?.value, params: incoming.searchParams, base, user: await getSessionUser(db) });
+    const res = NextResponse.redirect(`${base}${result.returnTo}${result.error ? `?ms=${result.error}` : ""}`, 303);
+    res.cookies.delete({ name: LINK_COOKIE, path: "/api/auth" });
+    return res;
+  }
 
   if (incoming.searchParams.get("error")) return fail("idp_denied");
 

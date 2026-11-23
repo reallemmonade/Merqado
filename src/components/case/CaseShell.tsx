@@ -10,7 +10,7 @@ import { Icon, type IconName } from "./icons";
 import { Shortcuts } from "./Shortcuts";
 import { WakeWord } from "./WakeWord";
 
-export type CaseSection = "overview" | "onboarding" | "tiles" | "desk" | "gpt" | "workplan" | "experts" | "deck" | "channel" | "files" | "dictionary" | "notes" | "search";
+export type CaseSection = "overview" | "onboarding" | "tiles" | "desk" | "gpt" | "workplan" | "experts" | "meetings" | "deck" | "channel" | "files" | "dictionary" | "notes" | "search";
 
 export function caseSections(gpt: string): { key: CaseSection; label: string; icon: IconName; href: string }[] {
   return [
@@ -21,6 +21,7 @@ export function caseSections(gpt: string): { key: CaseSection; label: string; ic
     { key: "gpt", label: gpt, icon: "gpt", href: "/gpt" },
     { key: "workplan", label: "Workplan", icon: "workplan", href: "/workplan" },
     { key: "experts", label: "Experts", icon: "experts", href: "/experts" },
+    { key: "meetings", label: "Meetings", icon: "meetings", href: "/meetings" },
     { key: "deck", label: "Deck", icon: "deck", href: "/deck" },
     { key: "channel", label: "Team channel", icon: "channel", href: "/channel" },
     { key: "files", label: "Files", icon: "files", href: "/files" },

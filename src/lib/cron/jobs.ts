@@ -4,6 +4,7 @@ import { engagements, jobRuns } from "@/db/schema";
 import { sweepNewFiles } from "@/lib/case/dictionary";
 import { purgeDeleted } from "@/lib/files/trash";
 import { runNudges } from "@/lib/inbox/nudge";
+import { runMeetingSync } from "@/lib/meetings/sync";
 
 export type JobContext = { db: DB; now: Date; slot: string };
 
@@ -28,6 +29,11 @@ export const JOBS: Job[] = [
     name: "dictionary-from-files",
     everyMinutes: 15,
     run: ({ db, now }) => sweepNewFiles(db, now),
+  },
+  {
+    name: "meetings-from-microsoft",
+    everyMinutes: 15,
+    run: ({ db, now }) => runMeetingSync(db, now),
   },
   {
     name: "purge-deleted-files",

@@ -1088,3 +1088,21 @@ a.tile-btn svg { transform: rotate(45deg); }
 .tiles-add { display: inline-flex; align-items: center; gap: 6px; }
 html[data-tile] .fb-wrap { display: none; }
 @media (max-width: 640px) { .rail.rail-phone { padding-right: 56px; } }
+
+/* Meetings */
+.meeting-row { display: grid; grid-template-columns: minmax(0, 1fr) 120px 150px 236px; gap: 12px; align-items: center; padding: 10px 16px; border-top: 1px solid var(--line); font-size: 14px; color: inherit; text-decoration: none; }
+.group-head + .meeting-row { border-top: 0; }
+a.meeting-row:hover { background: var(--soft); }
+.meeting-row[aria-current="true"] { background: var(--accent-soft); }
+.meeting-title { font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.meeting-acts { display: flex; gap: 6px; justify-content: flex-end; flex-wrap: wrap; }
+.meeting-acts button { min-width: 112px; }
+.meeting-connect { padding: 0 14px; }
+.meeting-ktas { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 10px; line-height: 1.45; }
+.meeting-files { display: grid; grid-template-columns: 100px minmax(0, 1fr); gap: 6px 10px; font-size: 13px; overflow-wrap: anywhere; }
+@media (max-width: 720px) {
+  .meeting-row { grid-template-columns: minmax(0, 1fr); row-gap: 4px; }
+  .meeting-title { white-space: normal; }
+  .meeting-acts { justify-content: flex-start; }
+  .meeting-acts button { flex: 1; }
+}

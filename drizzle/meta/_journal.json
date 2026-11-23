@@ -169,6 +169,13 @@
       "when": 1795462574781,
       "tag": "0023_deleted_files",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "6",
+      "when": 1795463454437,
+      "tag": "0024_meetings",
+      "breakpoints": true
     }
   ]
 }

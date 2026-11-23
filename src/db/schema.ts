@@ -1015,3 +1015,71 @@ export const feedback = sqliteTable(
   },
   (t) => [index("feedback_firm").on(t.firmId, t.createdAt)],
 );
+
+/** A person's own Microsoft account, linked so Merqado can read their calendar and Teams meetings. */
+export const microsoftLinks = sqliteTable("microsoft_links", {
+  userId: text("user_id")
+    .primaryKey()
+    .references(() => users.id, { onDelete: "cascade" }),
+  firmId: text("firm_id")
+    .notNull()
+    .references(() => firms.id, { onDelete: "cascade" }),
+  account: text("account").notNull().default(""),
+  tenantId: text("tenant_id").notNull().default(""),
+  /** Encrypted { refreshToken, scope } (see lib/crypto). */
+  encryptedToken: text("encrypted_token").notNull(),
+  /** True once Teams transcript access was granted (the tenant's IT approved it). */
+  transcripts: integer("transcripts", { mode: "boolean" }).notNull().default(false),
+  lastError: text("last_error"),
+  createdAt: createdAt(),
+});
+
+/** Per case: whether meetings are pulled in on a schedule, and when they last were. */
+export const meetingSync = sqliteTable("meeting_sync", {
+  engagementId: text("engagement_id")
+    .primaryKey()
+    .references(() => engagements.id, { onDelete: "cascade" }),
+  auto: integer("auto", { mode: "boolean" }).notNull().default(true),
+  lastSyncAt: integer("last_sync_at", { mode: "timestamp" }),
+});
+
+export const MEETING_STATUSES = ["pending", "added", "skipped"] as const;
+export const TRANSCRIPT_STATUSES = ["none", "waiting", "ready", "unavailable"] as const;
+
+/** A Teams or Outlook meeting found for a case; it joins the case only once someone adds it. */
+export const meetings = sqliteTable(
+  "meetings",
+  {
+    id: id(),
+    engagementId: text("engagement_id")
+      .notNull()
+      .references(() => engagements.id, { onDelete: "cascade" }),
+    /** The calendar event's iCalUId, the same for every attendee. */
+    externalId: text("external_id").notNull(),
+    source: text("source", { enum: ["teams", "outlook"] }).notNull(),
+    /** Title with the client's real name and expert names replaced by codes. */
+    title: text("title").notNull(),
+    startAt: integer("start_at", { mode: "timestamp" }).notNull(),
+    minutes: integer("minutes").notNull().default(0),
+    joinUrl: text("join_url"),
+    onlineMeetingId: text("online_meeting_id"),
+    /** JSON array of attendee emails (lowercase). */
+    attendees: text("attendees").notNull().default("[]"),
+    /** Why it matched this case, e.g. "Case code in title" or "3 of 4 team". */
+    matchedBy: text("matched_by").notNull().default(""),
+    status: text("status", { enum: MEETING_STATUSES }).notNull().default("pending"),
+    foundBy: text("found_by").references(() => users.id, { onDelete: "set null" }),
+    addedBy: text("added_by").references(() => users.id, { onDelete: "set null" }),
+    transcriptStatus: text("transcript_status", { enum: TRANSCRIPT_STATUSES }).notNull().default("none"),
+    transcriptSourceId: text("transcript_source_id").references(() => sources.id, { onDelete: "set null" }),
+    transcriptCheckedAt: integer("transcript_checked_at", { mode: "timestamp" }),
+    /** Graph recording id; the recording streams from Microsoft when opened. */
+    recordingId: text("recording_id"),
+    /** Who can open the recording through their Microsoft link. */
+    recordingVia: text("recording_via").references(() => users.id, { onDelete: "set null" }),
+    /** JSON array of key takeaways (strings). */
+    takeaways: text("takeaways").notNull().default("[]"),
+    createdAt: createdAt(),
+  },
+  (t) => [uniqueIndex("meetings_case_event").on(t.engagementId, t.externalId), index("meetings_case_status").on(t.engagementId, t.status, t.startAt)],
+);
