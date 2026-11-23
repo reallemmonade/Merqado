@@ -1,7 +1,7 @@
 import { and, eq, gte, sql } from "drizzle-orm";
 import type { DB } from "@/db/client";
 import { firms, usageEvents } from "@/db/schema";
-import { costUsd } from "./pricing";
+import { costUsd, WEB_SEARCH_USD } from "./pricing";
 
 /** Thrown before a model call when the firm has used its monthly AI budget. */
 export class SpendCapError extends Error {
@@ -25,11 +25,12 @@ export async function monthlySpendUsd(db: DB, firmId: string, now = new Date()):
       model: usageEvents.model,
       input: sql<number>`coalesce(sum(${usageEvents.inputTokens}), 0)`,
       output: sql<number>`coalesce(sum(${usageEvents.outputTokens}), 0)`,
+      searches: sql<number>`coalesce(sum(${usageEvents.webSearches}), 0)`,
     })
     .from(usageEvents)
     .where(and(eq(usageEvents.firmId, firmId), gte(usageEvents.createdAt, monthStartUtc(now))))
     .groupBy(usageEvents.model);
-  return rows.reduce((sum, r) => sum + costUsd(r.model, Number(r.input), Number(r.output)), 0);
+  return rows.reduce((sum, r) => sum + costUsd(r.model, Number(r.input), Number(r.output)) + Number(r.searches) * WEB_SEARCH_USD, 0);
 }
 
 /**

@@ -28,3 +28,6 @@ export function costUsd(model: string, inputTokens: number, outputTokens: number
   const p = priceFor(model);
   return (inputTokens * p.input + outputTokens * p.output) / 1_000_000;
 }
+
+/** Web search is billed per search on top of tokens: $10 per 1,000. */
+export const WEB_SEARCH_USD = 0.01;

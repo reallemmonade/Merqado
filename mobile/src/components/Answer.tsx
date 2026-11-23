@@ -1,4 +1,4 @@
-import { Text, View } from "react-native";
+import { Linking, Pressable, Text, View } from "react-native";
 import type { GptSource } from "@/lib/api";
 import { C, F } from "@/lib/theme";
 
@@ -20,12 +20,18 @@ export function Answer({ body, sources }: { body: string; sources: GptSource[] }
       {sources.length > 0 && (
         <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6, marginTop: 4 }}>
           {sources.map((s) => (
-            <View key={s.n} style={{ flexDirection: "row", gap: 4, paddingHorizontal: 10, paddingVertical: 5, borderRadius: 12, borderWidth: 1, borderColor: "#e4e0ec", maxWidth: "100%" }}>
+            <Pressable
+              key={s.n}
+              disabled={!s.web}
+              onPress={() => void Linking.openURL(s.href)}
+              accessibilityRole={s.web ? "link" : undefined}
+              style={{ flexDirection: "row", gap: 4, paddingHorizontal: 10, paddingVertical: 5, borderRadius: 12, borderWidth: 1, borderColor: "#e4e0ec", maxWidth: "100%" }}
+            >
               <Text style={{ fontFamily: F.semibold, fontSize: 12, color: C.orchid }}>{s.n}</Text>
               <Text style={{ fontFamily: F.medium, fontSize: 12, color: C.ink, flexShrink: 1 }} numberOfLines={1}>
                 {s.label}
               </Text>
-            </View>
+            </Pressable>
           ))}
         </View>
       )}

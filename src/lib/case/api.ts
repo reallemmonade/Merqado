@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import type { z } from "zod";
 import { authorize, type Authorized } from "@/lib/experts/api";
 import type { Action } from "@/lib/roles";
-import { completeAndMeter, resolveProvider } from "@/lib/ai";
+import { completeAndMeter, resolveProvider, type CompletionRequest, type CompletionResult } from "@/lib/ai";
 
 export { aiError, badRequest, extractJson } from "@/lib/experts/api";
 
@@ -24,14 +24,15 @@ export const ok = (data: Record<string, unknown> = {}) => NextResponse.json({ ok
 export const notFoundJson = () => NextResponse.json({ error: "Not found." }, { status: 404 });
 
 /** One model call for a case feature, metered to the case. */
-export async function runAi(
-  auth: Authorized,
-  feature: string,
-  req: { system: string; messages: { role: "user" | "assistant"; content: string }[]; maxTokens?: number },
-): Promise<string> {
+export async function runAi(auth: Authorized, feature: string, req: CompletionRequest & { system: string }): Promise<string> {
+  return (await runAiResult(auth, feature, req)).text;
+}
+
+/** Like runAi, but returns the whole result (e.g. the web pages an answer cites). */
+export async function runAiResult(auth: Authorized, feature: string, req: CompletionRequest & { system: string }): Promise<CompletionResult> {
   const { db, user, engagement } = auth;
   const resolved = await resolveProvider(db, user.firmId, engagement.aiProviderId);
   const result = await completeAndMeter(db, resolved, req, { firmId: user.firmId, engagementId: engagement.id, userId: user.id, feature });
   if (result.refused) throw new Error("The model declined this request.");
-  return result.text;
+  return result;
 }
