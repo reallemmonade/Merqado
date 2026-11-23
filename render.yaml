@@ -49,3 +49,10 @@ services:
       # Set when using a custom domain; SSO redirects use it.
       - key: APP_URL
         sync: false
+      # Temporary sign-in bypass, test copies only (see src/lib/auth/bypass.ts). Leave unset on the live site.
+      - key: SIGNIN_BYPASS_CODE
+        sync: false
+      - key: SIGNIN_BYPASS_EMAIL
+        sync: false
+      - key: SIGNIN_BYPASS_UNTIL
+        sync: false

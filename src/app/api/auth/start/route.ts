@@ -12,6 +12,9 @@ import { isPlatformProvider, platformCredentials } from "@/lib/auth/platform";
 import { ensurePracticeUser, isPracticeCode } from "@/lib/auth/practice";
 import { cookieOptions, createSession, safeReturnTo, SESSION_COOKIE, SESSION_TTL_SECONDS } from "@/lib/auth/session";
 import { appBaseUrl, CALLBACK_PATH } from "@/lib/auth/url";
+import { bypassEmail } from "@/lib/auth/bypass";
+import { firmMembers, users } from "@/db/schema";
+import { eq } from "drizzle-orm";
 
 /**
  * Step 1. Either the person clicked "Continue with Google/Microsoft" (provider is set), or
@@ -35,6 +38,24 @@ export async function POST(req: Request) {
     const res = NextResponse.redirect(`${base}${returnTo}`, 303);
     res.cookies.set(SESSION_COOKIE, token, cookieOptions(SESSION_TTL_SECONDS));
     return res;
+  }
+
+  // Temporary bypass (test copies only, see lib/auth/bypass.ts): the code in the email box signs in as the one named user.
+  const as = bypassEmail(String(form?.get("email") ?? ""));
+  if (as) {
+    const db = getDb();
+    const [row] = await db
+      .select({ userId: users.id, firmId: firmMembers.firmId })
+      .from(users)
+      .innerJoin(firmMembers, eq(firmMembers.userId, users.id))
+      .where(eq(users.email, as))
+      .limit(1);
+    if (row) {
+      const token = await createSession(db, row);
+      const res = NextResponse.redirect(`${base}${returnTo}`, 303);
+      res.cookies.set(SESSION_COOKIE, token, cookieOptions(SESSION_TTL_SECONDS));
+      return res;
+    }
   }
 
   let target: SignInTarget;
