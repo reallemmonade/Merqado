@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { Dictate } from "./Dictate";
 
 /** The case GPT bar along the bottom of every case page; asking opens the chat. */
 export function GptBar({ engagementId, name }: { engagementId: string; name: string }) {
@@ -41,6 +42,7 @@ export function GptBar({ engagementId, name }: { engagementId: string; name: str
       />
       {error && <span className="error" style={{ fontSize: 12 }}>{error}</span>}
       <kbd>Ctrl /</kbd>
+      <Dictate value={q} onText={setQ} />
       <button type="submit" aria-label={`Ask ${name}`} disabled={busy || !q.trim()} className="gpt-send">
         {busy ? "…" : "→"}
       </button>

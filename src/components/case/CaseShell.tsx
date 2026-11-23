@@ -58,7 +58,7 @@ export async function CaseShell({
   return (
     <div className="shell">
       <Shortcuts engagementId={id} />
-      <WakeWord engagementId={id} name="AtlasGPT" />
+      <WakeWord engagementId={id} name={ctx.gpt} />
       <Suspense>
         <HashFocus />
       </Suspense>
