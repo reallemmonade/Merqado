@@ -216,7 +216,7 @@ export async function rescanCaseFiles(db: DB, engagement: CaseRow, run: Complete
   const rows = await db
     .select({ id: sources.id, name: sources.filename, text: sources.textBody })
     .from(sources)
-    .where(and(eq(sources.engagementId, engagement.id), isNull(sources.roomId), isNotNull(sources.textBody)))
+    .where(and(eq(sources.engagementId, engagement.id), isNull(sources.roomId), isNotNull(sources.textBody), isNull(sources.deletedAt)))
     .orderBy(desc(sources.createdAt));
   const files = rows.filter((r) => r.text?.trim()).map((r) => ({ name: r.name, text: r.text! }));
   const parts = packTexts(files);
@@ -250,7 +250,7 @@ export async function sweepNewFiles(db: DB, now = new Date()): Promise<{ files: 
   const rows = await db
     .select({ id: sources.id })
     .from(sources)
-    .where(and(isNull(sources.termsScannedAt), isNull(sources.roomId), isNotNull(sources.textBody), gte(sources.createdAt, since)))
+    .where(and(isNull(sources.termsScannedAt), isNull(sources.roomId), isNotNull(sources.textBody), gte(sources.createdAt, since), isNull(sources.deletedAt)))
     .orderBy(desc(sources.createdAt))
     .limit(SWEEP_LIMIT);
   let added = 0;

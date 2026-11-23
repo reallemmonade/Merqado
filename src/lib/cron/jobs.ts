@@ -1,7 +1,8 @@
-import { lt } from "drizzle-orm";
+import { eq, lt } from "drizzle-orm";
 import type { DB } from "@/db/client";
-import { jobRuns } from "@/db/schema";
+import { engagements, jobRuns } from "@/db/schema";
 import { sweepNewFiles } from "@/lib/case/dictionary";
+import { purgeDeleted } from "@/lib/files/trash";
 import { runNudges } from "@/lib/inbox/nudge";
 
 export type JobContext = { db: DB; now: Date; slot: string };
@@ -27,6 +28,20 @@ export const JOBS: Job[] = [
     name: "dictionary-from-files",
     everyMinutes: 15,
     run: ({ db, now }) => sweepNewFiles(db, now),
+  },
+  {
+    name: "purge-deleted-files",
+    everyMinutes: 1440,
+    run: ({ db, now }) => {
+      const firms = new Map<string, string | null>();
+      return purgeDeleted(db, now, async (engagementId) => {
+        if (!firms.has(engagementId)) {
+          const e = await db.query.engagements.findFirst({ where: eq(engagements.id, engagementId), columns: { firmId: true } });
+          firms.set(engagementId, e?.firmId ?? null);
+        }
+        return firms.get(engagementId)!;
+      });
+    },
   },
   {
     name: "prune-job-runs",

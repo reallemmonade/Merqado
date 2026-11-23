@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { desc, eq } from "drizzle-orm";
+import { and, desc, eq, isNull } from "drizzle-orm";
 import { z } from "zod";
 import { getDb } from "@/db/client";
 import { findings, sources } from "@/db/schema";
@@ -25,7 +25,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
 
   const [recentFindings, recentSources] = await Promise.all([
     db.select().from(findings).where(eq(findings.engagementId, id)).orderBy(desc(findings.createdAt)).limit(50),
-    db.select().from(sources).where(eq(sources.engagementId, id)).orderBy(desc(sources.createdAt)).limit(50),
+    db.select().from(sources).where(and(eq(sources.engagementId, id), isNull(sources.deletedAt))).orderBy(desc(sources.createdAt)).limit(50),
   ]);
 
   // v0 context: findings and file names. Retrieval over source contents comes next.

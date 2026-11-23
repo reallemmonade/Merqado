@@ -1,4 +1,4 @@
-import { and, asc, eq, isNotNull, sql } from "drizzle-orm";
+import { and, asc, eq, isNotNull, isNull, sql } from "drizzle-orm";
 import type { DB } from "@/db/client";
 import { engagements, sources } from "@/db/schema";
 import { deleteSourceBytes, sourceMeta, type SourceMeta } from "@/lib/storage/files";
@@ -14,7 +14,7 @@ export async function firstCopy(db: DB, engagementId: string, hash: string): Pro
   const [row] = await db
     .select(sourceMeta)
     .from(sources)
-    .where(and(eq(sources.engagementId, engagementId), eq(sources.contentHash, hash)))
+    .where(and(eq(sources.engagementId, engagementId), eq(sources.contentHash, hash), isNull(sources.deletedAt)))
     .orderBy(asc(firstSaved))
     .limit(1);
   return row;
@@ -34,7 +34,7 @@ export async function removeWaitingDuplicates(db: DB, engagementId: string): Pro
   const rows = await db
     .select(sourceMeta)
     .from(sources)
-    .where(and(eq(sources.engagementId, engagementId), isNotNull(sources.contentHash)))
+    .where(and(eq(sources.engagementId, engagementId), isNotNull(sources.contentHash), isNull(sources.deletedAt)))
     .orderBy(asc(firstSaved));
   const seen = new Set<string>();
   const extra: SourceMeta[] = [];

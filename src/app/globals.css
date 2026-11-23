@@ -598,7 +598,7 @@ button.settings-close:hover { background: var(--soft); }
 :root:root[data-theme="dark"] { --glass-edge: rgba(255, 255, 255, 0.09); }
 :root.guava-playing { transition: none; }
 :root:root body { background: var(--ground); transition: color 0.6s ease; }
-:root:root body > :not(#backdrop):not(script):not(.gv-play):not(.fb-wrap):not(.fb-pop) { position: relative; z-index: 1; }
+:root:root body > :not(#backdrop):not(script):not(.gv-play):not(.fb-wrap):not(.fb-pop):not(.confirm-backdrop):not(.toast) { position: relative; z-index: 1; }
 #backdrop { position: fixed; inset: -6vh -8vw; z-index: 0; pointer-events: none; overflow: hidden;
   background:
     radial-gradient(62% 42% at var(--sun-x, 30%) 14%, var(--art1) 0%, transparent 70%),
@@ -727,6 +727,20 @@ button.settings-close:hover { background: var(--soft); }
 .new-folder input { flex: 1; min-width: 0; }
 .crumbs a { color: var(--ink); }
 .versions summary { cursor: pointer; }
+/* Delete: trash button per row, confirm box, Undo toast */
+td.row-end { text-align: right; white-space: nowrap; width: 1%; }
+/* Phones: the delete button stays in view while the table scrolls sideways. */
+@media (max-width: 640px) { td.row-end { position: sticky; right: 0; background: var(--panel, var(--surface)); } }
+button.icon-btn { min-height: 32px; width: 32px; padding: 0; display: inline-flex; align-items: center; justify-content: center; background: transparent; color: var(--muted); border-radius: 6px; }
+button.icon-btn:hover { color: var(--bad); background: color-mix(in srgb, var(--bad) 10%, transparent); }
+button.danger { background: var(--bad); color: #fff; }
+.confirm-backdrop { position: fixed; inset: 0; z-index: 70; background: rgba(17, 28, 38, 0.45); display: flex; align-items: center; justify-content: center; padding: 16px; }
+.confirm { text-align: left; background: var(--panel, var(--surface)); color: var(--ink); border: 1px solid var(--line); border-radius: 10px; padding: 20px; width: min(380px, 100%); display: flex; flex-direction: column; gap: 10px; box-shadow: 0 12px 32px rgba(17, 28, 38, 0.2); }
+.confirm h3 { font-size: 16px; font-weight: 600; overflow-wrap: anywhere; }
+.confirm p { margin: 0; }
+.confirm-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 6px; }
+.toast { position: fixed; left: 50%; bottom: 88px; transform: translateX(-50%); width: max-content; max-width: calc(100vw - 32px); z-index: 65; display: flex; align-items: center; gap: 14px; padding: 10px 16px; border-radius: 8px; background: var(--ink); color: var(--surface); box-shadow: 0 8px 24px rgba(17, 28, 38, 0.25); }
+.toast button.linkbtn { color: var(--surface); font-size: 14px; font-weight: 600; text-decoration: underline; padding: 0; }
 .versions a { display: block; white-space: nowrap; font-size: 12px; padding-top: 4px; }
 .chat-files { display: flex; flex-direction: column; gap: 8px; margin-top: 6px; }
 .chat-file { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; max-width: 560px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); }

@@ -187,7 +187,7 @@ export async function loadMessages(
   const nameOf = (uid: string | null) => (uid && nameMap.get(uid)) || "Former member";
 
   const [files, reactions, replies] = await Promise.all([
-    db.select().from(sources).where(and(eq(sources.engagementId, engagementId), inArray(sources.messageId, msgIds))),
+    db.select().from(sources).where(and(eq(sources.engagementId, engagementId), inArray(sources.messageId, msgIds), isNull(sources.deletedAt))),
     db.select().from(chatReactions).where(inArray(chatReactions.messageId, msgIds)).orderBy(asc(chatReactions.createdAt)),
     opts.parentId
       ? Promise.resolve([])
@@ -248,7 +248,7 @@ export async function loadSharedFiles(db: DB, engagementId: string, roomId: stri
   const rows = await db
     .select()
     .from(sources)
-    .where(and(eq(sources.engagementId, engagementId), eq(sources.roomId, roomId)))
+    .where(and(eq(sources.engagementId, engagementId), eq(sources.roomId, roomId), isNull(sources.deletedAt)))
     .orderBy(desc(sources.createdAt))
     .limit(200);
   const nameMap = new Map(people.map((p) => [p.id, p.name]));

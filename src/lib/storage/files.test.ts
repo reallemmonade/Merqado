@@ -53,4 +53,14 @@ describe("source files", () => {
     expect(html.headers.get("content-type")).toBe("text/plain; charset=utf-8");
     expect(html.headers.get("content-security-policy")).toContain("sandbox");
   });
+
+  it("shows pictures without a policy that would block them, but keeps one on SVG", () => {
+    for (const name of ["Shot.png", "Shot.PNG", "photo.jpg"]) {
+      const res = fileResponse(new Uint8Array([1]), name, null);
+      expect(res.headers.get("content-disposition")).toMatch(/^inline;/);
+      expect(res.headers.get("content-security-policy")).toBeNull();
+      expect(res.headers.get("x-content-type-options")).toBe("nosniff");
+    }
+    expect(fileResponse(new Uint8Array([1]), "logo.svg", "image/svg+xml").headers.get("content-security-policy")).toContain("sandbox");
+  });
 });
