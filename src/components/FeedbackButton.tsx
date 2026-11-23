@@ -41,7 +41,7 @@ export function FeedbackButton() {
       const res = await fetch("/api/feedback", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ note, photo }),
+        body: JSON.stringify({ note, photo, page: window.location.pathname }),
       });
       if (!res.ok) throw new Error("failed");
       setState("sent");
