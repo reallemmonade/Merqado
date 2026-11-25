@@ -1,3 +1,5 @@
+import { webUrl } from "./webTiles";
+
 /**
  * Tiles page: which case sections can be tiles, and where each tile goes.
  * Sizing follows Celaya's board (reallemmonade/celaya public/mosaica.js `reflow`): about √n tiles per row,
@@ -10,7 +12,7 @@ export type TileMode = "grid" | "focus";
 export type TileRect = { x: number; y: number; w: number; h: number }; // fractions of the board, 0..1
 
 /** A tile is one case page; `path` is the page under /e/<id>, e.g. "/notes" or "/gpt/abc". */
-export type Tile = { id: string; section: TileSection; path: string; main?: boolean; rect?: GridRect };
+export type Tile = { id: string; section: TileSection | "web"; path: string; url?: string; main?: boolean; rect?: GridRect };
 /** A tile's place on the board's grid: GRID_COLS columns by GRID_ROWS rows that always fill the board. */
 export type GridRect = { x: number; y: number; w: number; h: number };
 export const GRID_COLS = 12;
@@ -49,6 +51,13 @@ export function pathFromDrop(text: string, engagementId: string, origin: string)
   const path = url.pathname.slice(base.length) || "/";
   if (!sectionOf(path)) return null;
   return path + url.search;
+}
+
+/** Adds a web page (an https address) as a tile; a page already on the board is not added twice. */
+export function addWebTile(state: TilesState, url: string, id?: string): TilesState {
+  if (state.tiles.some((t) => t.url === url)) return state;
+  const tile: Tile = { id: id ?? `web-${Date.now().toString(36)}`, section: "web", path: url, url };
+  return { ...state, tiles: [...state.tiles, tile].slice(-MAX_TILES) };
 }
 
 /** Adds a page as a tile (or moves it if that page is already a tile). `at` is the index to put it at. */
@@ -110,12 +119,13 @@ export function parseTiles(json: string | null | undefined): TilesState | null {
     const tiles: Tile[] = [];
     for (const t of v.tiles) {
       if (!t || typeof t.id !== "string" || typeof t.path !== "string" || seen.has(t.path)) continue;
-      const section = sectionOf(t.path);
-      if (!section || !t.path.startsWith("/")) continue;
+      const web = typeof t.url === "string" ? webUrl(t.url) : null;
+      const section = web ? "web" : sectionOf(t.path);
+      if (!section || (!web && !t.path.startsWith("/"))) continue;
       seen.add(t.path);
       const r = t.rect;
       const okRect = r && [r.x, r.y, r.w, r.h].every((v) => Number.isInteger(v)) && r.x >= 0 && r.y >= 0 && r.w >= 1 && r.h >= 1 && r.x + r.w <= GRID_COLS && r.y + r.h <= GRID_ROWS;
-      tiles.push({ id: t.id, section, path: t.path, ...(t.main ? { main: true } : {}), ...(okRect ? { rect: { x: r.x, y: r.y, w: r.w, h: r.h } } : {}) });
+      tiles.push({ id: t.id, section, path: web ?? t.path, ...(web ? { url: web } : {}), ...(t.main ? { main: true } : {}), ...(okRect ? { rect: { x: r.x, y: r.y, w: r.w, h: r.h } } : {}) });
     }
     const out: TilesState = { tiles: tiles.slice(-MAX_TILES), mode: v.mode === "focus" ? "focus" : "grid" };
     // Saved places that overlap (an older or hand-edited layout) are tidied rather than drawn on top of each other.
