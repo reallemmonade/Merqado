@@ -3,7 +3,10 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Icon, type IconName } from "./icons";
 import { TILE_FRAME_PREFIX } from "@/lib/case/tileEmbed";
+import { hostOf, webUrl } from "@/lib/case/webTiles";
+import { TileWeb } from "./TileWeb";
 import {
+  addWebTile,
   dropTile,
   EMPTY_TILES,
   GRID_COLS,
@@ -58,7 +61,14 @@ export function TilesBoard({ engagementId, sections }: { engagementId: string; s
   const boardRef = useRef<HTMLDivElement>(null);
   const base = `/e/${engagementId}`;
   const labelOf = (section: string) => sections.find((s) => s.key === section)?.label ?? section;
+  const labelFor = (t: { section: string; url?: string }) => (t.url ? hostOf(t.url) : labelOf(t.section));
   const iconOf = (section: string) => sections.find((s) => s.key === section)?.icon ?? "overview";
+  const addAddress = (value: string) => {
+    const url = webUrl(value);
+    if (!url) return;
+    setAdding(false);
+    update((s) => tidy(addWebTile(s, url)));
+  };
 
   useEffect(() => {
     setState(load(engagementId));
@@ -114,7 +124,11 @@ export function TilesBoard({ engagementId, sections }: { engagementId: string; s
     setDropping(false);
     const text = e.dataTransfer.getData("text/uri-list") || e.dataTransfer.getData("text/plain");
     const path = pathFromDrop(text, engagementId, location.origin);
-    if (!path) return;
+    if (!path) {
+      const web = /^https?:\/\//i.test(text.trim()) ? webUrl(text) : null;
+      if (web) update((s) => tidy(addWebTile(s, web)));
+      return;
+    }
     let at: number | undefined;
     if (!phone && boardRef.current) {
       const c = cellAt(e.clientX, e.clientY);
@@ -190,6 +204,7 @@ export function TilesBoard({ engagementId, sections }: { engagementId: string; s
             </button>
             {adding && (
               <div className="pop-menu pop-right" role="menu" onMouseLeave={() => setAdding(false)}>
+                <input className="tiles-address" placeholder="Address" aria-label="Address" onKeyDown={(e) => { if (e.key === "Enter") addAddress(e.currentTarget.value); }} />
                 {sections.map((s) => (
                   <button
                     key={s.key}
@@ -235,27 +250,31 @@ export function TilesBoard({ engagementId, sections }: { engagementId: string; s
       >
         {ready && !state.tiles.length && <div className="tiles-empty">No tiles</div>}
         {state.tiles.map((t) => {
-          const label = labelOf(t.section);
+          const label = labelFor(t);
           const style = phone || !t.rect ? undefined : place(drag?.id === t.id && drag.kind === "size" ? drag.ghost : t.rect);
           return (
             <section key={t.id} className={`tile${drag?.id === t.id ? " is-active" : ""}`} style={style} aria-label={label}>
               <div className="tile-card">
                 <div className="tile-head" onPointerDown={(e) => startPointer(e, t.id, "move")}>
-                  <Icon name={iconOf(t.section)} size={15} />
+                  <Icon name={t.url ? "globe" : iconOf(t.section)} size={15} />
                   <span className="tile-name">{label}</span>
                   {state.mode === "focus" && !phone && (
                     <button type="button" className="tile-btn" aria-pressed={!!t.main} aria-label={t.main ? "Unpin from main" : "Pin to main"} title={t.main ? "Unpin" : "Pin"} onPointerDown={(e) => e.stopPropagation()} onClick={() => update((s) => toggleMain(s, t.id))}>
                       <Icon name="pin" size={15} />
                     </button>
                   )}
-                  <a className="tile-btn" href={base + t.path} aria-label={`Open ${label}`} title="Open" onPointerDown={(e) => e.stopPropagation()}>
+                  <a className="tile-btn" href={t.url ?? base + t.path} {...(t.url ? { target: "_blank", rel: "noopener noreferrer" } : {})} aria-label={`Open ${label}`} title="Open" onPointerDown={(e) => e.stopPropagation()}>
                     <Icon name="up" size={15} />
                   </a>
                   <button type="button" className="tile-btn" aria-label={`Close ${label}`} title="Close" onPointerDown={(e) => e.stopPropagation()} onClick={() => update((s) => tidy(removeTile(s, t.id)))}>
                     <Icon name="close" size={15} />
                   </button>
                 </div>
-                <iframe className="tile-frame" title={label} name={TILE_FRAME_PREFIX + t.id} src={base + t.path} onLoad={(e) => onFrameLoad(t.id, e.currentTarget)} />
+                {t.url ? (
+                  <TileWeb url={t.url} onNavigate={(next) => update((s) => ({ ...s, tiles: s.tiles.map((x) => (x.id === t.id ? { ...x, url: next, path: next } : x)) }))} />
+                ) : (
+                  <iframe className="tile-frame" title={label} name={TILE_FRAME_PREFIX + t.id} src={base + t.path} onLoad={(e) => onFrameLoad(t.id, e.currentTarget)} />
+                )}
                 {!phone && <span className="tile-size" aria-hidden="true" onPointerDown={(e) => startPointer(e, t.id, "size")} />}
               </div>
             </section>
