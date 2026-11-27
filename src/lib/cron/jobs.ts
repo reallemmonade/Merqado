@@ -2,6 +2,7 @@ import { eq, lt } from "drizzle-orm";
 import type { DB } from "@/db/client";
 import { engagements, jobRuns } from "@/db/schema";
 import { sweepNewFiles } from "@/lib/case/dictionary";
+import { refreshLinkedFiles } from "@/lib/files/link";
 import { purgeDeleted } from "@/lib/files/trash";
 import { runNudges } from "@/lib/inbox/nudge";
 import { runGmailCheck } from "@/lib/mail/check";
@@ -35,6 +36,11 @@ export const JOBS: Job[] = [
     name: "meetings-from-microsoft",
     everyMinutes: 15,
     run: ({ db, now }) => runMeetingSync(db, now),
+  },
+  {
+    name: "linked-files-refresh",
+    everyMinutes: 15,
+    run: ({ db, now }) => refreshLinkedFiles(db, now),
   },
   {
     name: "gmail-new-mail",

@@ -2,9 +2,14 @@ import { and, eq, getTableColumns } from "drizzle-orm";
 import type { DB } from "@/db/client";
 import { sourceBlobs, sources } from "@/db/schema";
 import { resolveStorage } from "./index";
+import { GDriveStorage } from "./providers/gdrive";
 
 /** Object keys that mean "the bytes are in the database" rather than in the firm's storage. */
 const DB_PREFIX = "db:";
+/** Object keys of files that link to a live original elsewhere: Merqado never moves or deletes those bytes. */
+export const LINK_PREFIX = "link:";
+export const linkKey = (kind: string, ref: string) => `${LINK_PREFIX}${kind}:${ref}`;
+export const isLinked = (s: { objectKey: string }) => s.objectKey.startsWith(LINK_PREFIX);
 /** Largest file kept in the database while a firm has no storage connected. */
 export const MAX_DB_FILE_BYTES = 20 * 1024 * 1024;
 
@@ -101,7 +106,8 @@ export function safeSegment(name: string): string {
  * lives only in Merqado and the stored object stays where it is.
  */
 export async function placeSourceFile(db: DB, firmId: string, source: Stored, place: string[]): Promise<string> {
-  if (source.objectKey.startsWith(DB_PREFIX)) return source.objectKey;
+  // A linked original stays where its owner keeps it; only Merqado's folder changes.
+  if (source.objectKey.startsWith(DB_PREFIX) || isLinked(source)) return source.objectKey;
   const { storage } = await resolveStorage(db, firmId, source.storageConnectionId);
   if (!storage.move || !storage.pathKeys) return source.objectKey;
   return storage.move(source.objectKey, [...place, source.filename].map(safeSegment).join("/"));
@@ -109,21 +115,24 @@ export async function placeSourceFile(db: DB, firmId: string, source: Stored, pl
 
 /** Removes a file's bytes from wherever they were saved (Drive: to its trash). */
 export async function deleteSourceBytes(db: DB, firmId: string, source: Stored): Promise<void> {
-  if (source.objectKey.startsWith(DB_PREFIX)) return; // the row's cascade removes the blob
+  // The row's cascade removes a database blob; a link's original stays where it is.
+  if (source.objectKey.startsWith(DB_PREFIX) || isLinked(source)) return;
   const { storage } = await resolveStorage(db, firmId, source.storageConnectionId);
   await storage.delete(source.objectKey);
 }
 
 /** On delete, moves bytes to the store's own trash where it has one (Drive); others keep them until purge. */
 export async function trashSourceBytes(db: DB, firmId: string, source: Stored): Promise<void> {
-  if (source.objectKey.startsWith(DB_PREFIX)) return;
+  // Deleting a link never touches the original.
+  if (source.objectKey.startsWith(DB_PREFIX) || isLinked(source)) return;
   const { storage } = await resolveStorage(db, firmId, source.storageConnectionId);
   if (storage.restore) await storage.delete(source.objectKey);
 }
 
 /** Moves a deleted file's bytes back out of the store's trash, where it has one. */
 export async function restoreSourceBytes(db: DB, firmId: string, source: Stored): Promise<void> {
-  if (source.objectKey.startsWith(DB_PREFIX)) return;
+  // Deleting a link never touches the original.
+  if (source.objectKey.startsWith(DB_PREFIX) || isLinked(source)) return;
   const { storage } = await resolveStorage(db, firmId, source.storageConnectionId);
   await storage.restore?.(source.objectKey);
 }
@@ -141,6 +150,10 @@ export async function readSourceFile(db: DB, firmId: string, source: Source): Pr
     return new Uint8Array(row.data);
   }
   const { storage } = await resolveStorage(db, firmId, source.storageConnectionId);
+  if (isLinked(source)) {
+    if (!(storage instanceof GDriveStorage) || source.originKind !== "gdrive" || !source.originRef) throw new Error("File not found.");
+    return (await storage.readLinked(await storage.meta(source.originRef))).bytes;
+  }
   return storage.get(source.objectKey);
 }
 

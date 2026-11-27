@@ -34,6 +34,39 @@ export async function refreshAccessToken(refreshToken: string): Promise<string> 
   return data.access_token;
 }
 
+export interface DriveFileMeta {
+  id: string;
+  name: string;
+  mimeType: string;
+  size?: string;
+  modifiedTime?: string;
+  webViewLink?: string;
+  trashed?: boolean;
+}
+
+/** Google's own file types, read as the Office file they export to. */
+const GOOGLE_EXPORTS: Record<string, { mime: string; ext: string }> = {
+  "application/vnd.google-apps.document": { mime: "application/vnd.openxmlformats-officedocument.wordprocessingml.document", ext: "docx" },
+  "application/vnd.google-apps.spreadsheet": { mime: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", ext: "xlsx" },
+  "application/vnd.google-apps.presentation": { mime: "application/vnd.openxmlformats-officedocument.presentationml.presentation", ext: "pptx" },
+};
+
+/** The file id in a Google Drive, Docs, Sheets or Slides link, or null. */
+export function driveFileIdFromLink(link: string): string | null {
+  let u: URL;
+  try {
+    u = new URL(link.trim());
+  } catch {
+    return null;
+  }
+  if (!/(^|\.)google\.com$/.test(u.hostname) || !/^(drive|docs)\./.test(u.hostname)) return null;
+  const m = /\/(?:file|document|spreadsheets|presentation|forms)\/d\/([A-Za-z0-9_-]{10,})/.exec(u.pathname);
+  if (m) return m[1]!;
+  if (/\/folders\//.test(u.pathname)) return null;
+  const id = u.searchParams.get("id");
+  return id && /^[A-Za-z0-9_-]{10,}$/.test(id) ? id : null;
+}
+
 const q = (s: string) => s.replace(/\\/g, "\\\\").replace(/'/g, "\\'");
 
 /**
@@ -167,6 +200,28 @@ export class GDriveStorage implements StorageProvider {
       body: JSON.stringify({ name }),
     });
     return key;
+  }
+
+  /** Facts about any Drive file this connection can read (a linked original, not only Merqado's own). */
+  async meta(fileId: string): Promise<DriveFileMeta> {
+    return this.call<DriveFileMeta>(
+      `${API}/files/${encodeURIComponent(fileId)}?${ALL}&fields=id,name,mimeType,size,modifiedTime,webViewLink,trashed`,
+    );
+  }
+
+  /**
+   * The bytes of a linked original. Google Docs, Sheets and Slides have no bytes of their own,
+   * so they're exported as Word, Excel and PowerPoint. Returns the name to read them under.
+   */
+  async readLinked(file: Pick<DriveFileMeta, "id" | "name" | "mimeType">): Promise<{ bytes: Uint8Array; filename: string }> {
+    const exp = GOOGLE_EXPORTS[file.mimeType];
+    const url = exp
+      ? `${API}/files/${encodeURIComponent(file.id)}/export?mimeType=${encodeURIComponent(exp.mime)}`
+      : `${API}/files/${encodeURIComponent(file.id)}?alt=media&${ALL}`;
+    const res = await fetch(url, { headers: await this.auth() });
+    if (!res.ok) throw new Error(`Google Drive ${res.status}: couldn't read the file.`);
+    const filename = exp && !file.name.toLowerCase().endsWith(`.${exp.ext}`) ? `${file.name}.${exp.ext}` : file.name;
+    return { bytes: new Uint8Array(await res.arrayBuffer()), filename };
   }
 
   /** A link that opens the file in Google Drive. */

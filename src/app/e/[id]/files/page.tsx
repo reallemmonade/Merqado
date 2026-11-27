@@ -15,6 +15,8 @@ import { allows } from "@/lib/roles";
 export const dynamic = "force-dynamic";
 
 const TRANSCRIPTS = "__transcripts";
+/** Where a linked file's live original is kept. */
+const ORIGIN = { gdrive: "Google Drive", onedrive: "OneDrive", local: "Case folder" } as const;
 const REVIEW = "__review";
 const UNFILED = "__unfiled";
 const DELETED = "__deleted";
@@ -260,6 +262,7 @@ export default async function FilesPage({ params, searchParams }: { params: Prom
                       <thead>
                         <tr>
                           <th>Name</th>
+                          <th>Source</th>
                           <th style={{ width: 200 }}>Folder</th>
                           <th>Linked to</th>
                           <th>Added by</th>
@@ -279,6 +282,15 @@ export default async function FilesPage({ params, searchParams }: { params: Prom
                                 <a href={`/api/engagements/${id}/sources/${f.id}`} target="_blank" rel="noreferrer">
                                   {f.filename}
                                 </a>
+                              </td>
+                              <td>
+                                {f.originKind ? (
+                                  <span className="tag tag-good" title={ORIGIN[f.originKind]}>
+                                    Live
+                                  </span>
+                                ) : (
+                                  <span className="tag">Copy</span>
+                                )}
                               </td>
                               <td>{canUpload ? <MoveFile engagementId={id} sourceId={f.id} folder={f.folder} /> : f.folder}</td>
                               <td>

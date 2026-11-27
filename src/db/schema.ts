@@ -205,11 +205,28 @@ export const sources = sqliteTable(
     batchId: text("batch_id"),
     /** When the file was read for new dictionary terms; null until then. */
     termsScannedAt: integer("terms_scanned_at", { mode: "timestamp" }),
+    /**
+     * Set when the file is a link to a live original (not a copy): where it lives. The
+     * original is the source of truth; text_body is a cached copy for search.
+     */
+    originKind: text("origin_kind", { enum: ["gdrive", "onedrive", "local"] }),
+    /** The original's id in its store (Drive file id, OneDrive item id, case-folder path). */
+    originRef: text("origin_ref"),
+    /** Where the original opens (Drive's web link). */
+    originUrl: text("origin_url"),
+    /** The original's own version marker (Drive modifiedTime), to spot edits. */
+    originVersion: text("origin_version"),
+    /** When the cached text was last checked against the original. */
+    originCheckedAt: integer("origin_checked_at", { mode: "timestamp" }),
     /** Set when someone deletes the file; it can be restored until it's purged. */
     deletedAt: integer("deleted_at", { mode: "timestamp" }),
     createdAt: createdAt(),
   },
-  (t) => [index("sources_engagement").on(t.engagementId), index("sources_hash").on(t.engagementId, t.contentHash)],
+  (t) => [
+    index("sources_engagement").on(t.engagementId),
+    index("sources_hash").on(t.engagementId, t.contentHash),
+    index("sources_origin").on(t.originKind, t.originRef),
+  ],
 );
 
 /** A case's folder list, seeded from the firm default and editable per case. */
