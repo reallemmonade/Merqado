@@ -137,6 +137,36 @@ export function FilesWorkspace({
     [engagementId, router],
   );
 
+  // Links to live originals (Google Drive) join the same confirm drawer as dropped files.
+  const link = useCallback(
+    async (urls: string[]) => {
+      const list = [...new Set(urls.map((u) => u.trim()).filter((u) => /^https:\/\//.test(u)))].slice(0, 50);
+      if (!list.length) return;
+      const id = crypto.randomUUID();
+      const skipped: Duplicate[] = [];
+      const failed: string[] = [];
+      setBatch({ id, targets: {}, skipped: [], failed: [] });
+      setProgress({ done: 0, total: list.length });
+      let done = 0;
+      for (const url of list) {
+        const res = await fetch(`/api/engagements/${engagementId}/files`, {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ op: "link", url, batchId: id }),
+        }).catch(() => null);
+        const data: { error?: string; duplicate?: boolean; source?: { filename: string; folder: string; filing: string } } = res ? await res.json().catch(() => ({})) : {};
+        if (!res?.ok) failed.push(data.error ?? "Couldn't link that file.");
+        else if (data.duplicate && data.source) skipped.push({ name: data.source.filename, folder: data.source.filing === "filed" ? data.source.folder || "Unfiled" : "To review" });
+        setProgress({ done: ++done, total: list.length });
+        setBatch((b) => (b?.id === id ? { ...b, skipped: [...skipped], failed: [...failed] } : b));
+        router.refresh();
+      }
+      setProgress(null);
+      router.refresh();
+    },
+    [engagementId, router],
+  );
+
   useEffect(() => {
     // Without upload rights, still stop the browser from leaving the page to open a dropped file.
     if (!canUpload) {
@@ -148,8 +178,9 @@ export function FilesWorkspace({
         window.removeEventListener("drop", block);
       };
     }
+    const droppable = (e: DragEvent) => !!e.dataTransfer && (e.dataTransfer.types.includes("Files") || e.dataTransfer.types.includes("text/uri-list"));
     const onEnter = (e: DragEvent) => {
-      if (!e.dataTransfer?.types.includes("Files")) return;
+      if (!droppable(e)) return;
       e.preventDefault();
       depth.current++;
       setOver(true);
@@ -159,27 +190,44 @@ export function FilesWorkspace({
       if (!depth.current) setOver(false);
     };
     const onOver = (e: DragEvent) => {
-      if (e.dataTransfer?.types.includes("Files")) e.preventDefault();
+      if (droppable(e)) e.preventDefault();
     };
     const onDrop = async (e: DragEvent) => {
-      if (!e.dataTransfer?.types.includes("Files")) return;
+      if (!droppable(e)) return;
       e.preventDefault();
       depth.current = 0;
       setOver(false);
+      // A file dragged from a Google Drive tab arrives as its link: keep it live, not a copy.
+      if (!e.dataTransfer!.types.includes("Files")) {
+        link(e.dataTransfer!.getData("text/uri-list").split(/\r?\n/).filter((l) => l && !l.startsWith("#")));
+        return;
+      }
       const target = (e.target as HTMLElement | null)?.closest<HTMLElement>("[data-drop-folder]")?.dataset.dropFolder ?? "";
-      upload(await readDrop(e.dataTransfer).catch(() => []), target);
+      upload(await readDrop(e.dataTransfer!).catch(() => []), target);
+    };
+    // A pasted Drive link (outside a text box) is linked the same way.
+    const onPaste = (e: ClipboardEvent) => {
+      const el = e.target as HTMLElement | null;
+      if (el?.closest("input, textarea, [contenteditable='true']")) return;
+      const text = e.clipboardData?.getData("text/plain") ?? "";
+      const urls = text.split(/\s+/).filter((u) => /^https:\/\/(drive|docs)\.google\.com\//.test(u));
+      if (!urls.length) return;
+      e.preventDefault();
+      link(urls);
     };
     window.addEventListener("dragenter", onEnter);
     window.addEventListener("dragleave", onLeave);
     window.addEventListener("dragover", onOver);
     window.addEventListener("drop", onDrop);
+    window.addEventListener("paste", onPaste);
     return () => {
+      window.removeEventListener("paste", onPaste);
       window.removeEventListener("dragenter", onEnter);
       window.removeEventListener("dragleave", onLeave);
       window.removeEventListener("dragover", onOver);
       window.removeEventListener("drop", onDrop);
     };
-  }, [canUpload, upload]);
+  }, [canUpload, upload, link]);
 
   const batchRows = batch ? pending.filter((p) => p.batchId === batch.id) : [];
 
@@ -192,6 +240,7 @@ export function FilesWorkspace({
               {progress.done} / {progress.total}
             </span>
           )}
+          <LinkButton onLink={(url) => link([url])} />
           <PickButton label="Upload folder" folder onPick={(f) => upload(f)} />
           <PickButton label="Upload" onPick={(f) => upload(f)} primary />
         </div>
@@ -223,6 +272,42 @@ export function FilesWorkspace({
         </div>
       )}
     </div>
+  );
+}
+
+function LinkButton({ onLink }: { onLink: (url: string) => void }) {
+  const [open, setOpen] = useState(false);
+  const [url, setUrl] = useState("");
+  if (!open)
+    return (
+      <button type="button" className="secondary small" onClick={() => setOpen(true)}>
+        Link
+      </button>
+    );
+  return (
+    <form
+      style={{ display: "flex", gap: 6, alignItems: "center" }}
+      onSubmit={(e) => {
+        e.preventDefault();
+        if (url.trim()) onLink(url.trim());
+        setUrl("");
+        setOpen(false);
+      }}
+    >
+      <input
+        type="url"
+        autoFocus
+        aria-label="Drive link"
+        placeholder="Drive link"
+        value={url}
+        onChange={(e) => setUrl(e.target.value)}
+        onKeyDown={(e) => e.key === "Escape" && setOpen(false)}
+        onBlur={() => !url && setOpen(false)}
+      />
+      <button type="submit" className="small">
+        Link
+      </button>
+    </form>
   );
 }
 

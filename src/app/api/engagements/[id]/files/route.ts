@@ -6,6 +6,7 @@ import { notFoundJson, ok, parseOp } from "@/lib/case/api";
 import { sourceVisibility } from "@/lib/files/access";
 import { addCaseFolders, cleanPath, insideFolder } from "@/lib/files/folders";
 import { caseFolderName, fileSources } from "@/lib/files/intake";
+import { LinkError, linkDriveFile } from "@/lib/files/link";
 import { deleteFiles, filesInFolder, restoreFiles } from "@/lib/files/trash";
 import { deleteSourceBytes, placeSourceFile, sourceMeta } from "@/lib/storage/files";
 
@@ -19,6 +20,7 @@ const Op = z.discriminatedUnion("op", [
   z.object({ op: z.literal("folder.add"), path: folder.min(1, "Name the folder.") }),
   z.object({ op: z.literal("folder.delete"), path: folder.min(1) }),
   z.object({ op: z.literal("delete"), sourceIds: z.array(ref).min(1).max(500) }),
+  z.object({ op: z.literal("link"), url: z.string().trim().min(1).max(2000), batchId: z.string().max(64).optional() }),
   z.object({ op: z.literal("restore"), sourceIds: z.array(ref).max(5000), folders: z.array(folder).max(500).optional() }),
 ]);
 
@@ -93,6 +95,15 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       const deleted = await deleteFiles(db, { firmId: user.firmId, engagementId: id, ids: op.sourceIds, canSee });
       if (!deleted?.length) return notFoundJson();
       return ok({ deleted });
+    }
+    case "link": {
+      try {
+        const res = await linkDriveFile(auth, { url: op.url, batchId: op.batchId });
+        return ok({ duplicate: res.duplicate, source: { id: res.source.id, filename: res.source.filename, folder: res.source.folder, filing: res.source.filing } });
+      } catch (err) {
+        if (!(err instanceof LinkError)) console.error("link failed", err);
+        return NextResponse.json({ error: err instanceof LinkError ? err.message : "Couldn't link that file." }, { status: 400 });
+      }
     }
     case "restore": {
       return ok({ restored: await restoreFiles(db, { firmId: user.firmId, engagementId: id, ids: op.sourceIds, canSee, folders: op.folders?.map(cleanPath) }) });

@@ -10,6 +10,8 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
   if (auth instanceof NextResponse) return auth;
   const source = await findSource(auth.db, id, sourceId);
   if (!source || !(await sourceVisibility(auth.db, id, auth.user))(source)) return NextResponse.json({ error: "File not found." }, { status: 404 });
+  // A linked file opens its live original, not Merqado's cached text.
+  if (source.originUrl && /^https:\/\/(drive|docs)\.google\.com\//.test(source.originUrl)) return NextResponse.redirect(source.originUrl);
   try {
     return fileResponse(await readSourceFile(auth.db, auth.user.firmId, source), source.filename, source.mimeType);
   } catch (err) {

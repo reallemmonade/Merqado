@@ -39,22 +39,8 @@ export async function intakeFile(
   if (dup) return { duplicate: true, source: dup };
 
   const text = await extractText(input.file.name, bytes);
-  const folders = await loadCaseFolders(db, engagement.id);
   const relPath = input.relPath?.replace(/\\/g, "/").replace(/^\/+/, "").slice(0, 500) || null;
-  const facts = { name: input.file.name, relPath, text };
-  let { folders: suggested, sure } = suggestFolders(facts, folders);
-
-  const candidate = await findVersionCandidate(auth, input.file.name);
-  if (candidate?.folder) suggested = [candidate.folder, ...suggested.filter((f) => f !== candidate.folder)];
-  else if (!sure) {
-    const ai = await aiSuggest(auth, facts, folders).catch((err) => {
-      console.warn("folder suggestion: AI unavailable", err instanceof Error ? err.message : err);
-      return [];
-    });
-    if (ai.length) suggested = [...new Set([...ai, ...suggested])];
-  }
-
-  const links = findLinks(facts, await expertRefs(auth));
+  const { suggested, candidate, links } = await suggestPlace(auth, { name: input.file.name, relPath, text });
   const source = await saveSourceFile(db, {
     firmId: user.firmId,
     engagementId: engagement.id,
@@ -82,6 +68,23 @@ export async function intakeFile(
     return { duplicate: true, source: first };
   }
   return { duplicate: false, source };
+}
+
+/** Suggested folders, a likely earlier version, and the case items a new file is about. */
+export async function suggestPlace(auth: Authorized, facts: { name: string; relPath: string | null; text: string }) {
+  const folders = await loadCaseFolders(auth.db, auth.engagement.id);
+  let { folders: suggested, sure } = suggestFolders(facts, folders);
+  const candidate = await findVersionCandidate(auth, facts.name);
+  if (candidate?.folder) suggested = [candidate.folder, ...suggested.filter((f) => f !== candidate.folder)];
+  else if (!sure) {
+    const ai = await aiSuggest(auth, facts, folders).catch((err) => {
+      console.warn("folder suggestion: AI unavailable", err instanceof Error ? err.message : err);
+      return [];
+    });
+    if (ai.length) suggested = [...new Set([...ai, ...suggested])];
+  }
+  const links = findLinks(facts, await expertRefs(auth));
+  return { suggested, candidate, links };
 }
 
 /** The newest filed file with the same name once version marks are removed. */
