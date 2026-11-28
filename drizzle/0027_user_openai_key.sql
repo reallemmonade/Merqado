@@ -1,0 +1,1 @@
+ALTER TABLE `users` ADD `encrypted_openai_key` text;

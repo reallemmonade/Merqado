@@ -2,7 +2,9 @@ import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { getDb } from "@/db/client";
 import { NavTitleSwitch } from "@/components/NavTitleSwitch";
+import { OpenAIKeySetting } from "@/components/OpenAIKeySetting";
 import { SettingsShell } from "@/components/SettingsShell";
+import { keyTail, userOpenAIKey } from "@/lib/voice/key";
 import { gmailStatus } from "@/lib/mail/gmail";
 import { initials } from "@/lib/prefs";
 import { getSessionUser } from "@/lib/session";
@@ -17,6 +19,7 @@ export default async function SettingsProfilePage({ searchParams }: { searchPara
   const user = await getSessionUser(db);
   if (!user) redirect("/welcome");
   const gmail = await gmailStatus(db, user.id);
+  const openaiKey = await userOpenAIKey(getDb(), user.id);
   const hideDesktopApp = /Electron\/|iPhone|iPad|Android/.test((await headers()).get("user-agent") ?? "");
 
   return (
@@ -33,6 +36,9 @@ export default async function SettingsProfilePage({ searchParams }: { searchPara
           </div>
         </div>
         <NavTitleSwitch />
+      </section>
+      <section className="card">
+        <OpenAIKeySetting tail={openaiKey ? keyTail(openaiKey) : null} />
       </section>
       <section className="card">
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>

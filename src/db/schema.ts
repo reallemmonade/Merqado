@@ -67,6 +67,8 @@ export const users = sqliteTable("users", {
   presence: text("presence", { enum: PRESENCE_STATUSES }).notNull().default("auto"),
   /** IANA time zone (e.g. "America/New_York"), picked up from the person's browser. Null until seen. */
   timeZone: text("time_zone"),
+  /** The person's own OpenAI key for desktop dictation, encrypted (see lib/crypto). Null when not set. */
+  encryptedOpenaiKey: text("encrypted_openai_key"),
   createdAt: createdAt(),
 });
 
