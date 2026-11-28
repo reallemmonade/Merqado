@@ -1,11 +1,12 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { desc, eq } from "drizzle-orm";
+import { asc, desc, eq } from "drizzle-orm";
 import { getDb } from "@/db/client";
-import { engagementMembers, engagements } from "@/db/schema";
+import { engagementMembers, engagements, firmMembers, firmRoles, firms, users } from "@/db/schema";
 import { AppNav } from "@/components/AppNav";
 import { NewEngagement } from "@/components/NewEngagement";
 import { needsYouCount } from "@/lib/inbox/status";
+import { parseStandard } from "@/lib/onboarding/model";
 import { getSessionUser } from "@/lib/session";
 
 export const dynamic = "force-dynamic";
@@ -17,7 +18,7 @@ export default async function Home() {
   const user = await getSessionUser(db);
   if (!user) redirect("/welcome");
 
-  const [rows, needsYou] = await Promise.all([
+  const [rows, needsYou, people, firm] = await Promise.all([
     db
       .select({ id: engagements.id, clientName: engagements.clientName, title: engagements.title, status: engagements.status })
       .from(engagements)
@@ -25,7 +26,16 @@ export default async function Home() {
       .where(eq(engagementMembers.userId, user.id))
       .orderBy(desc(engagements.createdAt)),
     needsYouCount(db, user.id),
+    db
+      .select({ id: users.id, name: users.name, archetype: firmRoles.archetype })
+      .from(firmMembers)
+      .innerJoin(users, eq(users.id, firmMembers.userId))
+      .innerJoin(firmRoles, eq(firmRoles.id, firmMembers.firmRoleId))
+      .where(eq(firmMembers.firmId, user.firmId))
+      .orderBy(asc(users.name)),
+    db.query.firms.findFirst({ where: eq(firms.id, user.firmId), columns: { onboardingStandard: true } }),
   ]);
+  const standard = parseStandard(firm?.onboardingStandard);
 
   return (
     <div className="shell">
@@ -48,7 +58,7 @@ export default async function Home() {
             </div>
           ))}
           {rows.length === 0 && <p className="muted">No cases</p>}
-          <NewEngagement />
+          <NewEngagement me={user.id} people={people} standard={standard} />
         </section>
       </main>
     </div>
